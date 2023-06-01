@@ -37,11 +37,14 @@ func TestEngine_DeleteCompiledModule(t *testing.T) {
 // TestEngine_CompileModule tracks what can be compiled with the current implementation.
 // This will be eventually removed after wazevo reaches some maturity (e.g. passing v1 spectest).
 func TestEngine_CompileModule(t *testing.T) {
+	vv := wasm.FunctionType{}
+
 	for _, tc := range []struct {
 		name string
 		m    *wasm.Module
 	}{
 		{name: "empty", m: &wasm.Module{}},
+		{name: "empty return", m: singleFunctionModule(vv, []byte{wasm.OpcodeReturn}, nil)},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -49,5 +52,16 @@ func TestEngine_CompileModule(t *testing.T) {
 			err := e.CompileModule(ctx, tc.m, nil, false)
 			require.NoError(t, err)
 		})
+	}
+}
+
+func singleFunctionModule(typ wasm.FunctionType, body []byte, localTypes []wasm.ValueType) *wasm.Module {
+	return &wasm.Module{
+		TypeSection:     []wasm.FunctionType{typ},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			LocalTypes: localTypes,
+			Body:       body,
+		}},
 	}
 }

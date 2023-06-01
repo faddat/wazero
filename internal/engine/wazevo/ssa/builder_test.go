@@ -4,10 +4,9 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestNewBuilder(t *testing.T) {
-	b := NewBuilder(&wasm.Module{})
+	b := NewBuilder()
 	require.NotNil(t, b)
 }

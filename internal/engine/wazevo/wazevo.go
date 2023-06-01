@@ -2,11 +2,17 @@ package wazevo
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/frontend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/filecache"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -18,7 +24,14 @@ type (
 	}
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
-	compiledModule struct{}
+	compiledModule struct {
+		executable        []byte
+		compiledFunctions []compiledFunction
+	}
+
+	compiledFunction struct {
+		offsetInExecutable int
+	}
 )
 
 var _ wasm.Engine = (*engine)(nil)
@@ -38,7 +51,78 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		return nil
 	}
 
-	panic("implement me")
+	var totalSize int
+	bodies := make([][]byte, localFns)
+
+	ssaBuilder := ssa.NewBuilder()
+	fe, be := frontend.NewFrontendCompiler(module, ssaBuilder), backend.NewBackendCompiler(ssaBuilder)
+	for i := range module.CodeSection {
+		typ := &module.TypeSection[module.FunctionSection[i]]
+
+		codeSeg := &module.CodeSection[i]
+		if codeSeg.GoFunc != nil {
+			panic("TODO: host module")
+		}
+
+		fe.Init(wasm.Index(i), typ, codeSeg.LocalTypes, codeSeg.Body)
+
+		// Lower Wasm to SSA.
+		err := fe.LowerToSSA()
+		if err != nil {
+			return fmt.Errorf("wasm->ssa: %v", err)
+		}
+
+		// Now our ssaBuilder contains the necessary information to further lower them to
+		// machine code.
+		body, err := be.Generate()
+		if err != nil {
+			return fmt.Errorf("ssa->machine code: %v", err)
+		}
+
+		totalSize += len(body)
+
+		// TODO: optimize as zero copy.
+		copied := make([]byte, len(body))
+		copy(copied, body)
+		bodies[i] = copied
+
+		// Now we've generated machine code, so reset the backend's state,
+		// make it ready for the next iteration.
+		be.Reset()
+	}
+
+	if totalSize == 0 {
+		// TODO: temporarily allowing empty code gen results until start implementing
+		// backend.
+		return nil
+	}
+
+	executable, err := platform.MmapCodeSegment(totalSize)
+	if err != nil {
+		panic(err)
+	}
+	cm.executable = executable
+	cm.compiledFunctions = make([]compiledFunction, localFns)
+
+	var offset int
+	for i, b := range bodies {
+		cm.compiledFunctions[i].offsetInExecutable = offset
+		copy(executable[offset:], b)
+
+		// Align 16-bytes boundary.
+		offset = (offset + len(b) + 15) &^ 15
+	}
+
+	// TODO: handle relocations w.r.t direct function calls.
+
+	if runtime.GOARCH == "arm64" {
+		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+		if err = platform.MprotectRX(executable); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Close implements wasm.Engine.
