@@ -13,8 +13,9 @@ type Compiler struct {
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
 
-	// Followings are reset by per function and prefixed by "wasm" to clarify
-	// they are input Wasm info.
+	wasmFunctionParamBeginInEntryBlock ssa.Variable
+
+	// Followings are reset by per function.
 
 	wasmLocalFunctionIndex wasm.Index
 	wasmFunctionTyp        *wasm.FunctionType
@@ -40,5 +41,39 @@ func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []was
 // After calling this, the caller will be able to access the SSA info in ssa.SSABuilder pased
 // when calling NewFrontendCompiler and can share them with the backend.
 func (c *Compiler) LowerToSSA() error {
+	entryBlock := c.ssaBuilder.AllocateBasicBlock()
+	c.ssaBuilder.SetCurrentBlock(entryBlock)
+
+	// TODO: add moduleContext param as a first argument, then adjust this to 1.
+	c.wasmFunctionParamBeginInEntryBlock = 0
+	c.declareFunctionParams(entryBlock)
+
+	// Declare locals.
 	return nil
+}
+
+func (c *Compiler) declareFunctionParams(entry ssa.BasicBlock) {
+	var paramVar = c.wasmFunctionParamBeginInEntryBlock
+	for _, pt := range c.wasmFunctionTyp.Params {
+		st := wasmToSSA(pt)
+		c.ssaBuilder.DeclareVariable(paramVar, st)
+
+		value := entry.AddParam(st)
+		c.ssaBuilder.DefineVariable(paramVar, value, entry)
+	}
+}
+
+func wasmToSSA(vt wasm.ValueType) ssa.Type {
+	switch vt {
+	case wasm.ValueTypeI32:
+		return ssa.TypeI32
+	case wasm.ValueTypeI64:
+		return ssa.TypeI64
+	case wasm.ValueTypeF32:
+		return ssa.TypeF32
+	case wasm.ValueTypeF64:
+		return ssa.TypeF64
+	default:
+		panic("TODO: " + wasm.ValueTypeName(vt))
+	}
 }

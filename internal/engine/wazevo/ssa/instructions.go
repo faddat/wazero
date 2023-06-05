@@ -7,6 +7,9 @@ type Opcode uint32
 // Opcode. Since Go doesn't have union type, we use this flattened type
 // for all instructions, and therefore each field has different meaning
 // depending on Opcode.
+//
+// Instruction implements Value because some instructions produces values
+// and can be used in subsequent instructions as inputs.
 type Instruction struct {
 	Opcode Opcode
 
