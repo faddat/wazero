@@ -3,12 +3,14 @@ package ssa
 type Type byte
 
 const (
-	TypeInvalid = 1 + iota
+	TypeInvalid Type = 1 + iota
 
 	// TypeI8 represents an integer type with 8 bits.
+	// TODO: do we need this?
 	TypeI8
 
 	// TypeI16 represents an integer type with 16 bits.
+	// TODO: do we need this?
 	TypeI16
 
 	// TypeI32 represents an integer type with 32 bits.

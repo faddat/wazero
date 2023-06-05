@@ -28,6 +28,9 @@ type (
 
 		// DefineVariable defines a variable in the `block` with value.
 		DefineVariable(variable Variable, value Value, block BasicBlock)
+
+		// AllocateInstruction returns a new Instruction.
+		AllocateInstruction() *Instruction
 	}
 
 	// BasicBlock represents the Basic Block of an SSA function.
@@ -42,7 +45,10 @@ type (
 
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
-	return &builder{variableAnnotations: make(map[Variable]string)}
+	return &builder{
+		variableAnnotations: make(map[Variable]string),
+		instructionsPool:    instructionsPool{index: instructionsPoolPageSize},
+	}
 }
 
 // builder implements Builder interface.
@@ -64,10 +70,15 @@ type builder struct {
 	// lastDefinitions track last definitions of a variable in each block.
 	lastDefinitions          []map[Variable]Value
 	lastDefinitionsResetTemp []Variable
+	instructions             []Instruction
+
+	instructionsPool instructionsPool
 }
 
 // Reset implements Builder.
 func (b *builder) Reset() {
+	b.instructionsPool.reset()
+
 	for i := 0; i < b.nextBasicBlock; i++ {
 		b.basicBlocks[i].reset()
 	}
@@ -86,6 +97,10 @@ func (b *builder) Reset() {
 			delete(defs, key)
 		}
 	}
+}
+
+func (b *builder) AllocateInstruction() *Instruction {
+	return b.instructionsPool.allocateInstruction()
 }
 
 // AllocateBasicBlock implements Builder.
@@ -169,4 +184,43 @@ func (bb *basicBlock) String() string {
 		ps[i] = bb.params[i].String()
 	}
 	return fmt.Sprintf("block[%d] (%s)", bb.id, strings.Join(ps, ","))
+}
+
+const instructionsPoolPageSize = 128
+
+type (
+	instructionsPoolPage = [instructionsPoolPageSize]Instruction
+	instructionsPool     struct {
+		pages []*instructionsPoolPage
+		index int
+	}
+)
+
+func (n *instructionsPool) allocateInstruction() *Instruction {
+	if n.index == instructionsPoolPageSize {
+		if len(n.pages) == cap(n.pages) {
+			n.pages = append(n.pages, new(instructionsPoolPage))
+		} else {
+			i := len(n.pages)
+			n.pages = n.pages[:i+1]
+			if n.pages[i] == nil {
+				n.pages[i] = new(instructionsPoolPage)
+			}
+		}
+		n.index = 0
+	}
+	ret := &n.pages[len(n.pages)-1][n.index]
+	n.index++
+	return ret
+}
+
+func (n *instructionsPool) reset() {
+	for _, ns := range n.pages {
+		pages := ns[:]
+		for i := range pages {
+			pages[i] = Instruction{}
+		}
+	}
+	n.pages = n.pages[:0]
+	n.index = instructionsPoolPageSize
 }

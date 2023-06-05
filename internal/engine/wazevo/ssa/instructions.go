@@ -1,5 +1,10 @@
 package ssa
 
+import (
+	"fmt"
+	"math"
+)
+
 // Opcode represents a SSA instruction.
 type Opcode uint32
 
@@ -11,10 +16,15 @@ type Opcode uint32
 // Instruction implements Value because some instructions produces values
 // and can be used in subsequent instructions as inputs.
 type Instruction struct {
-	Opcode Opcode
+	opcode Opcode
+	u64    uint64
+
+	typ Type
 
 	// TODO: adds fields
 }
+
+var instructionFormats = [opcodeEnd]func(instruction Instruction) string{}
 
 // Followings match the generated code from https://github.com/bytecodealliance/wasmtime/blob/v9.0.3/cranelift/codegen/meta/src/shared/instructions.rs
 // TODO: complete opcode comments.
@@ -936,401 +946,459 @@ const (
 	// `a = extract_vector x, y`. (BinaryImm8)
 	// Type inferred from `x`.
 	OpcodeExtractVector
+
+	opcodeEnd
 )
 
-// String implements fmt.Stringer.
-func (o Instruction) String() (ret string) {
-	switch o.Opcode {
-	case OpcodeJump:
-		panic("TODO: format for OpcodeJump")
-	case OpcodeBrz:
-		panic("TODO: format for OpcodeBrz")
-	case OpcodeBrnz:
-		panic("TODO: format for OpcodeBrnz")
-	case OpcodeBrTable:
-		panic("TODO: format for OpcodeBrTable")
-	case OpcodeDebugtrap:
-		panic("TODO: format for OpcodeDebugtrap")
-	case OpcodeTrap:
-		panic("TODO: format for OpcodeTrap")
-	case OpcodeTrapz:
-		panic("TODO: format for OpcodeTrapz")
-	case OpcodeResumableTrap:
-		panic("TODO: format for OpcodeResumableTrap")
-	case OpcodeTrapnz:
-		panic("TODO: format for OpcodeTrapnz")
-	case OpcodeResumableTrapnz:
-		panic("TODO: format for OpcodeResumableTrapnz")
-	case OpcodeReturn:
-		panic("TODO: format for OpcodeReturn")
-	case OpcodeCall:
-		panic("TODO: format for OpcodeCall")
-	case OpcodeCallIndirect:
-		panic("TODO: format for OpcodeCallIndirect")
-	case OpcodeFuncAddr:
-		panic("TODO: format for OpcodeFuncAddr")
-	case OpcodeSplat:
-		panic("TODO: format for OpcodeSplat")
-	case OpcodeSwizzle:
-		panic("TODO: format for OpcodeSwizzle")
-	case OpcodeInsertlane:
-		panic("TODO: format for OpcodeInsertlane")
-	case OpcodeExtractlane:
-		panic("TODO: format for OpcodeExtractlane")
-	case OpcodeSmin:
-		panic("TODO: format for OpcodeSmin")
-	case OpcodeUmin:
-		panic("TODO: format for OpcodeUmin")
-	case OpcodeSmax:
-		panic("TODO: format for OpcodeSmax")
-	case OpcodeUmax:
-		panic("TODO: format for OpcodeUmax")
-	case OpcodeAvgRound:
-		panic("TODO: format for OpcodeAvgRound")
-	case OpcodeUaddSat:
-		panic("TODO: format for OpcodeUaddSat")
-	case OpcodeSaddSat:
-		panic("TODO: format for OpcodeSaddSat")
-	case OpcodeUsubSat:
-		panic("TODO: format for OpcodeUsubSat")
-	case OpcodeSsubSat:
-		panic("TODO: format for OpcodeSsubSat")
-	case OpcodeLoad:
-		panic("TODO: format for OpcodeLoad")
-	case OpcodeStore:
-		panic("TODO: format for OpcodeStore")
-	case OpcodeUload8:
-		panic("TODO: format for OpcodeUload8")
-	case OpcodeSload8:
-		panic("TODO: format for OpcodeSload8")
-	case OpcodeIstore8:
-		panic("TODO: format for OpcodeIstore8")
-	case OpcodeUload16:
-		panic("TODO: format for OpcodeUload16")
-	case OpcodeSload16:
-		panic("TODO: format for OpcodeSload16")
-	case OpcodeIstore16:
-		panic("TODO: format for OpcodeIstore16")
-	case OpcodeUload32:
-		panic("TODO: format for OpcodeUload32")
-	case OpcodeSload32:
-		panic("TODO: format for OpcodeSload32")
-	case OpcodeIstore32:
-		panic("TODO: format for OpcodeIstore32")
-	case OpcodeUload8x8:
-		panic("TODO: format for OpcodeUload8x8")
-	case OpcodeSload8x8:
-		panic("TODO: format for OpcodeSload8x8")
-	case OpcodeUload16x4:
-		panic("TODO: format for OpcodeUload16x4")
-	case OpcodeSload16x4:
-		panic("TODO: format for OpcodeSload16x4")
-	case OpcodeUload32x2:
-		panic("TODO: format for OpcodeUload32x2")
-	case OpcodeSload32x2:
-		panic("TODO: format for OpcodeSload32x2")
-	case OpcodeStackLoad:
-		panic("TODO: format for OpcodeStackLoad")
-	case OpcodeStackStore:
-		panic("TODO: format for OpcodeStackStore")
-	case OpcodeStackAddr:
-		panic("TODO: format for OpcodeStackAddr")
-	case OpcodeDynamicStackLoad:
-		panic("TODO: format for OpcodeDynamicStackLoad")
-	case OpcodeDynamicStackStore:
-		panic("TODO: format for OpcodeDynamicStackStore")
-	case OpcodeDynamicStackAddr:
-		panic("TODO: format for OpcodeDynamicStackAddr")
-	case OpcodeGlobalValue:
-		panic("TODO: format for OpcodeGlobalValue")
-	case OpcodeSymbolValue:
-		panic("TODO: format for OpcodeSymbolValue")
-	case OpcodeTlsValue:
-		panic("TODO: format for OpcodeTlsValue")
-	case OpcodeHeapAddr:
-		panic("TODO: format for OpcodeHeapAddr")
-	case OpcodeHeapLoad:
-		panic("TODO: format for OpcodeHeapLoad")
-	case OpcodeHeapStore:
-		panic("TODO: format for OpcodeHeapStore")
-	case OpcodeGetPinnedReg:
-		panic("TODO: format for OpcodeGetPinnedReg")
-	case OpcodeSetPinnedReg:
-		panic("TODO: format for OpcodeSetPinnedReg")
-	case OpcodeGetFramePointer:
-		panic("TODO: format for OpcodeGetFramePointer")
-	case OpcodeGetStackPointer:
-		panic("TODO: format for OpcodeGetStackPointer")
-	case OpcodeGetReturnAddress:
-		panic("TODO: format for OpcodeGetReturnAddress")
-	case OpcodeTableAddr:
-		panic("TODO: format for OpcodeTableAddr")
-	case OpcodeIconst:
-		panic("TODO: format for OpcodeIconst")
-	case OpcodeF32const:
-		panic("TODO: format for OpcodeF32const")
-	case OpcodeF64const:
-		panic("TODO: format for OpcodeF64const")
-	case OpcodeVconst:
-		panic("TODO: format for OpcodeVconst")
-	case OpcodeShuffle:
-		panic("TODO: format for OpcodeShuffle")
-	case OpcodeNull:
-		panic("TODO: format for OpcodeNull")
-	case OpcodeNop:
-		panic("TODO: format for OpcodeNop")
-	case OpcodeSelect:
-		panic("TODO: format for OpcodeSelect")
-	case OpcodeSelectSpectreGuard:
-		panic("TODO: format for OpcodeSelectSpectreGuard")
-	case OpcodeBitselect:
-		panic("TODO: format for OpcodeBitselect")
-	case OpcodeVsplit:
-		panic("TODO: format for OpcodeVsplit")
-	case OpcodeVconcat:
-		panic("TODO: format for OpcodeVconcat")
-	case OpcodeVselect:
-		panic("TODO: format for OpcodeVselect")
-	case OpcodeVanyTrue:
-		panic("TODO: format for OpcodeVanyTrue")
-	case OpcodeVallTrue:
-		panic("TODO: format for OpcodeVallTrue")
-	case OpcodeVhighBits:
-		panic("TODO: format for OpcodeVhighBits")
-	case OpcodeIcmp:
-		panic("TODO: format for OpcodeIcmp")
-	case OpcodeIcmpImm:
-		panic("TODO: format for OpcodeIcmpImm")
-	case OpcodeIfcmp:
-		panic("TODO: format for OpcodeIfcmp")
-	case OpcodeIfcmpImm:
-		panic("TODO: format for OpcodeIfcmpImm")
-	case OpcodeIadd:
-		panic("TODO: format for OpcodeIadd")
-	case OpcodeIsub:
-		panic("TODO: format for OpcodeIsub")
-	case OpcodeIneg:
-		panic("TODO: format for OpcodeIneg")
-	case OpcodeIabs:
-		panic("TODO: format for OpcodeIabs")
-	case OpcodeImul:
-		panic("TODO: format for OpcodeImul")
-	case OpcodeUmulhi:
-		panic("TODO: format for OpcodeUmulhi")
-	case OpcodeSmulhi:
-		panic("TODO: format for OpcodeSmulhi")
-	case OpcodeSqmulRoundSat:
-		panic("TODO: format for OpcodeSqmulRoundSat")
-	case OpcodeUdiv:
-		panic("TODO: format for OpcodeUdiv")
-	case OpcodeSdiv:
-		panic("TODO: format for OpcodeSdiv")
-	case OpcodeUrem:
-		panic("TODO: format for OpcodeUrem")
-	case OpcodeSrem:
-		panic("TODO: format for OpcodeSrem")
-	case OpcodeIaddImm:
-		panic("TODO: format for OpcodeIaddImm")
-	case OpcodeImulImm:
-		panic("TODO: format for OpcodeImulImm")
-	case OpcodeUdivImm:
-		panic("TODO: format for OpcodeUdivImm")
-	case OpcodeSdivImm:
-		panic("TODO: format for OpcodeSdivImm")
-	case OpcodeUremImm:
-		panic("TODO: format for OpcodeUremImm")
-	case OpcodeSremImm:
-		panic("TODO: format for OpcodeSremImm")
-	case OpcodeIrsubImm:
-		panic("TODO: format for OpcodeIrsubImm")
-	case OpcodeIaddCin:
-		panic("TODO: format for OpcodeIaddCin")
-	case OpcodeIaddIfcin:
-		panic("TODO: format for OpcodeIaddIfcin")
-	case OpcodeIaddCout:
-		panic("TODO: format for OpcodeIaddCout")
-	case OpcodeIaddIfcout:
-		panic("TODO: format for OpcodeIaddIfcout")
-	case OpcodeIaddCarry:
-		panic("TODO: format for OpcodeIaddCarry")
-	case OpcodeIaddIfcarry:
-		panic("TODO: format for OpcodeIaddIfcarry")
-	case OpcodeUaddOverflowTrap:
-		panic("TODO: format for OpcodeUaddOverflowTrap")
-	case OpcodeIsubBin:
-		panic("TODO: format for OpcodeIsubBin")
-	case OpcodeIsubIfbin:
-		panic("TODO: format for OpcodeIsubIfbin")
-	case OpcodeIsubBout:
-		panic("TODO: format for OpcodeIsubBout")
-	case OpcodeIsubIfbout:
-		panic("TODO: format for OpcodeIsubIfbout")
-	case OpcodeIsubBorrow:
-		panic("TODO: format for OpcodeIsubBorrow")
-	case OpcodeIsubIfborrow:
-		panic("TODO: format for OpcodeIsubIfborrow")
-	case OpcodeBand:
-		panic("TODO: format for OpcodeBand")
-	case OpcodeBor:
-		panic("TODO: format for OpcodeBor")
-	case OpcodeBxor:
-		panic("TODO: format for OpcodeBxor")
-	case OpcodeBnot:
-		panic("TODO: format for OpcodeBnot")
-	case OpcodeBandNot:
-		panic("TODO: format for OpcodeBandNot")
-	case OpcodeBorNot:
-		panic("TODO: format for OpcodeBorNot")
-	case OpcodeBxorNot:
-		panic("TODO: format for OpcodeBxorNot")
-	case OpcodeBandImm:
-		panic("TODO: format for OpcodeBandImm")
-	case OpcodeBorImm:
-		panic("TODO: format for OpcodeBorImm")
-	case OpcodeBxorImm:
-		panic("TODO: format for OpcodeBxorImm")
-	case OpcodeRotl:
-		panic("TODO: format for OpcodeRotl")
-	case OpcodeRotr:
-		panic("TODO: format for OpcodeRotr")
-	case OpcodeRotlImm:
-		panic("TODO: format for OpcodeRotlImm")
-	case OpcodeRotrImm:
-		panic("TODO: format for OpcodeRotrImm")
-	case OpcodeIshl:
-		panic("TODO: format for OpcodeIshl")
-	case OpcodeUshr:
-		panic("TODO: format for OpcodeUshr")
-	case OpcodeSshr:
-		panic("TODO: format for OpcodeSshr")
-	case OpcodeIshlImm:
-		panic("TODO: format for OpcodeIshlImm")
-	case OpcodeUshrImm:
-		panic("TODO: format for OpcodeUshrImm")
-	case OpcodeSshrImm:
-		panic("TODO: format for OpcodeSshrImm")
-	case OpcodeBitrev:
-		panic("TODO: format for OpcodeBitrev")
-	case OpcodeClz:
-		panic("TODO: format for OpcodeClz")
-	case OpcodeCls:
-		panic("TODO: format for OpcodeCls")
-	case OpcodeCtz:
-		panic("TODO: format for OpcodeCtz")
-	case OpcodeBswap:
-		panic("TODO: format for OpcodeBswap")
-	case OpcodePopcnt:
-		panic("TODO: format for OpcodePopcnt")
-	case OpcodeFcmp:
-		panic("TODO: format for OpcodeFcmp")
-	case OpcodeFfcmp:
-		panic("TODO: format for OpcodeFfcmp")
-	case OpcodeFadd:
-		panic("TODO: format for OpcodeFadd")
-	case OpcodeFsub:
-		panic("TODO: format for OpcodeFsub")
-	case OpcodeFmul:
-		panic("TODO: format for OpcodeFmul")
-	case OpcodeFdiv:
-		panic("TODO: format for OpcodeFdiv")
-	case OpcodeSqrt:
-		panic("TODO: format for OpcodeSqrt")
-	case OpcodeFma:
-		panic("TODO: format for OpcodeFma")
-	case OpcodeFneg:
-		panic("TODO: format for OpcodeFneg")
-	case OpcodeFabs:
-		panic("TODO: format for OpcodeFabs")
-	case OpcodeFcopysign:
-		panic("TODO: format for OpcodeFcopysign")
-	case OpcodeFmin:
-		panic("TODO: format for OpcodeFmin")
-	case OpcodeFminPseudo:
-		panic("TODO: format for OpcodeFminPseudo")
-	case OpcodeFmax:
-		panic("TODO: format for OpcodeFmax")
-	case OpcodeFmaxPseudo:
-		panic("TODO: format for OpcodeFmaxPseudo")
-	case OpcodeCeil:
-		panic("TODO: format for OpcodeCeil")
-	case OpcodeFloor:
-		panic("TODO: format for OpcodeFloor")
-	case OpcodeTrunc:
-		panic("TODO: format for OpcodeTrunc")
-	case OpcodeNearest:
-		panic("TODO: format for OpcodeNearest")
-	case OpcodeIsNull:
-		panic("TODO: format for OpcodeIsNull")
-	case OpcodeIsInvalid:
-		panic("TODO: format for OpcodeIsInvalid")
-	case OpcodeBitcast:
-		panic("TODO: format for OpcodeBitcast")
-	case OpcodeScalarToVector:
-		panic("TODO: format for OpcodeScalarToVector")
-	case OpcodeBmask:
-		panic("TODO: format for OpcodeBmask")
-	case OpcodeIreduce:
-		panic("TODO: format for OpcodeIreduce")
-	case OpcodeSnarrow:
-		panic("TODO: format for OpcodeSnarrow")
-	case OpcodeUnarrow:
-		panic("TODO: format for OpcodeUnarrow")
-	case OpcodeUunarrow:
-		panic("TODO: format for OpcodeUunarrow")
-	case OpcodeSwidenLow:
-		panic("TODO: format for OpcodeSwidenLow")
-	case OpcodeSwidenHigh:
-		panic("TODO: format for OpcodeSwidenHigh")
-	case OpcodeUwidenLow:
-		panic("TODO: format for OpcodeUwidenLow")
-	case OpcodeUwidenHigh:
-		panic("TODO: format for OpcodeUwidenHigh")
-	case OpcodeIaddPairwise:
-		panic("TODO: format for OpcodeIaddPairwise")
-	case OpcodeWideningPairwiseDotProductS:
-		panic("TODO: format for OpcodeWideningPairwiseDotProductS")
-	case OpcodeUextend:
-		panic("TODO: format for OpcodeUextend")
-	case OpcodeSextend:
-		panic("TODO: format for OpcodeSextend")
-	case OpcodeFpromote:
-		panic("TODO: format for OpcodeFpromote")
-	case OpcodeFdemote:
-		panic("TODO: format for OpcodeFdemote")
-	case OpcodeFvdemote:
-		panic("TODO: format for OpcodeFvdemote")
-	case OpcodeFvpromoteLow:
-		panic("TODO: format for OpcodeFvpromoteLow")
-	case OpcodeFcvtToUint:
-		panic("TODO: format for OpcodeFcvtToUint")
-	case OpcodeFcvtToSint:
-		panic("TODO: format for OpcodeFcvtToSint")
-	case OpcodeFcvtToUintSat:
-		panic("TODO: format for OpcodeFcvtToUintSat")
-	case OpcodeFcvtToSintSat:
-		panic("TODO: format for OpcodeFcvtToSintSat")
-	case OpcodeFcvtFromUint:
-		panic("TODO: format for OpcodeFcvtFromUint")
-	case OpcodeFcvtFromSint:
-		panic("TODO: format for OpcodeFcvtFromSint")
-	case OpcodeFcvtLowFromSint:
-		panic("TODO: format for OpcodeFcvtLowFromSint")
-	case OpcodeIsplit:
-		panic("TODO: format for OpcodeIsplit")
-	case OpcodeIconcat:
-		panic("TODO: format for OpcodeIconcat")
-	case OpcodeAtomicRmw:
-		panic("TODO: format for OpcodeAtomicRmw")
-	case OpcodeAtomicCas:
-		panic("TODO: format for OpcodeAtomicCas")
-	case OpcodeAtomicLoad:
-		panic("TODO: format for OpcodeAtomicLoad")
-	case OpcodeAtomicStore:
-		panic("TODO: format for OpcodeAtomicStore")
-	case OpcodeFence:
-		panic("TODO: format for OpcodeFence")
-	case OpcodeExtractVector:
-		panic("TODO: format for OpcodeExtractVector")
+func (i Instruction) AsIconst64(v uint64) {
+	i.opcode = OpcodeIconst
+	i.typ = TypeI64
+	i.u64 = v
+}
+
+func (i Instruction) AsIconst32(v uint32) {
+	i.opcode = OpcodeIconst
+	i.typ = TypeI32
+	i.u64 = uint64(v)
+}
+
+func init() {
+	instructionFormats[OpcodeIconst] = func(i Instruction) (ret string) {
+		switch i.typ {
+		case TypeI32:
+			ret = fmt.Sprintf("iconst_32 %#x", uint32(i.u64))
+		case TypeI64:
+			ret = fmt.Sprintf("iconst_64 %#x", i.u64)
+		}
+		return
 	}
-	return
+}
+
+func (i Instruction) AsF32const(f float32) {
+	i.opcode = OpcodeF32const
+	i.typ = TypeF64
+	i.u64 = uint64(math.Float32bits(f))
+}
+
+func (i Instruction) AsF64const(f float64) {
+	i.opcode = OpcodeF64const
+	i.typ = TypeF64
+	i.u64 = math.Float64bits(f)
+}
+
+func init() {
+	instructionFormats[OpcodeF32const] = func(i Instruction) (ret string) {
+		ret = fmt.Sprintf("f32const %f", math.Float32frombits(uint32(i.u64)))
+		return
+	}
+	instructionFormats[OpcodeF64const] = func(i Instruction) (ret string) {
+		ret = fmt.Sprintf("f64const %f", math.Float64frombits(i.u64))
+		return
+	}
+}
+
+// String implements fmt.Stringer.
+func (i Instruction) String() (ret string) {
+	fn := instructionFormats[i.opcode]
+	if fn == nil {
+		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
+	}
+	return fn(i)
+}
+
+// String implements fmt.Stringer.
+func (o Opcode) String() (ret string) {
+	switch o {
+	case OpcodeJump:
+		return "Jump"
+	case OpcodeBrz:
+		return "Brz"
+	case OpcodeBrnz:
+		return "Brnz"
+	case OpcodeBrTable:
+		return "BrTable"
+	case OpcodeDebugtrap:
+		return "Debugtrap"
+	case OpcodeTrap:
+		return "Trap"
+	case OpcodeTrapz:
+		return "Trapz"
+	case OpcodeResumableTrap:
+		return "ResumableTrap"
+	case OpcodeTrapnz:
+		return "Trapnz"
+	case OpcodeResumableTrapnz:
+		return "ResumableTrapnz"
+	case OpcodeReturn:
+		return "Return"
+	case OpcodeCall:
+		return "Call"
+	case OpcodeCallIndirect:
+		return "CallIndirect"
+	case OpcodeFuncAddr:
+		return "FuncAddr"
+	case OpcodeSplat:
+		return "Splat"
+	case OpcodeSwizzle:
+		return "Swizzle"
+	case OpcodeInsertlane:
+		return "Insertlane"
+	case OpcodeExtractlane:
+		return "Extractlane"
+	case OpcodeSmin:
+		return "Smin"
+	case OpcodeUmin:
+		return "Umin"
+	case OpcodeSmax:
+		return "Smax"
+	case OpcodeUmax:
+		return "Umax"
+	case OpcodeAvgRound:
+		return "AvgRound"
+	case OpcodeUaddSat:
+		return "UaddSat"
+	case OpcodeSaddSat:
+		return "SaddSat"
+	case OpcodeUsubSat:
+		return "UsubSat"
+	case OpcodeSsubSat:
+		return "SsubSat"
+	case OpcodeLoad:
+		return "Load"
+	case OpcodeStore:
+		return "Store"
+	case OpcodeUload8:
+		return "Uload8"
+	case OpcodeSload8:
+		return "Sload8"
+	case OpcodeIstore8:
+		return "Istore8"
+	case OpcodeUload16:
+		return "Uload16"
+	case OpcodeSload16:
+		return "Sload16"
+	case OpcodeIstore16:
+		return "Istore16"
+	case OpcodeUload32:
+		return "Uload32"
+	case OpcodeSload32:
+		return "Sload32"
+	case OpcodeIstore32:
+		return "Istore32"
+	case OpcodeUload8x8:
+		return "Uload8x8"
+	case OpcodeSload8x8:
+		return "Sload8x8"
+	case OpcodeUload16x4:
+		return "Uload16x4"
+	case OpcodeSload16x4:
+		return "Sload16x4"
+	case OpcodeUload32x2:
+		return "Uload32x2"
+	case OpcodeSload32x2:
+		return "Sload32x2"
+	case OpcodeStackLoad:
+		return "StackLoad"
+	case OpcodeStackStore:
+		return "StackStore"
+	case OpcodeStackAddr:
+		return "StackAddr"
+	case OpcodeDynamicStackLoad:
+		return "DynamicStackLoad"
+	case OpcodeDynamicStackStore:
+		return "DynamicStackStore"
+	case OpcodeDynamicStackAddr:
+		return "DynamicStackAddr"
+	case OpcodeGlobalValue:
+		return "GlobalValue"
+	case OpcodeSymbolValue:
+		return "SymbolValue"
+	case OpcodeTlsValue:
+		return "TlsValue"
+	case OpcodeHeapAddr:
+		return "HeapAddr"
+	case OpcodeHeapLoad:
+		return "HeapLoad"
+	case OpcodeHeapStore:
+		return "HeapStore"
+	case OpcodeGetPinnedReg:
+		return "GetPinnedReg"
+	case OpcodeSetPinnedReg:
+		return "SetPinnedReg"
+	case OpcodeGetFramePointer:
+		return "GetFramePointer"
+	case OpcodeGetStackPointer:
+		return "GetStackPointer"
+	case OpcodeGetReturnAddress:
+		return "GetReturnAddress"
+	case OpcodeTableAddr:
+		return "TableAddr"
+	case OpcodeIconst:
+		return "Iconst"
+	case OpcodeF32const:
+		return "F32const"
+	case OpcodeF64const:
+		return "F64const"
+	case OpcodeVconst:
+		return "Vconst"
+	case OpcodeShuffle:
+		return "Shuffle"
+	case OpcodeNull:
+		return "Null"
+	case OpcodeNop:
+		return "Nop"
+	case OpcodeSelect:
+		return "Select"
+	case OpcodeSelectSpectreGuard:
+		return "SelectSpectreGuard"
+	case OpcodeBitselect:
+		return "Bitselect"
+	case OpcodeVsplit:
+		return "Vsplit"
+	case OpcodeVconcat:
+		return "Vconcat"
+	case OpcodeVselect:
+		return "Vselect"
+	case OpcodeVanyTrue:
+		return "VanyTrue"
+	case OpcodeVallTrue:
+		return "VallTrue"
+	case OpcodeVhighBits:
+		return "VhighBits"
+	case OpcodeIcmp:
+		return "Icmp"
+	case OpcodeIcmpImm:
+		return "IcmpImm"
+	case OpcodeIfcmp:
+		return "Ifcmp"
+	case OpcodeIfcmpImm:
+		return "IfcmpImm"
+	case OpcodeIadd:
+		return "Iadd"
+	case OpcodeIsub:
+		return "Isub"
+	case OpcodeIneg:
+		return "Ineg"
+	case OpcodeIabs:
+		return "Iabs"
+	case OpcodeImul:
+		return "Imul"
+	case OpcodeUmulhi:
+		return "Umulhi"
+	case OpcodeSmulhi:
+		return "Smulhi"
+	case OpcodeSqmulRoundSat:
+		return "SqmulRoundSat"
+	case OpcodeUdiv:
+		return "Udiv"
+	case OpcodeSdiv:
+		return "Sdiv"
+	case OpcodeUrem:
+		return "Urem"
+	case OpcodeSrem:
+		return "Srem"
+	case OpcodeIaddImm:
+		return "IaddImm"
+	case OpcodeImulImm:
+		return "ImulImm"
+	case OpcodeUdivImm:
+		return "UdivImm"
+	case OpcodeSdivImm:
+		return "SdivImm"
+	case OpcodeUremImm:
+		return "UremImm"
+	case OpcodeSremImm:
+		return "SremImm"
+	case OpcodeIrsubImm:
+		return "IrsubImm"
+	case OpcodeIaddCin:
+		return "IaddCin"
+	case OpcodeIaddIfcin:
+		return "IaddIfcin"
+	case OpcodeIaddCout:
+		return "IaddCout"
+	case OpcodeIaddIfcout:
+		return "IaddIfcout"
+	case OpcodeIaddCarry:
+		return "IaddCarry"
+	case OpcodeIaddIfcarry:
+		return "IaddIfcarry"
+	case OpcodeUaddOverflowTrap:
+		return "UaddOverflowTrap"
+	case OpcodeIsubBin:
+		return "IsubBin"
+	case OpcodeIsubIfbin:
+		return "IsubIfbin"
+	case OpcodeIsubBout:
+		return "IsubBout"
+	case OpcodeIsubIfbout:
+		return "IsubIfbout"
+	case OpcodeIsubBorrow:
+		return "IsubBorrow"
+	case OpcodeIsubIfborrow:
+		return "IsubIfborrow"
+	case OpcodeBand:
+		return "Band"
+	case OpcodeBor:
+		return "Bor"
+	case OpcodeBxor:
+		return "Bxor"
+	case OpcodeBnot:
+		return "Bnot"
+	case OpcodeBandNot:
+		return "BandNot"
+	case OpcodeBorNot:
+		return "BorNot"
+	case OpcodeBxorNot:
+		return "BxorNot"
+	case OpcodeBandImm:
+		return "BandImm"
+	case OpcodeBorImm:
+		return "BorImm"
+	case OpcodeBxorImm:
+		return "BxorImm"
+	case OpcodeRotl:
+		return "Rotl"
+	case OpcodeRotr:
+		return "Rotr"
+	case OpcodeRotlImm:
+		return "RotlImm"
+	case OpcodeRotrImm:
+		return "RotrImm"
+	case OpcodeIshl:
+		return "Ishl"
+	case OpcodeUshr:
+		return "Ushr"
+	case OpcodeSshr:
+		return "Sshr"
+	case OpcodeIshlImm:
+		return "IshlImm"
+	case OpcodeUshrImm:
+		return "UshrImm"
+	case OpcodeSshrImm:
+		return "SshrImm"
+	case OpcodeBitrev:
+		return "Bitrev"
+	case OpcodeClz:
+		return "Clz"
+	case OpcodeCls:
+		return "Cls"
+	case OpcodeCtz:
+		return "Ctz"
+	case OpcodeBswap:
+		return "Bswap"
+	case OpcodePopcnt:
+		return "Popcnt"
+	case OpcodeFcmp:
+		return "Fcmp"
+	case OpcodeFfcmp:
+		return "Ffcmp"
+	case OpcodeFadd:
+		return "Fadd"
+	case OpcodeFsub:
+		return "Fsub"
+	case OpcodeFmul:
+		return "Fmul"
+	case OpcodeFdiv:
+		return "Fdiv"
+	case OpcodeSqrt:
+		return "Sqrt"
+	case OpcodeFma:
+		return "Fma"
+	case OpcodeFneg:
+		return "Fneg"
+	case OpcodeFabs:
+		return "Fabs"
+	case OpcodeFcopysign:
+		return "Fcopysign"
+	case OpcodeFmin:
+		return "Fmin"
+	case OpcodeFminPseudo:
+		return "FminPseudo"
+	case OpcodeFmax:
+		return "Fmax"
+	case OpcodeFmaxPseudo:
+		return "FmaxPseudo"
+	case OpcodeCeil:
+		return "Ceil"
+	case OpcodeFloor:
+		return "Floor"
+	case OpcodeTrunc:
+		return "Trunc"
+	case OpcodeNearest:
+		return "Nearest"
+	case OpcodeIsNull:
+		return "IsNull"
+	case OpcodeIsInvalid:
+		return "IsInvalid"
+	case OpcodeBitcast:
+		return "Bitcast"
+	case OpcodeScalarToVector:
+		return "ScalarToVector"
+	case OpcodeBmask:
+		return "Bmask"
+	case OpcodeIreduce:
+		return "Ireduce"
+	case OpcodeSnarrow:
+		return "Snarrow"
+	case OpcodeUnarrow:
+		return "Unarrow"
+	case OpcodeUunarrow:
+		return "Uunarrow"
+	case OpcodeSwidenLow:
+		return "SwidenLow"
+	case OpcodeSwidenHigh:
+		return "SwidenHigh"
+	case OpcodeUwidenLow:
+		return "UwidenLow"
+	case OpcodeUwidenHigh:
+		return "UwidenHigh"
+	case OpcodeIaddPairwise:
+		return "IaddPairwise"
+	case OpcodeWideningPairwiseDotProductS:
+		return "WideningPairwiseDotProductS"
+	case OpcodeUextend:
+		return "Uextend"
+	case OpcodeSextend:
+		return "Sextend"
+	case OpcodeFpromote:
+		return "Fpromote"
+	case OpcodeFdemote:
+		return "Fdemote"
+	case OpcodeFvdemote:
+		return "Fvdemote"
+	case OpcodeFvpromoteLow:
+		return "FvpromoteLow"
+	case OpcodeFcvtToUint:
+		return "FcvtToUint"
+	case OpcodeFcvtToSint:
+		return "FcvtToSint"
+	case OpcodeFcvtToUintSat:
+		return "FcvtToUintSat"
+	case OpcodeFcvtToSintSat:
+		return "FcvtToSintSat"
+	case OpcodeFcvtFromUint:
+		return "FcvtFromUint"
+	case OpcodeFcvtFromSint:
+		return "FcvtFromSint"
+	case OpcodeFcvtLowFromSint:
+		return "FcvtLowFromSint"
+	case OpcodeIsplit:
+		return "Isplit"
+	case OpcodeIconcat:
+		return "Iconcat"
+	case OpcodeAtomicRmw:
+		return "AtomicRmw"
+	case OpcodeAtomicCas:
+		return "AtomicCas"
+	case OpcodeAtomicLoad:
+		return "AtomicLoad"
+	case OpcodeAtomicStore:
+		return "AtomicStore"
+	case OpcodeFence:
+		return "Fence"
+	case OpcodeExtractVector:
+		return "ExtractVector"
+	}
+	panic(fmt.Sprintf("unknown opcode %d", o))
 }
