@@ -45,6 +45,9 @@ type (
 		// Param returns Value which corresponds to the i-th parameter of this block.
 		Param(i int) Value
 
+		// Params returns the number of parameters to this block.
+		Params() int
+
 		// InsertInstruction inserts an instruction that implements Value into the tail of this block.
 		InsertInstruction(raw Value)
 	}
@@ -181,6 +184,11 @@ func (bb *basicBlock) AddParam(typ Type) Value {
 	n := len(bb.params)
 	bb.params = append(bb.params, blockParam{bb: bb, typ: typ, n: n})
 	return &bb.params[n]
+}
+
+// Params implements BasicBlock.
+func (bb *basicBlock) Params() int {
+	return len(bb.params)
 }
 
 // InsertInstruction implements BasicBlock.

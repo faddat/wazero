@@ -59,7 +59,7 @@ func (c *Compiler) LowerToSSA() error {
 	//endBlock := c.ssaBuilder.AllocateBasicBlock()
 	//c.declareWasmFunctionReturns(endBlock)
 
-	c.lowerBody()
+	c.lowerBody(entryBlock)
 	return nil
 }
 

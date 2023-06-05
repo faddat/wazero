@@ -70,7 +70,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret controlFrame) {
 	return l.controlFrames[tail-n]
 }
 
-func (c *Compiler) lowerBody() {
+func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 	// Pushes the empty control frame which corresponds to the function return.
 	c.loweringState.ctrlPush(controlFrame{})
 
