@@ -16,6 +16,8 @@ type Compiler struct {
 
 	nextVariable ssa.Variable
 
+	loweringState loweringState
+
 	// Followings are reset by per function.
 
 	wasmLocalFunctionIndex wasm.Index
@@ -31,7 +33,8 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
 
 // Init initializes the state of frontendCompiler and make it ready for a next function.
 func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []wasm.ValueType, body []byte) {
-	c.ssaBuilder.Reset() // Clears the previous state.
+	c.ssaBuilder.Reset()
+	c.loweringState.reset()
 	c.nextVariable = 0
 
 	c.wasmLocalFunctionIndex = idx
@@ -44,18 +47,23 @@ func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []was
 // After calling this, the caller will be able to access the SSA info in ssa.SSABuilder pased
 // when calling NewFrontendCompiler and can share them with the backend.
 func (c *Compiler) LowerToSSA() error {
+	// Set up the entry block.
 	entryBlock := c.ssaBuilder.AllocateBasicBlock()
 	c.ssaBuilder.SetCurrentBlock(entryBlock)
-
 	// TODO: add moduleContext param as a first argument, then adjust this to 1.
 	c.nextVariable = 0
-
-	c.declareWasmFunctionParam(entryBlock)
+	c.declareWasmFunctionParams(entryBlock)
 	c.declareWasmLocals(entryBlock)
+
+	// Set up the end block for function return.
+	//endBlock := c.ssaBuilder.AllocateBasicBlock()
+	//c.declareWasmFunctionReturns(endBlock)
+
+	c.lowerBody()
 	return nil
 }
 
-func (c *Compiler) declareWasmFunctionParam(entry ssa.BasicBlock) {
+func (c *Compiler) declareWasmFunctionParams(entry ssa.BasicBlock) {
 	for i, typ := range c.wasmFunctionTyp.Params {
 		variable := c.allocateVar()
 
@@ -87,12 +95,30 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 			zeroInst.AsF32const(0)
 		case ssa.TypeF64:
 			zeroInst.AsF64const(0)
+		default:
+			panic("TODO: " + wasm.ValueTypeName(typ))
 		}
 
 		c.ssaBuilder.DefineVariable(variable, zeroInst, entry)
 
 		// TODO: put this debugging info behind flag.
 		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_locals[%d]", i))
+	}
+}
+
+// TODO: I guess we don't need this.
+func (c *Compiler) declareWasmFunctionReturns(endBlock ssa.BasicBlock) {
+	for i, typ := range c.wasmFunctionTyp.Results {
+		variable := c.allocateVar()
+
+		st := wasmToSSA(typ)
+		c.ssaBuilder.DeclareVariable(variable, st)
+
+		value := endBlock.AddParam(st)
+		c.ssaBuilder.DefineVariable(variable, value, endBlock)
+
+		// TODO: put this debugging info behind flag.
+		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_returns[%d]", i))
 	}
 }
 

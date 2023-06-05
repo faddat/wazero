@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 // Opcode represents a SSA instruction.
@@ -18,13 +19,13 @@ type Opcode uint32
 type Instruction struct {
 	opcode Opcode
 	u64    uint64
+	vs     []Value
+	typ    Type
 
-	typ Type
-
-	// TODO: adds fields
+	prev, next *Instruction
 }
 
-var instructionFormats = [opcodeEnd]func(instruction Instruction) string{}
+var instructionFormats = [opcodeEnd]func(instruction *Instruction) string{}
 
 // Followings match the generated code from https://github.com/bytecodealliance/wasmtime/blob/v9.0.3/cranelift/codegen/meta/src/shared/instructions.rs
 // TODO: complete opcode comments.
@@ -950,20 +951,20 @@ const (
 	opcodeEnd
 )
 
-func (i Instruction) AsIconst64(v uint64) {
+func (i *Instruction) AsIconst64(v uint64) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
 	i.u64 = v
 }
 
-func (i Instruction) AsIconst32(v uint32) {
+func (i *Instruction) AsIconst32(v uint32) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u64 = uint64(v)
 }
 
 func init() {
-	instructionFormats[OpcodeIconst] = func(i Instruction) (ret string) {
+	instructionFormats[OpcodeIconst] = func(i *Instruction) (ret string) {
 		switch i.typ {
 		case TypeI32:
 			ret = fmt.Sprintf("iconst_32 %#x", uint32(i.u64))
@@ -974,31 +975,48 @@ func init() {
 	}
 }
 
-func (i Instruction) AsF32const(f float32) {
+func (i *Instruction) AsF32const(f float32) {
 	i.opcode = OpcodeF32const
 	i.typ = TypeF64
 	i.u64 = uint64(math.Float32bits(f))
 }
 
-func (i Instruction) AsF64const(f float64) {
+func (i *Instruction) AsF64const(f float64) {
 	i.opcode = OpcodeF64const
 	i.typ = TypeF64
 	i.u64 = math.Float64bits(f)
 }
 
 func init() {
-	instructionFormats[OpcodeF32const] = func(i Instruction) (ret string) {
+	instructionFormats[OpcodeF32const] = func(i *Instruction) (ret string) {
 		ret = fmt.Sprintf("f32const %f", math.Float32frombits(uint32(i.u64)))
 		return
 	}
-	instructionFormats[OpcodeF64const] = func(i Instruction) (ret string) {
+	instructionFormats[OpcodeF64const] = func(i *Instruction) (ret string) {
 		ret = fmt.Sprintf("f64const %f", math.Float64frombits(i.u64))
 		return
 	}
 }
 
+func (i *Instruction) AsReturn(vs []Value) {
+	i.opcode = OpcodeReturn
+	i.vs = vs
+}
+
+func init() {
+	instructionFormats[OpcodeReturn] = func(i *Instruction) (ret string) {
+		vs := make([]string, len(i.vs))
+		for idx := range vs {
+			vs[idx] = i.vs[idx].String()
+		}
+
+		ret = fmt.Sprintf("return %s", strings.Join(vs, ","))
+		return
+	}
+}
+
 // String implements fmt.Stringer.
-func (i Instruction) String() (ret string) {
+func (i *Instruction) String() (ret string) {
 	fn := instructionFormats[i.opcode]
 	if fn == nil {
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

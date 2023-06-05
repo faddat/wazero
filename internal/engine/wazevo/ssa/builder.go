@@ -27,10 +27,14 @@ type (
 		AnnotateVariable(variable Variable, annotation string)
 
 		// DefineVariable defines a variable in the `block` with value.
+		// The defining instruction will be inserted into the `block`.
 		DefineVariable(variable Variable, value Value, block BasicBlock)
 
 		// AllocateInstruction returns a new Instruction.
 		AllocateInstruction() *Instruction
+
+		// InsertInstruction executes BasicBlock.InsertInstruction for the currently handled basic block.
+		InsertInstruction(raw Value)
 	}
 
 	// BasicBlock represents the Basic Block of an SSA function.
@@ -40,6 +44,9 @@ type (
 
 		// Param returns Value which corresponds to the i-th parameter of this block.
 		Param(i int) Value
+
+		// InsertInstruction inserts an instruction that implements Value into the tail of this block.
+		InsertInstruction(raw Value)
 	}
 )
 
@@ -115,6 +122,11 @@ func (b *builder) AllocateBasicBlock() BasicBlock {
 	return ret
 }
 
+// InsertInstruction implements Builder.
+func (b *builder) InsertInstruction(raw Value) {
+	b.currentBB.InsertInstruction(raw)
+}
+
 // DefineVariable implements Builder.
 func (b *builder) DefineVariable(variable Variable, value Value, block BasicBlock) {
 	blockID := block.(*basicBlock).id
@@ -128,6 +140,8 @@ func (b *builder) DefineVariable(variable Variable, value Value, block BasicBloc
 
 	defs := b.lastDefinitions[blockID]
 	defs[variable] = value
+
+	block.InsertInstruction(value)
 }
 
 // SetCurrentBlock implements Builder.
@@ -157,8 +171,9 @@ func (b *builder) AnnotateVariable(variable Variable, annotation string) {
 
 // BasicBlock is an identifier of a basic block in a SSA-transformed function.
 type basicBlock struct {
-	id     int
-	params []blockParam
+	id           int
+	params       []blockParam
+	currentInstr *Instruction
 }
 
 // AddParam implements BasicBlock.
@@ -168,8 +183,20 @@ func (bb *basicBlock) AddParam(typ Type) Value {
 	return &bb.params[n]
 }
 
+// InsertInstruction implements BasicBlock.
+func (bb *basicBlock) InsertInstruction(raw Value) {
+	next := raw.(*Instruction)
+	current := bb.currentInstr
+	if current != nil {
+		current.next = next
+		next.prev = current
+	}
+	bb.currentInstr = next
+}
+
 func (bb *basicBlock) reset() {
 	bb.params = bb.params[:0]
+	bb.currentInstr = nil
 }
 
 // Param implements BasicBlock.
