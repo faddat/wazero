@@ -44,7 +44,7 @@ func TestEngine_CompileModule(t *testing.T) {
 		m    *wasm.Module
 	}{
 		{name: "empty", m: &wasm.Module{}},
-		{name: "empty return", m: singleFunctionModule(vv, []byte{wasm.OpcodeReturn}, nil)},
+		{name: "empty return", m: singleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

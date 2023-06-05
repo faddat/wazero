@@ -7,12 +7,16 @@ import (
 
 type (
 	loweringState struct {
-		values        []ssa.Value
-		controlFrames []controlFrame
-		unreachable   bool
-		pc            int
+		values           []ssa.Value
+		controlFrames    []controlFrame
+		unreachable      bool
+		unreachableDepth int
+		pc               int
 	}
 	controlFrame struct {
+		// originalStackLen holds the number of values on the Wasm stack
+		// when start executing this control frame minus params for the block.
+		originalStackLenWithoutParam int
 		// loopBlock is not nil if this is the loop.
 		loopBlock,
 		// followingBlock is the basic block we enter if we reach "end" of block.
@@ -29,6 +33,7 @@ func (l *loweringState) reset() {
 	l.controlFrames = l.controlFrames[:0]
 	l.pc = 0
 	l.unreachable = false
+	l.unreachableDepth = 0
 }
 
 func (l *loweringState) pop() (ret ssa.Value) {
@@ -82,11 +87,29 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 }
 
 func (c *Compiler) lowerOpcode(op wasm.Opcode) {
+	state := &c.loweringState
 	switch op {
 	case wasm.OpcodeReturn:
 		c.insertReturn()
+		state.unreachable = true
+
 	case wasm.OpcodeEnd:
-		ctrl := c.loweringState.ctrlPop()
+		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
+			state.unreachableDepth--
+			return
+		} else if unreachable {
+			ctrl := state.ctrlPop()
+			if ctrl.isReturn() {
+				return
+			}
+
+			state.values = state.values[:ctrl.originalStackLenWithoutParam]
+			c.ssaBuilder.SetCurrentBlock(ctrl.followingBlock)
+			// We do not need branching here because this is unreachable.
+			return
+		}
+
+		ctrl := state.ctrlPop()
 		if ctrl.isReturn() {
 			c.insertReturn()
 		}
@@ -99,12 +122,17 @@ func (c *Compiler) insertReturn() {
 
 	// Results is the view over c.loweringState.values, so we need to copy it.
 	// TODO: reuse the slice.
-	vs := make([]ssa.Value, len(results))
-	for i := range vs {
-		vs[i] = results[i]
-	}
+	vs := cloneValuesList(results)
 	instr.AsReturn(vs)
 	c.ssaBuilder.InsertInstruction(instr)
+}
+
+func cloneValuesList(in []ssa.Value) (ret []ssa.Value) {
+	ret = make([]ssa.Value, len(in))
+	for i := range ret {
+		ret[i] = in[i]
+	}
+	return
 }
 
 func (c *Compiler) results() int {

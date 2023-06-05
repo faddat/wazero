@@ -31,74 +31,73 @@ var instructionFormats = [opcodeEnd]func(instruction *Instruction) string{}
 // TODO: complete opcode comments.
 // TODO: there should be unnecessary opcodes.
 const (
-	// OpcodeJump ...
-	// `jump block, args`. (Jump)
+	// OpcodeJump takes the list of args to the `block` and unconditionally jumps to it.
 	OpcodeJump Opcode = 1 + iota
 
 	// OpcodeBrz ...
-	// `brz c, block, args`. (Branch)
+	// `brz c, block, args`.
 	// Type inferred from `c`.
 	OpcodeBrz
 
 	// OpcodeBrnz ...
-	// `brnz c, block, args`. (Branch)
+	// `brnz c, block, args`.
 	// Type inferred from `c`.
 	OpcodeBrnz
 
 	// OpcodeBrTable ...
-	// `br_table x, block, JT`. (BranchTable)
+	// `br_table x, block, JT`.
 	OpcodeBrTable
 
 	// OpcodeDebugtrap ...
-	// `debugtrap`. (NullAry)
+	// `debugtrap`.
 	OpcodeDebugtrap
 
 	// OpcodeTrap ...
-	// `trap code`. (Trap)
+	// `trap code`.
 	OpcodeTrap
 
 	// OpcodeTrapz ...
-	// `trapz c, code`. (CondTrap)
+	// `trapz c, code`.
 	// Type inferred from `c`.
 	OpcodeTrapz
 
 	// OpcodeResumableTrap ...
-	// `resumable_trap code`. (Trap)
+	// `resumable_trap code`.
 	OpcodeResumableTrap
 
 	// OpcodeTrapnz ...
-	// `trapnz c, code`. (CondTrap)
+	// `trapnz c, code`.
 	// Type inferred from `c`.
 	OpcodeTrapnz
 
 	// OpcodeResumableTrapnz ...
-	// `resumable_trapnz c, code`. (CondTrap)
+	// `resumable_trapnz c, code`.
 	// Type inferred from `c`.
 	OpcodeResumableTrapnz
 
 	// OpcodeReturn ...
-	// `return rvals`. (MultiAry)
+	// `return rvals`.
 	OpcodeReturn
 
 	// OpcodeCall ...
-	// `rvals = call FN, args`. (Call)
+	// `rvals = call FN, args`.
 	OpcodeCall
 
 	// OpcodeCallIndirect ...
-	// `rvals = call_indirect SIG, callee, args`. (CallIndirect)
+	// `rvals = call_indirect SIG, callee, args`.
 	// Type inferred from `callee`.
 	OpcodeCallIndirect
 
 	// OpcodeFuncAddr ...
-	// `addr = func_addr FN`. (FuncAddr)
+	// `addr = func_addr FN`.
 	OpcodeFuncAddr
 
 	// OpcodeSplat ...
-	// `a = splat x`. (Unary)
+	// `a = splat x`.
 	OpcodeSplat
 
 	// OpcodeSwizzle ...
-	// `a = swizzle x, y`. (Binary)
+	// `a = swizzle x, y`.
 	OpcodeSwizzle
 
 	// OpcodeInsertlane ...
@@ -112,208 +111,207 @@ const (
 	OpcodeExtractlane
 
 	// OpcodeSmin ...
-	// `a = smin x, y`. (Binary)
+	// `a = smin x, y`.
 	// Type inferred from `x`.
 	OpcodeSmin
 
 	// OpcodeUmin ...
-	// `a = umin x, y`. (Binary)
+	// `a = umin x, y`.
 	// Type inferred from `x`.
 	OpcodeUmin
 
 	// OpcodeSmax ...
-	// `a = smax x, y`. (Binary)
+	// `a = smax x, y`.
 	// Type inferred from `x`.
 	OpcodeSmax
 
 	// OpcodeUmax ...
-	// `a = umax x, y`. (Binary)
+	// `a = umax x, y`.
 	// Type inferred from `x`.
 	OpcodeUmax
 
 	// OpcodeAvgRound ...
-	// `a = avg_round x, y`. (Binary)
+	// `a = avg_round x, y`.
 	// Type inferred from `x`.
 	OpcodeAvgRound
 
 	// OpcodeUaddSat ...
-	// `a = uadd_sat x, y`. (Binary)
+	// `a = uadd_sat x, y`.
 	// Type inferred from `x`.
 	OpcodeUaddSat
 
 	// OpcodeSaddSat ...
-	// `a = sadd_sat x, y`. (Binary)
+	// `a = sadd_sat x, y`.
 	// Type inferred from `x`.
 	OpcodeSaddSat
 
 	// OpcodeUsubSat ...
-	// `a = usub_sat x, y`. (Binary)
+	// `a = usub_sat x, y`.
 	// Type inferred from `x`.
 	OpcodeUsubSat
 
 	// OpcodeSsubSat ...
-	// `a = ssub_sat x, y`. (Binary)
+	// `a = ssub_sat x, y`.
 	// Type inferred from `x`.
 	OpcodeSsubSat
 
 	// OpcodeLoad ...
-	// `a = load MemFlags, p, Offset`. (Load)
+	// `a = load MemFlags, p, Offset`.
 	OpcodeLoad
 
 	// OpcodeStore ...
-	// `store MemFlags, x, p, Offset`. (Store)
+	// `store MemFlags, x, p, Offset`.
 	// Type inferred from `x`.
 	OpcodeStore
 
 	// OpcodeUload8 ...
-	// `a = uload8 MemFlags, p, Offset`. (Load)
+	// `a = uload8 MemFlags, p, Offset`.
 	OpcodeUload8
 
 	// OpcodeSload8 ...
-	// `a = sload8 MemFlags, p, Offset`. (Load)
+	// `a = sload8 MemFlags, p, Offset`.
 	OpcodeSload8
 
 	// OpcodeIstore8 ...
-	// `istore8 MemFlags, x, p, Offset`. (Store)
+	// `istore8 MemFlags, x, p, Offset`.
 	// Type inferred from `x`.
 	OpcodeIstore8
 
 	// OpcodeUload16 ...
-	// `a = uload16 MemFlags, p, Offset`. (Load)
+	// `a = uload16 MemFlags, p, Offset`.
 	OpcodeUload16
 
 	// OpcodeSload16 ...
-	// `a = sload16 MemFlags, p, Offset`. (Load)
+	// `a = sload16 MemFlags, p, Offset`.
 	OpcodeSload16
 
 	// OpcodeIstore16 ...
-	// `istore16 MemFlags, x, p, Offset`. (Store)
+	// `istore16 MemFlags, x, p, Offset`.
 	// Type inferred from `x`.
 	OpcodeIstore16
 
 	// OpcodeUload32 ...
-	// `a = uload32 MemFlags, p, Offset`. (Load)
+	// `a = uload32 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeUload32
 
 	// OpcodeSload32 ...
-	// `a = sload32 MemFlags, p, Offset`. (Load)
+	// `a = sload32 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeSload32
 
 	// OpcodeIstore32 ...
-	// `istore32 MemFlags, x, p, Offset`. (Store)
+	// `istore32 MemFlags, x, p, Offset`.
 	// Type inferred from `x`.
 	OpcodeIstore32
 
 	// OpcodeUload8x8 ...
-	// `a = uload8x8 MemFlags, p, Offset`. (Load)
+	// `a = uload8x8 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeUload8x8
 
 	// OpcodeSload8x8 ...
-	// `a = sload8x8 MemFlags, p, Offset`. (Load)
+	// `a = sload8x8 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeSload8x8
 
 	// OpcodeUload16x4 ...
-	// `a = uload16x4 MemFlags, p, Offset`. (Load)
+	// `a = uload16x4 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeUload16x4
 
 	// OpcodeSload16x4 ...
-	// `a = sload16x4 MemFlags, p, Offset`. (Load)
+	// `a = sload16x4 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeSload16x4
 
 	// OpcodeUload32x2 ...
-	// `a = uload32x2 MemFlags, p, Offset`. (Load)
+	// `a = uload32x2 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeUload32x2
 
 	// OpcodeSload32x2 ...
-	// `a = sload32x2 MemFlags, p, Offset`. (Load)
+	// `a = sload32x2 MemFlags, p, Offset`.
 	// Type inferred from `p`.
 	OpcodeSload32x2
 
 	// OpcodeStackLoad ...
-	// `a = stack_load SS, Offset`. (StackLoad)
+	// `a = stack_load SS, Offset`.
 	OpcodeStackLoad
 
 	// OpcodeStackStore ...
-	// `stack_store x, SS, Offset`. (StackStore)
+	// `stack_store x, SS, Offset`.
 	// Type inferred from `x`.
 	OpcodeStackStore
 
 	// OpcodeStackAddr ...
-	// `addr = stack_addr SS, Offset`. (StackLoad)
+	// `addr = stack_addr SS, Offset`.
 	OpcodeStackAddr
 
 	// OpcodeDynamicStackLoad ...
-	// `a = dynamic_stack_load DSS`. (DynamicStackLoad)
+	// `a = dynamic_stack_load DSS`.
 	OpcodeDynamicStackLoad
 
 	// OpcodeDynamicStackStore ...
-	// `dynamic_stack_store x, DSS`. (DynamicStackStore)
+	// `dynamic_stack_store x, DSS`.
 	// Type inferred from `x`.
 	OpcodeDynamicStackStore
 
 	// OpcodeDynamicStackAddr ...
-	// `addr = dynamic_stack_addr DSS`. (DynamicStackLoad)
+	// `addr = dynamic_stack_addr DSS`.
 	OpcodeDynamicStackAddr
 
 	// OpcodeGlobalValue ...
-	// `a = global_value GV`. (UnaryGlobalValue)
+	// `a = global_value GV`.
 	OpcodeGlobalValue
 
 	// OpcodeSymbolValue ...
-	// `a = symbol_value GV`. (UnaryGlobalValue)
+	// `a = symbol_value GV`.
 	OpcodeSymbolValue
 
 	// OpcodeTlsValue ...
-	// `a = tls_value GV`. (UnaryGlobalValue)
+	// `a = tls_value GV`.
 	OpcodeTlsValue
 
 	// OpcodeHeapAddr ...
-	// `addr = heap_addr H, index, Offset, Size`. (HeapAddr)
+	// `addr = heap_addr H, index, Offset, Size`.
 	OpcodeHeapAddr
 
 	// OpcodeHeapLoad ...
-	// `a = heap_load heap_imm, index`. (HeapLoad)
+	// `a = heap_load heap_imm, index`.
 	OpcodeHeapLoad
 
 	// OpcodeHeapStore ...
-	// `heap_store heap_imm, index, a`. (HeapStore)
+	// `heap_store heap_imm, index, a`.
 	// Type inferred from `index`.
 	OpcodeHeapStore
 
 	// OpcodeGetPinnedReg ...
-	// `addr = get_pinned_reg`. (NullAry)
+	// `addr = get_pinned_reg`.
 	OpcodeGetPinnedReg
 
 	// OpcodeSetPinnedReg ...
-	// `set_pinned_reg addr`. (Unary)
+	// `set_pinned_reg addr`.
 	// Type inferred from `addr`.
 	OpcodeSetPinnedReg
 
 	// OpcodeGetFramePointer ...
-	// `addr = get_frame_pointer`. (NullAry)
+	// `addr = get_frame_pointer`.
 	OpcodeGetFramePointer
 
 	// OpcodeGetStackPointer ...
-	// `addr = get_stack_pointer`. (NullAry)
+	// `addr = get_stack_pointer`.
 	OpcodeGetStackPointer
 
 	// OpcodeGetReturnAddress ...
-	// `addr = get_return_address`. (NullAry)
+	// `addr = get_return_address`.
 	OpcodeGetReturnAddress
 
 	// OpcodeTableAddr ...
-	// `addr = table_addr T, p, Offset`. (TableAddr)
+	// `addr = table_addr T, p, Offset`.
 	OpcodeTableAddr
 
-	// OpcodeIconst ...
-	// `a = iconst N`. (UnaryImm)
+	// OpcodeIconst represents the integer const.
 	OpcodeIconst
 
 	// OpcodeF32const ...
@@ -325,77 +323,77 @@ const (
 	OpcodeF64const
 
 	// OpcodeVconst ...
-	// `a = vconst N`. (UnaryConst)
+	// `a = vconst N`.
 	OpcodeVconst
 
 	// OpcodeShuffle ...
-	// `a = shuffle a, b, mask`. (Shuffle)
+	// `a = shuffle a, b, mask`.
 	OpcodeShuffle
 
 	// OpcodeNull ...
-	// `a = null`. (NullAry)
+	// `a = null`.
 	OpcodeNull
 
 	// OpcodeNop ...
-	// `nop`. (NullAry)
+	// `nop`.
 	OpcodeNop
 
 	// OpcodeSelect ...
-	// `a = select c, x, y`. (Ternary)
+	// `a = select c, x, y`.
 	// Type inferred from `x`.
 	OpcodeSelect
 
 	// OpcodeSelectSpectreGuard ...
-	// `a = select_spectre_guard c, x, y`. (Ternary)
+	// `a = select_spectre_guard c, x, y`.
 	// Type inferred from `x`.
 	OpcodeSelectSpectreGuard
 
 	// OpcodeBitselect ...
-	// `a = bitselect c, x, y`. (Ternary)
+	// `a = bitselect c, x, y`.
 	// Type inferred from `x`.
 	OpcodeBitselect
 
 	// OpcodeVsplit ...
-	// `lo, hi = vsplit x`. (Unary)
+	// `lo, hi = vsplit x`.
 	// Type inferred from `x`.
 	OpcodeVsplit
 
 	// OpcodeVconcat ...
-	// `a = vconcat x, y`. (Binary)
+	// `a = vconcat x, y`.
 	// Type inferred from `x`.
 	OpcodeVconcat
 
 	// OpcodeVselect ...
-	// `a = vselect c, x, y`. (Ternary)
+	// `a = vselect c, x, y`.
 	// Type inferred from `x`.
 	OpcodeVselect
 
 	// OpcodeVanyTrue ...
-	// `s = vany_true a`. (Unary)
+	// `s = vany_true a`.
 	// Type inferred from `a`.
 	OpcodeVanyTrue
 
 	// OpcodeVallTrue ...
-	// `s = vall_true a`. (Unary)
+	// `s = vall_true a`.
 	// Type inferred from `a`.
 	OpcodeVallTrue
 
 	// OpcodeVhighBits ...
-	// `x = vhigh_bits a`. (Unary)
+	// `x = vhigh_bits a`.
 	OpcodeVhighBits
 
 	// OpcodeIcmp ...
-	// `a = icmp Cond, x, y`. (IntCompare)
+	// `a = icmp Cond, x, y`.
 	// Type inferred from `x`.
 	OpcodeIcmp
 
 	// OpcodeIcmpImm ...
-	// `a = icmp_imm Cond, x, Y`. (IntCompareImm)
+	// `a = icmp_imm Cond, x, Y`.
 	// Type inferred from `x`.
 	OpcodeIcmpImm
 
 	// OpcodeIfcmp ...
-	// `f = ifcmp x, y`. (Binary)
+	// `f = ifcmp x, y`.
 	// Type inferred from `x`.
 	OpcodeIfcmp
 
@@ -405,62 +403,62 @@ const (
 	OpcodeIfcmpImm
 
 	// OpcodeIadd ...
-	// `a = iadd x, y`. (Binary)
+	// `a = iadd x, y`.
 	// Type inferred from `x`.
 	OpcodeIadd
 
 	// OpcodeIsub ...
-	// `a = isub x, y`. (Binary)
+	// `a = isub x, y`.
 	// Type inferred from `x`.
 	OpcodeIsub
 
 	// OpcodeIneg ...
-	// `a = ineg x`. (Unary)
+	// `a = ineg x`.
 	// Type inferred from `x`.
 	OpcodeIneg
 
 	// OpcodeIabs ...
-	// `a = iabs x`. (Unary)
+	// `a = iabs x`.
 	// Type inferred from `x`.
 	OpcodeIabs
 
 	// OpcodeImul ...
-	// `a = imul x, y`. (Binary)
+	// `a = imul x, y`.
 	// Type inferred from `x`.
 	OpcodeImul
 
 	// OpcodeUmulhi ...
-	// `a = umulhi x, y`. (Binary)
+	// `a = umulhi x, y`.
 	// Type inferred from `x`.
 	OpcodeUmulhi
 
 	// OpcodeSmulhi ...
-	// `a = smulhi x, y`. (Binary)
+	// `a = smulhi x, y`.
 	// Type inferred from `x`.
 	OpcodeSmulhi
 
 	// OpcodeSqmulRoundSat ...
-	// `a = sqmul_round_sat x, y`. (Binary)
+	// `a = sqmul_round_sat x, y`.
 	// Type inferred from `x`.
 	OpcodeSqmulRoundSat
 
 	// OpcodeUdiv ...
-	// `a = udiv x, y`. (Binary)
+	// `a = udiv x, y`.
 	// Type inferred from `x`.
 	OpcodeUdiv
 
 	// OpcodeSdiv ...
-	// `a = sdiv x, y`. (Binary)
+	// `a = sdiv x, y`.
 	// Type inferred from `x`.
 	OpcodeSdiv
 
 	// OpcodeUrem ...
-	// `a = urem x, y`. (Binary)
+	// `a = urem x, y`.
 	// Type inferred from `x`.
 	OpcodeUrem
 
 	// OpcodeSrem ...
-	// `a = srem x, y`. (Binary)
+	// `a = srem x, y`.
 	// Type inferred from `x`.
 	OpcodeSrem
 
@@ -500,102 +498,102 @@ const (
 	OpcodeIrsubImm
 
 	// OpcodeIaddCin ...
-	// `a = iadd_cin x, y, c_in`. (Ternary)
+	// `a = iadd_cin x, y, c_in`.
 	// Type inferred from `y`.
 	OpcodeIaddCin
 
 	// OpcodeIaddIfcin ...
-	// `a = iadd_ifcin x, y, c_in`. (Ternary)
+	// `a = iadd_ifcin x, y, c_in`.
 	// Type inferred from `y`.
 	OpcodeIaddIfcin
 
 	// OpcodeIaddCout ...
-	// `a, c_out = iadd_cout x, y`. (Binary)
+	// `a, c_out = iadd_cout x, y`.
 	// Type inferred from `x`.
 	OpcodeIaddCout
 
 	// OpcodeIaddIfcout ...
-	// `a, c_out = iadd_ifcout x, y`. (Binary)
+	// `a, c_out = iadd_ifcout x, y`.
 	// Type inferred from `x`.
 	OpcodeIaddIfcout
 
 	// OpcodeIaddCarry ...
-	// `a, c_out = iadd_carry x, y, c_in`. (Ternary)
+	// `a, c_out = iadd_carry x, y, c_in`.
 	// Type inferred from `y`.
 	OpcodeIaddCarry
 
 	// OpcodeIaddIfcarry ...
-	// `a, c_out = iadd_ifcarry x, y, c_in`. (Ternary)
+	// `a, c_out = iadd_ifcarry x, y, c_in`.
 	// Type inferred from `y`.
 	OpcodeIaddIfcarry
 
 	// OpcodeUaddOverflowTrap ...
-	// `a = uadd_overflow_trap x, y, code`. (IntAddTrap)
+	// `a = uadd_overflow_trap x, y, code`.
 	// Type inferred from `x`.
 	OpcodeUaddOverflowTrap
 
 	// OpcodeIsubBin ...
-	// `a = isub_bin x, y, b_in`. (Ternary)
+	// `a = isub_bin x, y, b_in`.
 	// Type inferred from `y`.
 	OpcodeIsubBin
 
 	// OpcodeIsubIfbin ...
-	// `a = isub_ifbin x, y, b_in`. (Ternary)
+	// `a = isub_ifbin x, y, b_in`.
 	// Type inferred from `y`.
 	OpcodeIsubIfbin
 
 	// OpcodeIsubBout ...
-	// `a, b_out = isub_bout x, y`. (Binary)
+	// `a, b_out = isub_bout x, y`.
 	// Type inferred from `x`.
 	OpcodeIsubBout
 
 	// OpcodeIsubIfbout ...
-	// `a, b_out = isub_ifbout x, y`. (Binary)
+	// `a, b_out = isub_ifbout x, y`.
 	// Type inferred from `x`.
 	OpcodeIsubIfbout
 
 	// OpcodeIsubBorrow ...
-	// `a, b_out = isub_borrow x, y, b_in`. (Ternary)
+	// `a, b_out = isub_borrow x, y, b_in`.
 	// Type inferred from `y`.
 	OpcodeIsubBorrow
 
 	// OpcodeIsubIfborrow ...
-	// `a, b_out = isub_ifborrow x, y, b_in`. (Ternary)
+	// `a, b_out = isub_ifborrow x, y, b_in`.
 	// Type inferred from `y`.
 	OpcodeIsubIfborrow
 
 	// OpcodeBand ...
-	// `a = band x, y`. (Binary)
+	// `a = band x, y`.
 	// Type inferred from `x`.
 	OpcodeBand
 
 	// OpcodeBor ...
-	// `a = bor x, y`. (Binary)
+	// `a = bor x, y`.
 	// Type inferred from `x`.
 	OpcodeBor
 
 	// OpcodeBxor ...
-	// `a = bxor x, y`. (Binary)
+	// `a = bxor x, y`.
 	// Type inferred from `x`.
 	OpcodeBxor
 
 	// OpcodeBnot ...
-	// `a = bnot x`. (Unary)
+	// `a = bnot x`.
 	// Type inferred from `x`.
 	OpcodeBnot
 
 	// OpcodeBandNot ...
-	// `a = band_not x, y`. (Binary)
+	// `a = band_not x, y`.
 	// Type inferred from `x`.
 	OpcodeBandNot
 
 	// OpcodeBorNot ...
-	// `a = bor_not x, y`. (Binary)
+	// `a = bor_not x, y`.
 	// Type inferred from `x`.
 	OpcodeBorNot
 
 	// OpcodeBxorNot ...
-	// `a = bxor_not x, y`. (Binary)
+	// `a = bxor_not x, y`.
 	// Type inferred from `x`.
 	OpcodeBxorNot
 
@@ -615,12 +613,12 @@ const (
 	OpcodeBxorImm
 
 	// OpcodeRotl ...
-	// `a = rotl x, y`. (Binary)
+	// `a = rotl x, y`.
 	// Type inferred from `x`.
 	OpcodeRotl
 
 	// OpcodeRotr ...
-	// `a = rotr x, y`. (Binary)
+	// `a = rotr x, y`.
 	// Type inferred from `x`.
 	OpcodeRotr
 
@@ -635,17 +633,17 @@ const (
 	OpcodeRotrImm
 
 	// OpcodeIshl ...
-	// `a = ishl x, y`. (Binary)
+	// `a = ishl x, y`.
 	// Type inferred from `x`.
 	OpcodeIshl
 
 	// OpcodeUshr ...
-	// `a = ushr x, y`. (Binary)
+	// `a = ushr x, y`.
 	// Type inferred from `x`.
 	OpcodeUshr
 
 	// OpcodeSshr ...
-	// `a = sshr x, y`. (Binary)
+	// `a = sshr x, y`.
 	// Type inferred from `x`.
 	OpcodeSshr
 
@@ -665,282 +663,282 @@ const (
 	OpcodeSshrImm
 
 	// OpcodeBitrev ...
-	// `a = bitrev x`. (Unary)
+	// `a = bitrev x`.
 	// Type inferred from `x`.
 	OpcodeBitrev
 
 	// OpcodeClz ...
-	// `a = clz x`. (Unary)
+	// `a = clz x`.
 	// Type inferred from `x`.
 	OpcodeClz
 
 	// OpcodeCls ...
-	// `a = cls x`. (Unary)
+	// `a = cls x`.
 	// Type inferred from `x`.
 	OpcodeCls
 
 	// OpcodeCtz ...
-	// `a = ctz x`. (Unary)
+	// `a = ctz x`.
 	// Type inferred from `x`.
 	OpcodeCtz
 
 	// OpcodeBswap ...
-	// `a = bswap x`. (Unary)
+	// `a = bswap x`.
 	// Type inferred from `x`.
 	OpcodeBswap
 
 	// OpcodePopcnt ...
-	// `a = popcnt x`. (Unary)
+	// `a = popcnt x`.
 	// Type inferred from `x`.
 	OpcodePopcnt
 
 	// OpcodeFcmp ...
-	// `a = fcmp Cond, x, y`. (FloatCompare)
+	// `a = fcmp Cond, x, y`.
 	// Type inferred from `x`.
 	OpcodeFcmp
 
 	// OpcodeFfcmp ...
-	// `f = ffcmp x, y`. (Binary)
+	// `f = ffcmp x, y`.
 	// Type inferred from `x`.
 	OpcodeFfcmp
 
 	// OpcodeFadd ...
-	// `a = fadd x, y`. (Binary)
+	// `a = fadd x, y`.
 	// Type inferred from `x`.
 	OpcodeFadd
 
 	// OpcodeFsub ...
-	// `a = fsub x, y`. (Binary)
+	// `a = fsub x, y`.
 	// Type inferred from `x`.
 	OpcodeFsub
 
 	// OpcodeFmul ...
-	// `a = fmul x, y`. (Binary)
+	// `a = fmul x, y`.
 	// Type inferred from `x`.
 	OpcodeFmul
 
 	// OpcodeFdiv ...
-	// `a = fdiv x, y`. (Binary)
+	// `a = fdiv x, y`.
 	// Type inferred from `x`.
 	OpcodeFdiv
 
 	// OpcodeSqrt ...
-	// `a = sqrt x`. (Unary)
+	// `a = sqrt x`.
 	// Type inferred from `x`.
 	OpcodeSqrt
 
 	// OpcodeFma ...
-	// `a = fma x, y, z`. (Ternary)
+	// `a = fma x, y, z`.
 	// Type inferred from `y`.
 	OpcodeFma
 
 	// OpcodeFneg ...
-	// `a = fneg x`. (Unary)
+	// `a = fneg x`.
 	// Type inferred from `x`.
 	OpcodeFneg
 
 	// OpcodeFabs ...
-	// `a = fabs x`. (Unary)
+	// `a = fabs x`.
 	// Type inferred from `x`.
 	OpcodeFabs
 
 	// OpcodeFcopysign ...
-	// `a = fcopysign x, y`. (Binary)
+	// `a = fcopysign x, y`.
 	// Type inferred from `x`.
 	OpcodeFcopysign
 
 	// OpcodeFmin ...
-	// `a = fmin x, y`. (Binary)
+	// `a = fmin x, y`.
 	// Type inferred from `x`.
 	OpcodeFmin
 
 	// OpcodeFminPseudo ...
-	// `a = fmin_pseudo x, y`. (Binary)
+	// `a = fmin_pseudo x, y`.
 	// Type inferred from `x`.
 	OpcodeFminPseudo
 
 	// OpcodeFmax ...
-	// `a = fmax x, y`. (Binary)
+	// `a = fmax x, y`.
 	// Type inferred from `x`.
 	OpcodeFmax
 
 	// OpcodeFmaxPseudo ...
-	// `a = fmax_pseudo x, y`. (Binary)
+	// `a = fmax_pseudo x, y`.
 	// Type inferred from `x`.
 	OpcodeFmaxPseudo
 
 	// OpcodeCeil ...
-	// `a = ceil x`. (Unary)
+	// `a = ceil x`.
 	// Type inferred from `x`.
 	OpcodeCeil
 
 	// OpcodeFloor ...
-	// `a = floor x`. (Unary)
+	// `a = floor x`.
 	// Type inferred from `x`.
 	OpcodeFloor
 
 	// OpcodeTrunc ...
-	// `a = trunc x`. (Unary)
+	// `a = trunc x`.
 	// Type inferred from `x`.
 	OpcodeTrunc
 
 	// OpcodeNearest ...
-	// `a = nearest x`. (Unary)
+	// `a = nearest x`.
 	// Type inferred from `x`.
 	OpcodeNearest
 
 	// OpcodeIsNull ...
-	// `a = is_null x`. (Unary)
+	// `a = is_null x`.
 	// Type inferred from `x`.
 	OpcodeIsNull
 
 	// OpcodeIsInvalid ...
-	// `a = is_invalid x`. (Unary)
+	// `a = is_invalid x`.
 	// Type inferred from `x`.
 	OpcodeIsInvalid
 
 	// OpcodeBitcast ...
-	// `a = bitcast MemFlags, x`. (LoadNoOffset)
+	// `a = bitcast MemFlags, x`.
 	OpcodeBitcast
 
 	// OpcodeScalarToVector ...
-	// `a = scalar_to_vector s`. (Unary)
+	// `a = scalar_to_vector s`.
 	OpcodeScalarToVector
 
 	// OpcodeBmask ...
-	// `a = bmask x`. (Unary)
+	// `a = bmask x`.
 	OpcodeBmask
 
 	// OpcodeIreduce ...
-	// `a = ireduce x`. (Unary)
+	// `a = ireduce x`.
 	OpcodeIreduce
-	// `a = snarrow x, y`. (Binary)
+	// `a = snarrow x, y`.
 
 	// OpcodeSnarrow ...
 	// Type inferred from `x`.
 	OpcodeSnarrow
-	// `a = unarrow x, y`. (Binary)
+	// `a = unarrow x, y`.
 
 	// OpcodeUnarrow ...
 	// Type inferred from `x`.
 	OpcodeUnarrow
-	// `a = uunarrow x, y`. (Binary)
+	// `a = uunarrow x, y`.
 
 	// OpcodeUunarrow ...
 	// Type inferred from `x`.
 	OpcodeUunarrow
-	// `a = swiden_low x`. (Unary)
+	// `a = swiden_low x`.
 
 	// OpcodeSwidenLow ...
 	// Type inferred from `x`.
 	OpcodeSwidenLow
-	// `a = swiden_high x`. (Unary)
+	// `a = swiden_high x`.
 
 	// OpcodeSwidenHigh ...
 	// Type inferred from `x`.
 	OpcodeSwidenHigh
-	// `a = uwiden_low x`. (Unary)
+	// `a = uwiden_low x`.
 
 	// OpcodeUwidenLow ...
 	// Type inferred from `x`.
 	OpcodeUwidenLow
-	// `a = uwiden_high x`. (Unary)
+	// `a = uwiden_high x`.
 
 	// OpcodeUwidenHigh ...
 	// Type inferred from `x`.
 	OpcodeUwidenHigh
-	// `a = iadd_pairwise x, y`. (Binary)
+	// `a = iadd_pairwise x, y`.
 
 	// OpcodeIaddPairwise ...
 	// Type inferred from `x`.
 	OpcodeIaddPairwise
 
 	// OpcodeWideningPairwiseDotProductS ...
-	// `a = widening_pairwise_dot_product_s x, y`. (Binary)
+	// `a = widening_pairwise_dot_product_s x, y`.
 	OpcodeWideningPairwiseDotProductS
 
 	// OpcodeUextend ...
-	// `a = uextend x`. (Unary)
+	// `a = uextend x`.
 	OpcodeUextend
 
 	// OpcodeSextend ...
-	// `a = sextend x`. (Unary)
+	// `a = sextend x`.
 	OpcodeSextend
 
 	// OpcodeFpromote ...
-	// `a = fpromote x`. (Unary)
+	// `a = fpromote x`.
 	OpcodeFpromote
 
 	// OpcodeFdemote ...
-	// `a = fdemote x`. (Unary)
+	// `a = fdemote x`.
 	OpcodeFdemote
 
 	// OpcodeFvdemote ...
-	// `a = fvdemote x`. (Unary)
+	// `a = fvdemote x`.
 	OpcodeFvdemote
 
 	// OpcodeFvpromoteLow ...
-	// `x = fvpromote_low a`. (Unary)
+	// `x = fvpromote_low a`.
 	OpcodeFvpromoteLow
 
 	// OpcodeFcvtToUint ...
-	// `a = fcvt_to_uint x`. (Unary)
+	// `a = fcvt_to_uint x`.
 	OpcodeFcvtToUint
 
 	// OpcodeFcvtToSint ...
-	// `a = fcvt_to_sint x`. (Unary)
+	// `a = fcvt_to_sint x`.
 	OpcodeFcvtToSint
 
 	// OpcodeFcvtToUintSat ...
-	// `a = fcvt_to_uint_sat x`. (Unary)
+	// `a = fcvt_to_uint_sat x`.
 	OpcodeFcvtToUintSat
 
 	// OpcodeFcvtToSintSat ...
-	// `a = fcvt_to_sint_sat x`. (Unary)
+	// `a = fcvt_to_sint_sat x`.
 	OpcodeFcvtToSintSat
 
 	// OpcodeFcvtFromUint ...
-	// `a = fcvt_from_uint x`. (Unary)
+	// `a = fcvt_from_uint x`.
 	OpcodeFcvtFromUint
 
 	// OpcodeFcvtFromSint ...
-	// `a = fcvt_from_sint x`. (Unary)
+	// `a = fcvt_from_sint x`.
 	OpcodeFcvtFromSint
 
 	// OpcodeFcvtLowFromSint ...
-	// `a = fcvt_low_from_sint x`. (Unary)
+	// `a = fcvt_low_from_sint x`.
 	OpcodeFcvtLowFromSint
 
 	// OpcodeIsplit ...
-	// `lo, hi = isplit x`. (Unary)
+	// `lo, hi = isplit x`.
 	// Type inferred from `x`.
 	OpcodeIsplit
 
 	// OpcodeIconcat ...
-	// `a = iconcat lo, hi`. (Binary)
+	// `a = iconcat lo, hi`.
 	// Type inferred from `lo`.
 	OpcodeIconcat
 
 	// OpcodeAtomicRmw ...
-	// `a = atomic_rmw MemFlags, AtomicRmwOp, p, x`. (AtomicRmw)
+	// `a = atomic_rmw MemFlags, AtomicRmwOp, p, x`.
 	OpcodeAtomicRmw
 
 	// OpcodeAtomicCas ...
-	// `a = atomic_cas MemFlags, p, e, x`. (AtomicCas)
+	// `a = atomic_cas MemFlags, p, e, x`.
 	// Type inferred from `x`.
 	OpcodeAtomicCas
 
 	// OpcodeAtomicLoad ...
-	// `a = atomic_load MemFlags, p`. (LoadNoOffset)
+	// `a = atomic_load MemFlags, p`.
 	OpcodeAtomicLoad
 
 	// OpcodeAtomicStore ...
-	// `atomic_store MemFlags, x, p`. (StoreNoOffset)
+	// `atomic_store MemFlags, x, p`.
 	// Type inferred from `x`.
 	OpcodeAtomicStore
 
 	// OpcodeFence ...
-	// `fence`. (NullAry)
+	// `fence`.
 	OpcodeFence
 
 	// OpcodeExtractVector ...
@@ -1022,6 +1020,11 @@ func (i *Instruction) String() (ret string) {
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
 	return fn(i)
+}
+
+func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
+	i.opcode = OpcodeJump
+	i.vs = vs
 }
 
 // String implements fmt.Stringer.
