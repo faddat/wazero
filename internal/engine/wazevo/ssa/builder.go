@@ -46,7 +46,7 @@ type (
 	// and there does not exist "params". However, for simplicity, we handle them as parameters to a BB.
 	BasicBlock interface {
 		// AddParam adds the parameter to the block whose type specified by `t`.
-		AddParam(b Builder, t Type)
+		AddParam(b Builder, t Type) Variable
 
 		// Params returns the number of parameters to this block.
 		Params() int
@@ -201,10 +201,11 @@ type basicBlock struct {
 }
 
 // AddParam implements BasicBlock.
-func (bb *basicBlock) AddParam(b Builder, typ Type) {
+func (bb *basicBlock) AddParam(b Builder, typ Type) Variable {
 	variable := b.DeclareVariable(typ)
 	n := len(bb.params)
 	bb.params = append(bb.params, blockParam{bb: bb, typ: typ, n: n, variable: variable})
+	return variable
 }
 
 // Params implements BasicBlock.

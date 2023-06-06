@@ -15,8 +15,6 @@ type Compiler struct {
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
 
-	nextVariable ssa.Variable
-
 	loweringState loweringState
 
 	// Followings are reset by per function.
@@ -39,7 +37,6 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
 func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []wasm.ValueType, body []byte) {
 	c.ssaBuilder.Reset()
 	c.loweringState.reset()
-	c.nextVariable = 0
 
 	c.wasmLocalFunctionIndex = idx
 	c.wasmFunctionTyp = typ
@@ -54,8 +51,7 @@ func (c *Compiler) LowerToSSA() error {
 	// Set up the entry block.
 	entryBlock := c.ssaBuilder.AllocateBasicBlock()
 	c.ssaBuilder.SetCurrentBlock(entryBlock)
-	// TODO: add moduleContext param as a first argument, then adjust this to 1.
-	c.nextVariable = 0
+	// TODO: add moduleContext param as a first argument.
 	c.addBlockParamsFromWasmTypes(c.wasmFunctionTyp.Params, entryBlock)
 	c.declareWasmLocals(entryBlock)
 
@@ -107,8 +103,7 @@ func wasmToSSA(vt wasm.ValueType) ssa.Type {
 func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.BasicBlock) {
 	for i, typ := range tps {
 		st := wasmToSSA(typ)
-		variable := c.ssaBuilder.DeclareVariable(st)
-		blk.AddParam(c.ssaBuilder, st)
+		variable := blk.AddParam(c.ssaBuilder, st)
 
 		// TODO: put this debugging info behind flag.
 		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("block_params[%d]", i))
