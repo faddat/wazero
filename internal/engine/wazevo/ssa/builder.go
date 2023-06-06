@@ -4,6 +4,7 @@ package ssa
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -17,11 +18,14 @@ type (
 		// AllocateBasicBlock creates a basic block in SSA function.
 		AllocateBasicBlock() BasicBlock
 
+		// CurrentBlock returns the currently handled BasicBlock which is set by the latest call to SetCurrentBlock.
+		CurrentBlock() BasicBlock
+
 		// SetCurrentBlock sets the instruction insertion target to the BasicBlock `b`.
 		SetCurrentBlock(b BasicBlock)
 
 		// DeclareVariable declares a Variable of the given Type.
-		DeclareVariable(Variable, Type)
+		DeclareVariable(Type) Variable
 
 		// AnnotateVariable associate the given Variable with `annotation` for debugging purpose.
 		AnnotateVariable(variable Variable, annotation string)
@@ -38,18 +42,25 @@ type (
 	}
 
 	// BasicBlock represents the Basic Block of an SSA function.
+	// In traditional SSA terminology, the block "params" here are called phi values,
+	// and there does not exist "params". However, for simplicity, we handle them as parameters to a BB.
 	BasicBlock interface {
 		// AddParam adds the parameter to the block whose type specified by `t`.
-		AddParam(t Type) Value
-
-		// Param returns Value which corresponds to the i-th parameter of this block.
-		Param(i int) Value
+		AddParam(b Builder, t Type)
 
 		// Params returns the number of parameters to this block.
 		Params() int
 
+		// Param returns (Variable, Value) which corresponds to the i-th parameter of this block.
+		// The returned Variable can be used to add the definition of it in predecessors,
+		// and the returned Value is the phi definition of a variable in this block.
+		Param(i int) (Variable, Value)
+
 		// InsertInstruction inserts an instruction that implements Value into the tail of this block.
 		InsertInstruction(raw Value)
+
+		// AddPred appends `block` as a predecessor to this BB.
+		AddPred(block BasicBlock)
 	}
 )
 
@@ -69,12 +80,12 @@ func NewBuilder() Builder {
 // with the stricter assumption that our input is always a "complete" CFG.
 type builder struct {
 	nextBasicBlock int
+	nextVariable   Variable
 	basicBlocks    []basicBlock
 	currentBB      *basicBlock
 
 	// variables track the types for Variable with the index regarded Variable.
 	variables           []Type
-	variablesDefined    int
 	variableAnnotations map[Variable]string
 
 	// lastDefinitions track last definitions of a variable in each block.
@@ -93,7 +104,7 @@ func (b *builder) Reset() {
 		b.basicBlocks[i].reset()
 	}
 
-	for i := 0; i < b.variablesDefined; i++ {
+	for i := Variable(0); i < b.nextVariable; i++ {
 		b.variables[i] = TypeInvalid
 		delete(b.variableAnnotations, Variable(i))
 	}
@@ -152,18 +163,20 @@ func (b *builder) SetCurrentBlock(bb BasicBlock) {
 	b.currentBB = bb.(*basicBlock)
 }
 
+// CurrentBlock implements Builder.
+func (b *builder) CurrentBlock() BasicBlock {
+	return b.currentBB
+}
+
 // DeclareVariable implements Builder.
-func (b *builder) DeclareVariable(v Variable, typ Type) {
+func (b *builder) DeclareVariable(typ Type) Variable {
+	v := b.AllocateVariable()
 	iv := int(v)
 	if l := len(b.variables); l <= iv {
 		b.variables = append(b.variables, make([]Type, 2*(l+1))...)
 	}
 	b.variables[v] = typ
-
-	if iv > b.variablesDefined {
-		b.variablesDefined = iv
-	}
-	return
+	return v
 }
 
 // AnnotateVariable implements Builder.
@@ -172,23 +185,37 @@ func (b *builder) AnnotateVariable(variable Variable, annotation string) {
 	return
 }
 
+// AllocateVariable implements Builder.
+func (b *builder) AllocateVariable() (ret Variable) {
+	ret = b.nextVariable
+	b.nextVariable++
+	return
+}
+
 // BasicBlock is an identifier of a basic block in a SSA-transformed function.
 type basicBlock struct {
 	id           int
 	params       []blockParam
 	currentInstr *Instruction
+	preds        [2]*basicBlock
 }
 
 // AddParam implements BasicBlock.
-func (bb *basicBlock) AddParam(typ Type) Value {
+func (bb *basicBlock) AddParam(b Builder, typ Type) {
+	variable := b.DeclareVariable(typ)
 	n := len(bb.params)
-	bb.params = append(bb.params, blockParam{bb: bb, typ: typ, n: n})
-	return &bb.params[n]
+	bb.params = append(bb.params, blockParam{bb: bb, typ: typ, n: n, variable: variable})
 }
 
 // Params implements BasicBlock.
 func (bb *basicBlock) Params() int {
 	return len(bb.params)
+}
+
+// Param implements BasicBlock.
+func (bb *basicBlock) Param(i int) (Variable, Value) {
+	p := &bb.params[i]
+	return p.variable, p
 }
 
 // InsertInstruction implements BasicBlock.
@@ -205,11 +232,19 @@ func (bb *basicBlock) InsertInstruction(raw Value) {
 func (bb *basicBlock) reset() {
 	bb.params = bb.params[:0]
 	bb.currentInstr = nil
+	bb.preds[0], bb.preds[1] = nil, nil
 }
 
-// Param implements BasicBlock.
-func (bb *basicBlock) Param(i int) Value {
-	return &bb.params[i]
+// AddPred implements BasicBlock.
+func (bb *basicBlock) AddPred(blk BasicBlock) {
+	pred := blk.(*basicBlock)
+	if bb.preds[0] == nil {
+		bb.preds[0] = pred
+	} else if bb.preds[1] == nil {
+		bb.preds[1] = pred
+	} else {
+		panic("BUG: too many predecessors")
+	}
 }
 
 // String implements fmt.Stringer.
@@ -218,7 +253,14 @@ func (bb *basicBlock) String() string {
 	for i := range ps {
 		ps[i] = bb.params[i].String()
 	}
-	return fmt.Sprintf("block[%d] (%s)", bb.id, strings.Join(ps, ","))
+	preds := make([]string, 0, 2)
+	for i := 0; i < 2; i++ {
+		if pred := bb.preds[i]; pred != nil {
+			preds = append(preds, strconv.Itoa(pred.id))
+		}
+	}
+	return fmt.Sprintf("block[%d] (%s) <--(%s)",
+		bb.id, strings.Join(ps, ","), strings.Join(preds, ","))
 }
 
 const instructionsPoolPageSize = 128

@@ -55,23 +55,15 @@ func (c *Compiler) LowerToSSA() error {
 	c.declareWasmFunctionParams(entryBlock)
 	c.declareWasmLocals(entryBlock)
 
-	// Set up the end block for function return.
-	//endBlock := c.ssaBuilder.AllocateBasicBlock()
-	//c.declareWasmFunctionReturns(endBlock)
-
 	c.lowerBody(entryBlock)
 	return nil
 }
 
 func (c *Compiler) declareWasmFunctionParams(entry ssa.BasicBlock) {
 	for i, typ := range c.wasmFunctionTyp.Params {
-		variable := c.allocateVar()
-
 		st := wasmToSSA(typ)
-		c.ssaBuilder.DeclareVariable(variable, st)
-
-		value := entry.AddParam(st)
-		c.ssaBuilder.DefineVariable(variable, value, entry)
+		variable := c.ssaBuilder.DeclareVariable(st)
+		entry.AddParam(c.ssaBuilder, st)
 
 		// TODO: put this debugging info behind flag.
 		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_params[%d]", i))
@@ -80,10 +72,8 @@ func (c *Compiler) declareWasmFunctionParams(entry ssa.BasicBlock) {
 
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	for i, typ := range c.wasmFunctionLocalTypes {
-		variable := c.allocateVar()
-
 		st := wasmToSSA(typ)
-		c.ssaBuilder.DeclareVariable(variable, st)
+		variable := c.ssaBuilder.DeclareVariable(st)
 
 		zeroInst := c.ssaBuilder.AllocateInstruction()
 		switch st {
@@ -104,28 +94,6 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 		// TODO: put this debugging info behind flag.
 		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_locals[%d]", i))
 	}
-}
-
-// TODO: I guess we don't need this.
-func (c *Compiler) declareWasmFunctionReturns(endBlock ssa.BasicBlock) {
-	for i, typ := range c.wasmFunctionTyp.Results {
-		variable := c.allocateVar()
-
-		st := wasmToSSA(typ)
-		c.ssaBuilder.DeclareVariable(variable, st)
-
-		value := endBlock.AddParam(st)
-		c.ssaBuilder.DefineVariable(variable, value, endBlock)
-
-		// TODO: put this debugging info behind flag.
-		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_returns[%d]", i))
-	}
-}
-
-func (c *Compiler) allocateVar() (ret ssa.Variable) {
-	ret = c.nextVariable
-	c.nextVariable++
-	return
 }
 
 func wasmToSSA(vt wasm.ValueType) ssa.Type {

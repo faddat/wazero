@@ -21,6 +21,7 @@ type (
 		loopBlock,
 		// followingBlock is the basic block we enter if we reach "end" of block.
 		followingBlock ssa.BasicBlock
+		blockType *wasm.FunctionType
 	}
 )
 
@@ -59,9 +60,9 @@ func (l *loweringState) nPeek(n int) []ssa.Value {
 }
 
 func (l *loweringState) ctrlPop() (ret controlFrame) {
-	tail := len(l.values) - 1
+	tail := len(l.controlFrames) - 1
 	ret = l.controlFrames[tail]
-	l.values = l.values[:tail]
+	l.controlFrames = l.controlFrames[:tail]
 	return
 }
 
@@ -87,6 +88,7 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 }
 
 func (c *Compiler) lowerOpcode(op wasm.Opcode) {
+	builder := c.ssaBuilder
 	state := &c.loweringState
 	switch op {
 	case wasm.OpcodeReturn:
@@ -100,19 +102,48 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		} else if unreachable {
 			ctrl := state.ctrlPop()
 			if ctrl.isReturn() {
+				// This is the very end of function body.
 				return
 			}
-
-			state.values = state.values[:ctrl.originalStackLenWithoutParam]
-			c.ssaBuilder.SetCurrentBlock(ctrl.followingBlock)
 			// We do not need branching here because this is unreachable.
+			c.switchTo(ctrl.originalStackLenWithoutParam, ctrl.followingBlock)
 			return
 		}
 
 		ctrl := state.ctrlPop()
 		if ctrl.isReturn() {
 			c.insertReturn()
+			return
 		}
+
+		// Top n-th args will be used as a result of the current control frame.
+		args := c.loweringState.nPeek(len(ctrl.blockType.Results))
+
+		currentBlk := builder.CurrentBlock()
+		targetBlk := ctrl.followingBlock
+		// Record that the target has the current one as a predecessor.
+		targetBlk.AddPred(currentBlk)
+
+		// Insert the unconditional branch to the target.
+		jmp := builder.AllocateInstruction()
+		jmp.AsJump(cloneValuesList(args), targetBlk)
+		for i := 0; i < targetBlk.Params(); i++ {
+			variable, _ := targetBlk.Param(i)
+			builder.DefineVariable(variable, args[i], currentBlk)
+		}
+
+		c.switchTo(ctrl.originalStackLenWithoutParam, targetBlk)
+	}
+}
+
+func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
+	// Now we should adjust the stack and start translating the continuation block.
+	c.loweringState.values = c.loweringState.values[:originalStackLen]
+
+	c.ssaBuilder.SetCurrentBlock(targetBlk)
+	for i := 0; i < targetBlk.Params(); i++ {
+		_, value := targetBlk.Param(i)
+		c.loweringState.push(value)
 	}
 }
 

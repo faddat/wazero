@@ -17,11 +17,11 @@ type Opcode uint32
 // Instruction implements Value because some instructions produces values
 // and can be used in subsequent instructions as inputs.
 type Instruction struct {
-	opcode Opcode
-	u64    uint64
-	vs     []Value
-	typ    Type
-
+	opcode     Opcode
+	u64        uint64
+	vs         []Value
+	typ        Type
+	blk1, blk2 BasicBlock
 	prev, next *Instruction
 }
 
@@ -1013,6 +1013,24 @@ func init() {
 	}
 }
 
+func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
+	i.opcode = OpcodeJump
+	i.vs = vs
+	i.blk1 = target
+}
+
+func init() {
+	instructionFormats[OpcodeJump] = func(i *Instruction) (ret string) {
+		vs := make([]string, len(i.vs))
+		for idx := range vs {
+			vs[idx] = i.vs[idx].String()
+		}
+
+		ret = fmt.Sprintf("jmp %s, %s", i.blk1, strings.Join(vs, ","))
+		return
+	}
+}
+
 // String implements fmt.Stringer.
 func (i *Instruction) String() (ret string) {
 	fn := instructionFormats[i.opcode]
@@ -1020,11 +1038,6 @@ func (i *Instruction) String() (ret string) {
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
 	return fn(i)
-}
-
-func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
-	i.opcode = OpcodeJump
-	i.vs = vs
 }
 
 // String implements fmt.Stringer.

@@ -8,8 +8,12 @@ type Value interface {
 }
 
 // blockParam implements Value and represents a parameter to a basicBlock.
+// This is considered as a phi instruction in traditional SSA theory.
 type blockParam struct {
-	typ Type
+	// variable is a Variable for this parameter. This can be used to associate
+	// the origins of this parameter with the defining instruction if .
+	variable Variable
+	typ      Type
 	// n is the index of this blockParam in the bb.
 	n int
 	// bb is the basicBlock where this param exists.
