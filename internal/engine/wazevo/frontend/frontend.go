@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -24,11 +25,14 @@ type Compiler struct {
 	wasmFunctionTyp        *wasm.FunctionType
 	wasmFunctionLocalTypes []wasm.ValueType
 	wasmFunctionBody       []byte
+
+	// br is reused during lowering.
+	br *bytes.Reader
 }
 
 // NewFrontendCompiler returns a frontend Compiler.
 func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
-	return &Compiler{m: m, ssaBuilder: ssaBuilder}
+	return &Compiler{m: m, ssaBuilder: ssaBuilder, br: bytes.NewReader(nil)}
 }
 
 // Init initializes the state of frontendCompiler and make it ready for a next function.
@@ -52,22 +56,11 @@ func (c *Compiler) LowerToSSA() error {
 	c.ssaBuilder.SetCurrentBlock(entryBlock)
 	// TODO: add moduleContext param as a first argument, then adjust this to 1.
 	c.nextVariable = 0
-	c.declareWasmFunctionParams(entryBlock)
+	c.addBlockParamsFromWasmTypes(c.wasmFunctionTyp.Params, entryBlock)
 	c.declareWasmLocals(entryBlock)
 
 	c.lowerBody(entryBlock)
 	return nil
-}
-
-func (c *Compiler) declareWasmFunctionParams(entry ssa.BasicBlock) {
-	for i, typ := range c.wasmFunctionTyp.Params {
-		st := wasmToSSA(typ)
-		variable := c.ssaBuilder.DeclareVariable(st)
-		entry.AddParam(c.ssaBuilder, st)
-
-		// TODO: put this debugging info behind flag.
-		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_params[%d]", i))
-	}
 }
 
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
@@ -108,5 +101,16 @@ func wasmToSSA(vt wasm.ValueType) ssa.Type {
 		return ssa.TypeF64
 	default:
 		panic("TODO: " + wasm.ValueTypeName(vt))
+	}
+}
+
+func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.BasicBlock) {
+	for i, typ := range tps {
+		st := wasmToSSA(typ)
+		variable := c.ssaBuilder.DeclareVariable(st)
+		blk.AddParam(c.ssaBuilder, st)
+
+		// TODO: put this debugging info behind flag.
+		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("block_params[%d]", i))
 	}
 }
