@@ -3,6 +3,7 @@ package frontend
 import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -30,6 +31,10 @@ type (
 
 func (ctrl *controlFrame) isReturn() bool {
 	return ctrl.followingBlock == nil
+}
+
+func (ctrl *controlFrame) isLoop() bool {
+	return ctrl.loopBodyBlock != nil
 }
 
 func (l *loweringState) reset() {
@@ -89,19 +94,6 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 		c.lowerOpcode(op)
 		c.loweringState.pc++
 	}
-}
-
-func (c *Compiler) readBlockType() *wasm.FunctionType {
-	state := &c.loweringState
-
-	c.br.Reset(c.wasmFunctionBody[state.pc+1:])
-	bt, num, err := wasm.DecodeBlockType(c.m.TypeSection, c.br, api.CoreFeaturesV2)
-	if err != nil {
-		panic(err) // shouldn't be reached since compilation comes after validation.
-	}
-	state.pc += int(num)
-
-	return bt
 }
 
 func (c *Compiler) lowerOpcode(op wasm.Opcode) {
@@ -239,15 +231,55 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Ready to start translating the following block.
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
+
+	case wasm.OpcodeBr:
+		v := c.readU32()
+		if state.unreachable {
+			return
+		}
+
+		var targetBlk ssa.BasicBlock
+		var argNum int
+		if targetFrame := state.ctrlPeekAt(int(v)); targetFrame.isLoop() {
+			targetBlk, argNum = targetFrame.loopBodyBlock, len(targetFrame.blockType.Params)
+		} else {
+			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
+		}
+		args := c.loweringState.nPeekDup(argNum)
+		c.jumpToBlock(args, builder.CurrentBlock(), targetBlk)
+
+		state.unreachable = true
 	default:
 		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))
 	}
 }
 
+func (c *Compiler) readU32() uint32 {
+	v, n, err := leb128.LoadUint32(c.wasmFunctionBody[c.loweringState.pc+1:])
+	if err != nil {
+		panic(err) // shouldn't be reached since compilation comes after validation.
+	}
+	c.loweringState.pc += int(n)
+	return v
+}
+
+func (c *Compiler) readBlockType() *wasm.FunctionType {
+	state := &c.loweringState
+
+	c.br.Reset(c.wasmFunctionBody[state.pc+1:])
+	bt, num, err := wasm.DecodeBlockType(c.m.TypeSection, c.br, api.CoreFeaturesV2)
+	if err != nil {
+		panic(err) // shouldn't be reached since compilation comes after validation.
+	}
+	state.pc += int(num)
+
+	return bt
+}
+
 func (c *Compiler) jumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.BasicBlock) {
 	builder := c.ssaBuilder
 	jmp := builder.AllocateInstruction()
-	jmp.AsJump(cloneValuesList(args), targetBlk)
+	jmp.AsJump(args, targetBlk)
 	for i := 0; i < targetBlk.Params(); i++ {
 		variable, _ := targetBlk.Param(i)
 		builder.DefineVariable(variable, args[i], currentBlk)
