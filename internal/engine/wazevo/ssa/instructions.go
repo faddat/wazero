@@ -986,9 +986,9 @@ func init() {
 	instructionFormats[OpcodeIconst] = func(i *Instruction) (ret string) {
 		switch i.typ {
 		case TypeI32:
-			ret = fmt.Sprintf("iconst_32 %#x", uint32(i.u64))
+			ret = fmt.Sprintf("_32 %#x", uint32(i.u64))
 		case TypeI64:
-			ret = fmt.Sprintf("iconst_64 %#x", i.u64)
+			ret = fmt.Sprintf("_64 %#x", i.u64)
 		}
 		return
 	}
@@ -1008,11 +1008,11 @@ func (i *Instruction) AsF64const(f float64) {
 
 func init() {
 	instructionFormats[OpcodeF32const] = func(i *Instruction) (ret string) {
-		ret = fmt.Sprintf("f32const %f", math.Float32frombits(uint32(i.u64)))
+		ret = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u64)))
 		return
 	}
 	instructionFormats[OpcodeF64const] = func(i *Instruction) (ret string) {
-		ret = fmt.Sprintf("f64const %f", math.Float64frombits(i.u64))
+		ret = fmt.Sprintf(" %f", math.Float64frombits(i.u64))
 		return
 	}
 }
@@ -1029,7 +1029,7 @@ func init() {
 			vs[idx] = i.vs[idx].String()
 		}
 
-		ret = fmt.Sprintf("return %s", strings.Join(vs, ","))
+		ret = fmt.Sprintf(" %s", strings.Join(vs, ","))
 		return
 	}
 }
@@ -1047,7 +1047,7 @@ func init() {
 			vs[idx] = i.vs[idx].String()
 		}
 
-		ret = fmt.Sprintf("jmp %s, %s", i.blk1, strings.Join(vs, ","))
+		ret = fmt.Sprintf(" %s, %s", i.blk1, strings.Join(vs, ","))
 		return
 	}
 }
@@ -1058,7 +1058,7 @@ func (i *Instruction) String() (ret string) {
 	if fn == nil {
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
-	return fn(i)
+	return i.opcode.String() + fn(i)
 }
 
 // String implements fmt.Stringer.
