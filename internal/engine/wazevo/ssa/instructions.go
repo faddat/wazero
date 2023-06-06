@@ -23,6 +23,27 @@ type Instruction struct {
 	typ        Type
 	blk1, blk2 BasicBlock
 	prev, next *Instruction
+	srcPos     uint64
+}
+
+// Next returns the next instruction laid out next to itself.
+func (i *Instruction) Next() *Instruction {
+	return i.next
+}
+
+// Prev returns the previous instruction laid out prior to itself.
+func (i *Instruction) Prev() *Instruction {
+	return i.prev
+}
+
+// SetSourcePos sets the opaque source position of this instruction.
+func (i *Instruction) SetSourcePos(p uint64) {
+	i.srcPos = p
+}
+
+// SourcePos returns the opaque source position of this instruction set by SetSourcePos.
+func (i *Instruction) SourcePos() (p uint64) {
+	return i.srcPos
 }
 
 var instructionFormats = [opcodeEnd]func(instruction *Instruction) string{}

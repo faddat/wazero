@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"strings"
 )
 
 // Compiler is in charge of lowering Wasm to SSA IR, and does the optimization
@@ -60,7 +61,7 @@ func (c *Compiler) LowerToSSA() error {
 }
 
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
-	for i, typ := range c.wasmFunctionLocalTypes {
+	for _, typ := range c.wasmFunctionLocalTypes {
 		st := wasmToSSA(typ)
 		variable := c.ssaBuilder.DeclareVariable(st)
 
@@ -79,9 +80,7 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 		}
 
 		c.ssaBuilder.DefineVariable(variable, zeroInst, entry)
-
-		// TODO: put this debugging info behind flag.
-		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("function_locals[%d]", i))
+		c.ssaBuilder.InsertInstruction(zeroInst)
 	}
 }
 
@@ -101,11 +100,33 @@ func wasmToSSA(vt wasm.ValueType) ssa.Type {
 }
 
 func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.BasicBlock) {
-	for i, typ := range tps {
+	for _, typ := range tps {
 		st := wasmToSSA(typ)
-		variable := blk.AddParam(c.ssaBuilder, st)
-
-		// TODO: put this debugging info behind flag.
-		c.ssaBuilder.AnnotateVariable(variable, fmt.Sprintf("block_params[%d]", i))
+		_ = blk.AddParam(c.ssaBuilder, st)
 	}
+}
+
+// formatBuilder outputs the constructed SSA function as a string with a source information.
+func (c *Compiler) formatBuilder() string {
+	builder := c.ssaBuilder
+
+	str := strings.Builder{}
+	str.WriteString(fmt.Sprintf("module.function[%d]: %s",
+		c.wasmLocalFunctionIndex,
+		c.m.FunctionDefinition(c.m.ImportFunctionCount+c.wasmLocalFunctionIndex).DebugName(),
+	))
+	str.WriteString(fmt.Sprintf("signature: %s", c.wasmFunctionTyp.String()))
+	str.WriteString("\n -------------------- \n")
+
+	for _, b := range builder.Blocks() {
+		header := b.String()
+		str.WriteString(header)
+		for cur := b.Root(); cur != nil; cur = cur.Next() {
+			str.WriteByte('\n')
+			str.WriteByte('\t')
+			str.WriteString(cur.String())
+			// TODO: use source position to append the Wasm-level source info.
+		}
+	}
+	return str.String()
 }
