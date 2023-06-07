@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"strings"
@@ -48,6 +47,8 @@ func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []was
 // LowerToSSA lowers the current function to SSA function which will be held by ssaBuilder.
 // After calling this, the caller will be able to access the SSA info in ssa.SSABuilder pased
 // when calling NewFrontendCompiler and can share them with the backend.
+//
+// Note that this only does the naive lowering, and do not do any optimization, instead the caller is expected to do so.
 func (c *Compiler) LowerToSSA() error {
 	// Set up the entry block.
 	entryBlock := c.ssaBuilder.AllocateBasicBlock()
@@ -79,8 +80,9 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 			panic("TODO: " + wasm.ValueTypeName(typ))
 		}
 
-		c.ssaBuilder.DefineVariable(variable, zeroInst, entry)
 		c.ssaBuilder.InsertInstruction(zeroInst)
+		value, _ := zeroInst.Returns()
+		c.ssaBuilder.DefineVariable(variable, value, entry)
 	}
 }
 
@@ -111,21 +113,16 @@ func (c *Compiler) formatBuilder() string {
 	builder := c.ssaBuilder
 
 	str := strings.Builder{}
-	str.WriteString(fmt.Sprintf("module.function[%d]: %s",
-		c.wasmLocalFunctionIndex,
-		c.m.FunctionDefinition(c.m.ImportFunctionCount+c.wasmLocalFunctionIndex).DebugName(),
-	))
-	str.WriteString(fmt.Sprintf("signature: %s", c.wasmFunctionTyp.String()))
-	str.WriteString("\n -------------------- \n")
-
 	for _, b := range builder.Blocks() {
 		header := b.String()
+		str.WriteByte('\n')
 		str.WriteString(header)
+		str.WriteByte('\n')
 		for cur := b.Root(); cur != nil; cur = cur.Next() {
-			str.WriteByte('\n')
+			// TODO: use source position to add the Wasm-level source info.
 			str.WriteByte('\t')
 			str.WriteString(cur.String())
-			// TODO: use source position to append the Wasm-level source info.
+			str.WriteByte('\n')
 		}
 	}
 	return str.String()

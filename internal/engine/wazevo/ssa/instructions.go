@@ -13,9 +13,6 @@ type Opcode uint32
 // Opcode. Since Go doesn't have union type, we use this flattened type
 // for all instructions, and therefore each field has different meaning
 // depending on Opcode.
-//
-// Instruction implements Value because some instructions produces values
-// and can be used in subsequent instructions as inputs.
 type Instruction struct {
 	opcode     Opcode
 	u64        uint64
@@ -24,6 +21,15 @@ type Instruction struct {
 	blk1, blk2 BasicBlock
 	prev, next *Instruction
 	srcPos     uint64
+
+	rValue  Value
+	rValues []Value
+}
+
+// Returns Value(s) produced by this instruction if any.
+// The `first` is the first return value, and `rest` is the rest of the values.
+func (i *Instruction) Returns() (first Value, rest []Value) {
+	return i.rValue, i.rValues
 }
 
 // Next returns the next instruction laid out next to itself.
@@ -970,6 +976,27 @@ const (
 	opcodeEnd
 )
 
+var numReturns = [...]*struct {
+	num     int
+	unknown bool
+}{
+	OpcodeJump:     {num: 1, unknown: false},
+	OpcodeIconst:   {num: 1, unknown: false},
+	OpcodeF32const: {num: 1, unknown: false},
+	OpcodeF64const: {num: 1, unknown: false},
+	OpcodeReturn:   {num: 0, unknown: false},
+	opcodeEnd:      nil,
+}
+
+func (o Opcode) numReturns() (num int, unknown bool) {
+	rs := numReturns[o]
+	if rs == nil {
+		panic("TODO: " + o.String())
+	} else {
+		return rs.num, rs.unknown
+	}
+}
+
 func (i *Instruction) AsIconst64(v uint64) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
@@ -1029,7 +1056,7 @@ func init() {
 			vs[idx] = i.vs[idx].String()
 		}
 
-		ret = fmt.Sprintf(" %s", strings.Join(vs, ","))
+		ret = fmt.Sprintf(" (%s)", strings.Join(vs, ","))
 		return
 	}
 }
@@ -1047,7 +1074,7 @@ func init() {
 			vs[idx] = i.vs[idx].String()
 		}
 
-		ret = fmt.Sprintf(" %s, %s", i.blk1, strings.Join(vs, ","))
+		ret = fmt.Sprintf(" blk%d, (%s)", i.blk1.(*basicBlock).id, strings.Join(vs, ","))
 		return
 	}
 }
@@ -1058,7 +1085,22 @@ func (i *Instruction) String() (ret string) {
 	if fn == nil {
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
-	return i.opcode.String() + fn(i)
+	instr := i.opcode.String() + fn(i)
+
+	var rvs []string
+	if rv := i.rValue; rv.Valid() {
+		rvs = append(rvs, rv.String())
+	}
+
+	for _, v := range i.rValues {
+		rvs = append(rvs, v.String())
+	}
+
+	if len(rvs) > 0 {
+		return fmt.Sprintf("%s = %s", strings.Join(rvs, ", "), instr)
+	} else {
+		return instr
+	}
 }
 
 // String implements fmt.Stringer.

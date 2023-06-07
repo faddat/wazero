@@ -4,7 +4,6 @@ package ssa
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -38,7 +37,10 @@ type (
 		AllocateInstruction() *Instruction
 
 		// InsertInstruction executes BasicBlock.InsertInstruction for the currently handled basic block.
-		InsertInstruction(raw Value)
+		InsertInstruction(raw *Instruction)
+
+		// AllocateValue allocates an unused Value.
+		AllocateValue() Value
 	}
 
 	// BasicBlock represents the Basic Block of an SSA function.
@@ -59,7 +61,7 @@ type (
 		Param(i int) (Variable, Value)
 
 		// InsertInstruction inserts an instruction that implements Value into the tail of this block.
-		InsertInstruction(raw Value)
+		InsertInstruction(raw *Instruction)
 
 		// AddPred appends `block` as a predecessor to this BB.
 		AddPred(block BasicBlock)
@@ -98,6 +100,7 @@ type builder struct {
 	instructions             []Instruction
 
 	instructionsPool instructionsPool
+	nextValue        Value
 }
 
 // Reset implements Builder.
@@ -121,6 +124,8 @@ func (b *builder) Reset() {
 			delete(defs, key)
 		}
 	}
+
+	b.nextValue = valueInvalid + 1
 }
 
 func (b *builder) AllocateInstruction() *Instruction {
@@ -140,8 +145,30 @@ func (b *builder) AllocateBasicBlock() BasicBlock {
 }
 
 // InsertInstruction implements Builder.
-func (b *builder) InsertInstruction(raw Value) {
-	b.currentBB.InsertInstruction(raw)
+func (b *builder) InsertInstruction(instr *Instruction) {
+	b.currentBB.InsertInstruction(instr)
+	num, unknown := instr.opcode.numReturns()
+	if unknown {
+		panic("TODO: unknown returns")
+	}
+
+	if num == 0 {
+		return
+	}
+
+	r1 := b.AllocateValue()
+	instr.rValue = r1
+	num--
+
+	if num == 0 {
+		return
+	}
+
+	// TODO: reuse slices, though this seems not to be common.
+	instr.rValues = make([]Value, num)
+	for i := 0; i < num; i++ {
+		instr.rValues[i] = b.AllocateValue()
+	}
 }
 
 // Blocks implements Builder.
@@ -172,8 +199,6 @@ func (b *builder) DefineVariable(variable Variable, value Value, block BasicBloc
 
 	defs := b.lastDefinitions[blockID]
 	defs[variable] = value
-
-	block.InsertInstruction(value)
 }
 
 // SetCurrentBlock implements Builder.
@@ -207,8 +232,8 @@ func (b *builder) AllocateVariable() (ret Variable) {
 // BasicBlock is an identifier of a basic block in a SSA-transformed function.
 type basicBlock struct {
 	id                      int
-	params                  []blockParam
 	rootInstr, currentInstr *Instruction
+	params                  []blockParam
 	preds                   []*basicBlock
 }
 
@@ -216,8 +241,14 @@ type basicBlock struct {
 func (bb *basicBlock) AddParam(b Builder, typ Type) Variable {
 	variable := b.DeclareVariable(typ)
 	n := len(bb.params)
-	bb.params = append(bb.params, blockParam{bb: bb, typ: typ, n: n, variable: variable})
+	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: b.AllocateValue()})
 	return variable
+}
+
+func (b *builder) AllocateValue() (v Value) {
+	v = b.nextValue
+	b.nextValue++
+	return
 }
 
 // Params implements BasicBlock.
@@ -228,18 +259,17 @@ func (bb *basicBlock) Params() int {
 // Param implements BasicBlock.
 func (bb *basicBlock) Param(i int) (Variable, Value) {
 	p := &bb.params[i]
-	return p.variable, p
+	return p.variable, p.value
 }
 
 // InsertInstruction implements BasicBlock.
-func (bb *basicBlock) InsertInstruction(raw Value) {
-	next := raw.(*Instruction)
+func (bb *basicBlock) InsertInstruction(next *Instruction) {
 	current := bb.currentInstr
 	if current != nil {
 		current.next = next
 		next.prev = current
 	} else {
-		bb.rootInstr = current
+		bb.rootInstr = next
 	}
 	bb.currentInstr = next
 }
@@ -261,18 +291,22 @@ func (bb *basicBlock) AddPred(blk BasicBlock) {
 	bb.preds = append(bb.preds, pred)
 }
 
-// String implements fmt.Stringer.
+// String implements fmt.Stringer. Only used for debugging.
 func (bb *basicBlock) String() string {
 	ps := make([]string, len(bb.params))
-	for i := range ps {
-		ps[i] = bb.params[i].String()
+	for i, p := range bb.params {
+		ps[i] = p.String()
 	}
-	preds := make([]string, len(bb.preds))
-	for i, pred := range bb.preds {
-		preds[i] = strconv.Itoa(pred.id)
+	if bb.id == 0 {
+		return fmt.Sprintf("entrypoint: (%s)", strings.Join(ps, ", "))
+	} else {
+		preds := make([]string, len(bb.preds))
+		for i, pred := range bb.preds {
+			preds[i] = fmt.Sprintf("blk%d", pred.id)
+		}
+		return fmt.Sprintf("blk%d: (%s) <-- (%s)",
+			bb.id, strings.Join(ps, ","), strings.Join(preds, ","))
 	}
-	return fmt.Sprintf("block[%d] (%s) <--(%s)",
-		bb.id, strings.Join(ps, ","), strings.Join(preds, ","))
 }
 
 const instructionsPoolPageSize = 128
@@ -312,4 +346,22 @@ func (n *instructionsPool) reset() {
 	}
 	n.pages = n.pages[:0]
 	n.index = instructionsPoolPageSize
+}
+
+// blockParam implements Value and represents a parameter to a basicBlock.
+type blockParam struct {
+	// variable is a Variable for this parameter. This can be used to associate
+	// the origins of this parameter with the defining instruction if .
+	variable Variable
+	// value represents the very first value that defines .variable in this block,
+	// and can be considered as phi instruction.
+	value Value
+	typ   Type
+	// n is the index of this blockParam in the bb.
+	n int
+}
+
+// String implements Value.
+func (p *blockParam) String() (ret string) {
+	return fmt.Sprintf("%s: %s", p.value, p.typ)
 }

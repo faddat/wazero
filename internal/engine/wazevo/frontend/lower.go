@@ -284,7 +284,9 @@ func (c *Compiler) jumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.Basic
 		variable, _ := targetBlk.Param(i)
 		builder.DefineVariable(variable, args[i], currentBlk)
 	}
+
 	c.ssaBuilder.InsertInstruction(jmp)
+	targetBlk.AddPred(currentBlk)
 }
 
 func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
