@@ -25,6 +25,8 @@ const (
 
 func TestCompiler_LowerToSSA(t *testing.T) {
 	vv := wasm.FunctionType{}
+	i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
 	i32f32f64_v := wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
 
 	for _, tc := range []struct {
@@ -54,6 +56,16 @@ blk0: (v1: i32, v2: f32, v3: f64)
 `,
 		},
 		{
+			name: "param -> return", m: singleFunctionModule(i32_i32, []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeEnd,
+			}, nil),
+			exp: `
+blk0: (v1: i32)
+	Return v1
+`,
+		},
+		{
 			name: "locals", m: singleFunctionModule(vv, []byte{wasm.OpcodeEnd},
 				[]wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
@@ -75,6 +87,19 @@ blk0: (v1: i32, v2: f32, v3: f64)
 	v6 = F32const 0.000000
 	v7 = F64const 0.000000
 	Return
+`,
+		},
+		{
+			name: "locals + params return", m: singleFunctionModule(i32_i32i32, []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeEnd,
+			},
+				[]wasm.ValueType{i32}),
+			exp: `
+blk0: (v1: i32)
+	v2 = Iconst_32 0x0
+	Return v1, v2
 `,
 		},
 		{
@@ -124,6 +149,7 @@ blk2: ()
 		},
 		{
 			name: "if without else", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeIf, 0,
 				wasm.OpcodeEnd,
 				wasm.OpcodeEnd,
@@ -132,16 +158,22 @@ blk2: ()
 			exp: `
 blk0: ()
 	v1 = Iconst_32 0x0
+	Brz v1, blk2
+	Jump blk1
 
-blk1: ()
-	Jump blk2
+blk1: () <-- (blk0)
+	Jump blk3
 
-blk2: () <-- (blk1)
+blk2: () <-- (blk0)
+	Jump blk3
+
+blk3: () <-- (blk1,blk2)
 	Return
 `,
 		},
 		{
 			name: "if-else", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeIf, 0,
 				wasm.OpcodeElse,
 				wasm.OpcodeBr, 1,
@@ -152,11 +184,16 @@ blk2: () <-- (blk1)
 			exp: `
 blk0: ()
 	v1 = Iconst_32 0x0
+	Brz v1, blk2
+	Jump blk1
 
-blk1: ()
-	Jump blk2
+blk1: () <-- (blk0)
+	Jump blk3
 
-blk2: () <-- (blk1)
+blk2: () <-- (blk0)
+	Return
+
+blk3: () <-- (blk1)
 	Return
 `,
 		},

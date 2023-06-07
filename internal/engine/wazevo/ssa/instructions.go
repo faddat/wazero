@@ -986,6 +986,7 @@ var numReturns = [...]*struct {
 	OpcodeF32const: {num: 1, unknown: false},
 	OpcodeF64const: {num: 1, unknown: false},
 	OpcodeReturn:   {num: 0, unknown: false},
+	OpcodeBrz:      {num: 0, unknown: false},
 	opcodeEnd:      nil,
 }
 
@@ -1059,7 +1060,7 @@ func init() {
 		for idx := range vs {
 			vs[idx] = i.vs[idx].String()
 		}
-		ret = fmt.Sprintf(" %s", strings.Join(vs, ","))
+		ret = fmt.Sprintf(" %s", strings.Join(vs, ", "))
 		return
 	}
 }
@@ -1093,7 +1094,7 @@ func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 func init() {
 	instructionFormats[OpcodeBrz] = func(i *Instruction) (ret string) {
 		vs := make([]string, len(i.vs)+2)
-		vs[0] = "" + i.v.String()
+		vs[0] = " " + i.v.String()
 		vs[1] = fmt.Sprintf("blk%d", i.blk.(*basicBlock).id)
 		for idx := range i.vs {
 			vs[idx+2] = i.vs[idx].String()

@@ -36,7 +36,8 @@ type (
 const (
 	controlFrameKindFunction = iota + 1
 	controlFrameKindLoop
-	controlFrameKindIf
+	controlFrameKindIfWithElse
+	controlFrameKindIfWithoutElse
 	controlFrameKindBlock
 )
 
@@ -104,8 +105,10 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
 		c.lowerOpcode(op)
-		fmt.Println("---------" + wasm.InstructionName(op) + " --------")
+		// TODO: delete.
+		fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 		fmt.Println(c.ssaBuilder.String())
+		fmt.Println("--------------------------")
 		c.loweringState.pc++
 	}
 }
@@ -114,7 +117,11 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	builder := c.ssaBuilder
 	state := &c.loweringState
 	switch op {
-	case wasm.OpcodeNop:
+	case wasm.OpcodeLocalGet:
+		index := c.readU32()
+		variable := c.localVariable(index)
+		v := builder.FindValue(variable)
+		state.push(v)
 	case wasm.OpcodeBlock:
 		// Note: we do not need to create a BB for this as that would always have only one predecessor
 		// which is the current BB, and therefore it's always ok to merge them in any way.
@@ -130,6 +137,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.addBlockParamsFromWasmTypes(bt.Results, followingBlk)
 
 		state.ctrlPush(controlFrame{
+			kind:                         controlFrameKindBlock,
 			originalStackLenWithoutParam: len(state.values) - len(bt.Params),
 			followingBlock:               followingBlk,
 			blockType:                    bt,
@@ -167,6 +175,8 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		thenBlk, elseBlk, followingBlk :=
 			builder.AllocateBasicBlock(), builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
 
+		currentBlk := builder.CurrentBlock()
+
 		// We do not make the Wasm-level block parameters as SSA-level block params,
 		// since they won't be phi and the definition is unique.
 
@@ -179,14 +189,20 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			args = cloneValuesList(state.values[len(state.values)-1-len(bt.Params):])
 		}
 
-		// Insert the conditional jump to the else block.
+		// Insert the conditional jump to the Else block.
 		brz := builder.AllocateInstruction()
-		brz.AsBrz(v, args, elseBlk)
+		brz.AsBrz(v, nil, elseBlk)
 		builder.InsertInstruction(brz)
-		elseBlk.AddPred(builder.CurrentBlock())
+		elseBlk.AddPred(currentBlk)
+
+		// Then, insert the jump to the Then block.
+		br := builder.AllocateInstruction()
+		br.AsJump(nil, thenBlk)
+		builder.InsertInstruction(br)
+		thenBlk.AddPred(currentBlk)
 
 		state.ctrlPush(controlFrame{
-			kind:                         controlFrameKindIf,
+			kind:                         controlFrameKindIfWithoutElse,
 			originalStackLenWithoutParam: len(state.values) - len(bt.Params),
 			blk:                          elseBlk,
 			followingBlock:               followingBlk,
@@ -204,6 +220,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		ifctrl := state.ctrlPeekAt(0)
+		ifctrl.kind = controlFrameKindIfWithElse
 		if !state.unreachable {
 			// If this Then block is currently reachable, we have to insert the branching to the following BB.
 			followingBlk := ifctrl.followingBlock // == the BB after if-then-else.
@@ -247,14 +264,22 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
+		followingBlk := ctrl.followingBlock
+
 		// Top n-th args will be used as a result of the current control frame.
 		args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
 
 		currentBlk := builder.CurrentBlock()
-		followingBlk := ctrl.followingBlock
 
 		// Insert the unconditional branch to the target.
 		c.jumpToBlock(args, currentBlk, followingBlk)
+
+		// If this is the end of Then block, we have to emit the empty Else block.
+		if ctrl.kind == controlFrameKindIfWithoutElse {
+			elseBlk := ctrl.blk
+			builder.SetCurrentBlock(elseBlk)
+			c.jumpToBlock(nil, elseBlk, followingBlk)
+		}
 
 		// Ready to start translating the following block.
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
@@ -283,6 +308,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.jumpToBlock(args, builder.CurrentBlock(), targetBlk)
 
 		state.unreachable = true
+	case wasm.OpcodeNop:
 	default:
 		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))
 	}

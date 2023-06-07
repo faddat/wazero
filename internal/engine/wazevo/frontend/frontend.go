@@ -16,7 +16,10 @@ type Compiler struct {
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
 
-	loweringState loweringState
+	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
+	// to the corresponding ssa.Variable.
+	wasmLocalToVariable map[wasm.Index]ssa.Variable
+	loweringState       loweringState
 
 	// Followings are reset by per function.
 
@@ -31,7 +34,12 @@ type Compiler struct {
 
 // NewFrontendCompiler returns a frontend Compiler.
 func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
-	return &Compiler{m: m, ssaBuilder: ssaBuilder, br: bytes.NewReader(nil)}
+	return &Compiler{
+		m:                   m,
+		ssaBuilder:          ssaBuilder,
+		br:                  bytes.NewReader(nil),
+		wasmLocalToVariable: make(map[wasm.Index]ssa.Variable),
+	}
 }
 
 // Init initializes the state of frontendCompiler and make it ready for a next function.
@@ -55,17 +63,27 @@ func (c *Compiler) LowerToSSA() error {
 	entryBlock := c.ssaBuilder.AllocateBasicBlock()
 	c.ssaBuilder.SetCurrentBlock(entryBlock)
 	// TODO: add moduleContext param as a first argument.
-	c.addBlockParamsFromWasmTypes(c.wasmFunctionTyp.Params, entryBlock)
+	for i, typ := range c.wasmFunctionTyp.Params {
+		st := wasmToSSA(typ)
+		variable := entryBlock.AddParam(c.ssaBuilder, st)
+		c.wasmLocalToVariable[wasm.Index(i)] = variable
+	}
 	c.declareWasmLocals(entryBlock)
 
 	c.lowerBody(entryBlock)
 	return nil
 }
 
+func (c *Compiler) localVariable(index wasm.Index) ssa.Variable {
+	return c.wasmLocalToVariable[index]
+}
+
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
-	for _, typ := range c.wasmFunctionLocalTypes {
+	localCount := wasm.Index(len(c.wasmFunctionTyp.Params))
+	for i, typ := range c.wasmFunctionLocalTypes {
 		st := wasmToSSA(typ)
 		variable := c.ssaBuilder.DeclareVariable(st)
+		c.wasmLocalToVariable[wasm.Index(i)+localCount] = variable
 
 		zeroInst := c.ssaBuilder.AllocateInstruction()
 		switch st {
