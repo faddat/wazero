@@ -17,25 +17,35 @@ type (
 		pc               int
 	}
 	controlFrame struct {
+		kind controlFrameKind
 		// originalStackLen holds the number of values on the Wasm stack
 		// when start executing this control frame minus params for the block.
 		originalStackLenWithoutParam int
-		// loopBodyBlock is not nil if this is the loop.
-		loopBodyBlock,
+		// blk is the loop body if this is loop, and is the else-block if this is a if frame.
+		blk,
 		// followingBlock is the basic block we enter if we reach "end" of block.
 		followingBlock ssa.BasicBlock
 		blockType *wasm.FunctionType
 		// clonedArgs hold the arguments to Else block.
 		clonedArgs []ssa.Value
 	}
+
+	controlFrameKind byte
+)
+
+const (
+	controlFrameKindFunction = iota + 1
+	controlFrameKindLoop
+	controlFrameKindIf
+	controlFrameKindBlock
 )
 
 func (ctrl *controlFrame) isReturn() bool {
-	return ctrl.followingBlock == nil
+	return ctrl.kind == controlFrameKindFunction
 }
 
 func (ctrl *controlFrame) isLoop() bool {
-	return ctrl.loopBodyBlock != nil
+	return ctrl.kind == controlFrameKindLoop
 }
 
 func (l *loweringState) reset() {
@@ -63,6 +73,9 @@ func (l *loweringState) peek() ssa.Value {
 }
 
 func (l *loweringState) nPeekDup(n int) []ssa.Value {
+	if n == 0 {
+		return nil
+	}
 	tail := len(l.values)
 	view := l.values[tail-n : tail]
 	return cloneValuesList(view)
@@ -86,7 +99,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret controlFrame) {
 
 func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 	// Pushes the empty control frame which corresponds to the function return.
-	c.loweringState.ctrlPush(controlFrame{})
+	c.loweringState.ctrlPush(controlFrame{kind: controlFrameKindFunction})
 
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
@@ -136,7 +149,8 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		state.ctrlPush(controlFrame{
 			originalStackLenWithoutParam: len(state.values) - len(bt.Params),
-			loopBodyBlock:                loopBodyBlk,
+			kind:                         controlFrameKindLoop,
+			blk:                          loopBodyBlk,
 			followingBlock:               afterLoopBlock,
 			blockType:                    bt,
 		})
@@ -149,7 +163,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		thenBlk, followingBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+		v := state.pop()
+		thenBlk, elseBlk, followingBlk :=
+			builder.AllocateBasicBlock(), builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
 
 		// We do not make the Wasm-level block parameters as SSA-level block params,
 		// since they won't be phi and the definition is unique.
@@ -158,9 +174,21 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		// multiple definitions (one in Then and another in Else blocks).
 		c.addBlockParamsFromWasmTypes(bt.Results, followingBlk)
 
-		args := cloneValuesList(state.values[len(state.values)-1-len(bt.Params):])
+		var args []ssa.Value
+		if len(bt.Params) > 0 {
+			args = cloneValuesList(state.values[len(state.values)-1-len(bt.Params):])
+		}
+
+		// Insert the conditional jump to the else block.
+		brz := builder.AllocateInstruction()
+		brz.AsBrz(v, args, elseBlk)
+		builder.InsertInstruction(brz)
+		elseBlk.AddPred(builder.CurrentBlock())
+
 		state.ctrlPush(controlFrame{
+			kind:                         controlFrameKindIf,
 			originalStackLenWithoutParam: len(state.values) - len(bt.Params),
+			blk:                          elseBlk,
 			followingBlock:               followingBlk,
 			blockType:                    bt,
 			clonedArgs:                   args,
@@ -187,7 +215,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Reset the stack so that we can correctly handle the else block.
 		state.values = state.values[:ifctrl.originalStackLenWithoutParam]
-		elseBlk := builder.AllocateBasicBlock()
+		elseBlk := ifctrl.blk
 		for _, arg := range ifctrl.clonedArgs {
 			state.push(arg)
 		}
@@ -237,10 +265,17 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
+		targetFrame := state.ctrlPeekAt(int(v))
+		if targetFrame.isReturn() {
+			c.insertReturn()
+			state.unreachable = true
+			return
+		}
+
 		var targetBlk ssa.BasicBlock
 		var argNum int
-		if targetFrame := state.ctrlPeekAt(int(v)); targetFrame.isLoop() {
-			targetBlk, argNum = targetFrame.loopBodyBlock, len(targetFrame.blockType.Params)
+		if targetFrame.isLoop() {
+			targetBlk, argNum = targetFrame.blk, len(targetFrame.blockType.Params)
 		} else {
 			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
 		}

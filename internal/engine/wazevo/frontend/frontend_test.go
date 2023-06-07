@@ -122,6 +122,44 @@ blk2: ()
 	Jump blk1
 `,
 		},
+		{
+			name: "if without else", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeIf, 0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			},
+				[]wasm.ValueType{i32}),
+			exp: `
+blk0: ()
+	v1 = Iconst_32 0x0
+
+blk1: ()
+	Jump blk2
+
+blk2: () <-- (blk1)
+	Return
+`,
+		},
+		{
+			name: "if-else", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeIf, 0,
+				wasm.OpcodeElse,
+				wasm.OpcodeBr, 1,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			},
+				[]wasm.ValueType{i32}),
+			exp: `
+blk0: ()
+	v1 = Iconst_32 0x0
+
+blk1: ()
+	Jump blk2
+
+blk2: () <-- (blk1)
+	Return
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

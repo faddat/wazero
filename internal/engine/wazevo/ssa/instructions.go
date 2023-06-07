@@ -16,9 +16,10 @@ type Opcode uint32
 type Instruction struct {
 	opcode     Opcode
 	u64        uint64
+	v          Value
 	vs         []Value
 	typ        Type
-	blk1, blk2 BasicBlock
+	blk        BasicBlock
 	prev, next *Instruction
 	srcPos     uint64
 
@@ -1066,15 +1067,36 @@ func init() {
 func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.opcode = OpcodeJump
 	i.vs = vs
-	i.blk1 = target
+	i.blk = target
 }
 
 func init() {
 	instructionFormats[OpcodeJump] = func(i *Instruction) (ret string) {
 		vs := make([]string, len(i.vs)+1)
-		vs[0] = fmt.Sprintf(" blk%d", i.blk1.(*basicBlock).id)
+		vs[0] = fmt.Sprintf(" blk%d", i.blk.(*basicBlock).id)
 		for idx := range i.vs {
 			vs[idx+1] = i.vs[idx].String()
+		}
+
+		ret = strings.Join(vs, ", ")
+		return
+	}
+}
+
+func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
+	i.opcode = OpcodeBrz
+	i.v = v
+	i.vs = args
+	i.blk = target
+}
+
+func init() {
+	instructionFormats[OpcodeBrz] = func(i *Instruction) (ret string) {
+		vs := make([]string, len(i.vs)+2)
+		vs[0] = "" + i.v.String()
+		vs[1] = fmt.Sprintf("blk%d", i.blk.(*basicBlock).id)
+		for idx := range i.vs {
+			vs[idx+2] = i.vs[idx].String()
 		}
 
 		ret = strings.Join(vs, ", ")
