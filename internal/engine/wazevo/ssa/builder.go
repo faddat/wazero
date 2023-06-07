@@ -296,15 +296,16 @@ func (bb *basicBlock) String() string {
 	for i, p := range bb.params {
 		ps[i] = p.String()
 	}
-	if bb.id == 0 {
-		return fmt.Sprintf("entrypoint: (%s)", strings.Join(ps, ", "))
-	} else {
+
+	if len(bb.preds) > 0 {
 		preds := make([]string, len(bb.preds))
 		for i, pred := range bb.preds {
 			preds[i] = fmt.Sprintf("blk%d", pred.id)
 		}
 		return fmt.Sprintf("blk%d: (%s) <-- (%s)",
-			bb.id, strings.Join(ps, ","), strings.Join(preds, ","))
+			bb.id, strings.Join(ps, ",v"), strings.Join(preds, ","))
+	} else {
+		return fmt.Sprintf("blk%d: (%s)", bb.id, strings.Join(ps, ", "))
 	}
 }
 
