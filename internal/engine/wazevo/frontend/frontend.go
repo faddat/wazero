@@ -111,6 +111,8 @@ func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.Bas
 
 // formatBuilder outputs the constructed SSA function as a string with a source information.
 func (c *Compiler) formatBuilder() string {
+	// TODO: use source position to add the Wasm-level source info.
+
 	builder := c.ssaBuilder
 
 	str := strings.Builder{}
@@ -120,7 +122,6 @@ func (c *Compiler) formatBuilder() string {
 		str.WriteString(header)
 		str.WriteByte('\n')
 		for cur := b.Root(); cur != nil; cur = cur.Next() {
-			// TODO: use source position to add the Wasm-level source info.
 			str.WriteByte('\t')
 			str.WriteString(cur.String())
 			str.WriteByte('\n')

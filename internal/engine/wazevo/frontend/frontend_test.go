@@ -36,21 +36,21 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 			name: "empty", m: singleFunctionModule(vv, []byte{wasm.OpcodeEnd}, nil),
 			exp: `
 blk0: ()
-	Return ()
+	Return
 `,
 		},
 		{
 			name: "only return", m: singleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil),
 			exp: `
 blk0: ()
-	Return ()
+	Return
 `,
 		},
 		{
 			name: "params", m: singleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil),
 			exp: `
 blk0: (v1: i32, v2: f32, v3: f64)
-	Return ()
+	Return
 `,
 		},
 		{
@@ -62,7 +62,7 @@ blk0: ()
 	v2 = Iconst_64 0x0
 	v3 = F32const 0.000000
 	v4 = F64const 0.000000
-	Return ()
+	Return
 `,
 		},
 		{
@@ -74,7 +74,7 @@ blk0: (v1: i32, v2: f32, v3: f64)
 	v5 = Iconst_64 0x0
 	v6 = F32const 0.000000
 	v7 = F64const 0.000000
-	Return ()
+	Return
 `,
 		},
 		{
@@ -91,10 +91,10 @@ blk0: ()
 	v2 = Iconst_64 0x0
 	v3 = F32const 0.000000
 	v4 = F64const 0.000000
-	Jump blk1, ()
+	Jump blk1
 
 blk1: () <-- (blk0)
-	Return ()
+	Return
 `,
 		},
 		{
@@ -104,18 +104,22 @@ blk1: () <-- (blk0)
 				wasm.OpcodeBr, 1,
 				wasm.OpcodeEnd,
 				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
 			},
 				[]wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
-entrypoint: ()
+blk0: ()
 	v1 = Iconst_32 0x0
 	v2 = Iconst_64 0x0
 	v3 = F32const 0.000000
 	v4 = F64const 0.000000
-	Jump blk1, ()
+	Jump blk1
 
-blk1: () <-- (blk0)
-	Return ()
+blk1: () <-- (blk0,blk2)
+	Return
+
+blk2: ()
+	Jump blk1
 `,
 		},
 	} {

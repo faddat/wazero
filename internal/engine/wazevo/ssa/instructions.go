@@ -1051,12 +1051,14 @@ func (i *Instruction) AsReturn(vs []Value) {
 
 func init() {
 	instructionFormats[OpcodeReturn] = func(i *Instruction) (ret string) {
+		if len(i.vs) == 0 {
+			return
+		}
 		vs := make([]string, len(i.vs))
 		for idx := range vs {
 			vs[idx] = i.vs[idx].String()
 		}
-
-		ret = fmt.Sprintf(" (%s)", strings.Join(vs, ","))
+		ret = fmt.Sprintf(" %s", strings.Join(vs, ","))
 		return
 	}
 }
@@ -1069,12 +1071,13 @@ func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 
 func init() {
 	instructionFormats[OpcodeJump] = func(i *Instruction) (ret string) {
-		vs := make([]string, len(i.vs))
-		for idx := range vs {
-			vs[idx] = i.vs[idx].String()
+		vs := make([]string, len(i.vs)+1)
+		vs[0] = fmt.Sprintf(" blk%d", i.blk1.(*basicBlock).id)
+		for idx := range i.vs {
+			vs[idx+1] = i.vs[idx].String()
 		}
 
-		ret = fmt.Sprintf(" blk%d, (%s)", i.blk1.(*basicBlock).id, strings.Join(vs, ","))
+		ret = strings.Join(vs, ", ")
 		return
 	}
 }

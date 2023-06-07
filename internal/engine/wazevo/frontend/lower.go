@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -90,6 +91,8 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
 		c.lowerOpcode(op)
+		fmt.Println("---------" + wasm.InstructionName(op) + " --------")
+		fmt.Println(c.ssaBuilder.String())
 		c.loweringState.pc++
 	}
 }
@@ -221,8 +224,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		currentBlk := builder.CurrentBlock()
 		followingBlk := ctrl.followingBlock
-		// Record that the target has the current one as a predecessor.
-		followingBlk.AddPred(currentBlk)
 
 		// Insert the unconditional branch to the target.
 		c.jumpToBlock(args, currentBlk, followingBlk)
@@ -283,7 +284,7 @@ func (c *Compiler) jumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.Basic
 		builder.DefineVariable(variable, args[i], currentBlk)
 	}
 
-	c.ssaBuilder.InsertInstruction(jmp)
+	builder.InsertInstruction(jmp)
 	targetBlk.AddPred(currentBlk)
 }
 

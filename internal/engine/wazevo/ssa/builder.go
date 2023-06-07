@@ -11,6 +11,8 @@ type (
 
 	// Builder is used to builds SSA consisting of Basic Blocks per function.
 	Builder interface {
+		fmt.Stringer
+
 		// Reset must be called to reuse this builder for the next function.
 		Reset()
 
@@ -74,7 +76,8 @@ type (
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool: instructionsPool{index: instructionsPoolPageSize},
+		instructionsPool: newInstructionsPool(),
+		basicBlocksPool:  newBasicBlocksPool(),
 	}
 }
 
@@ -85,9 +88,10 @@ func NewBuilder() Builder {
 //
 // with the stricter assumption that our input is always a "complete" CFG.
 type builder struct {
-	nextBasicBlock  int
-	nextVariable    Variable
-	basicBlocks     []basicBlock
+	nextVariable     Variable
+	basicBlocksPool  basicBlocksPool
+	instructionsPool instructionsPool
+
 	basicBlocksView []BasicBlock
 	currentBB       *basicBlock
 
@@ -98,17 +102,13 @@ type builder struct {
 	lastDefinitions          []map[Variable]Value
 	lastDefinitionsResetTemp []Variable
 
-	instructionsPool instructionsPool
-	nextValue        Value
+	nextValue Value
 }
 
 // Reset implements Builder.
 func (b *builder) Reset() {
 	b.instructionsPool.reset()
-
-	for i := 0; i < b.nextBasicBlock; i++ {
-		b.basicBlocks[i].reset()
-	}
+	b.basicBlocksPool.reset()
 
 	for i := Variable(0); i < b.nextVariable; i++ {
 		b.variables[i] = TypeInvalid
@@ -127,20 +127,17 @@ func (b *builder) Reset() {
 	b.nextValue = valueInvalid + 1
 }
 
+// AllocateInstruction implements Builder.
 func (b *builder) AllocateInstruction() *Instruction {
-	return b.instructionsPool.allocateInstruction()
+	return b.instructionsPool.allocate()
 }
 
 // AllocateBasicBlock implements Builder.
 func (b *builder) AllocateBasicBlock() BasicBlock {
-	if l := len(b.basicBlocks); l <= b.nextBasicBlock {
-		b.basicBlocks = append(b.basicBlocks, make([]basicBlock, 2*(l+1))...)
-	}
-
-	ret := &b.basicBlocks[b.nextBasicBlock]
-	ret.id = b.nextBasicBlock
-	b.nextBasicBlock++
-	return ret
+	id := b.basicBlocksPool.allocated
+	blk := b.basicBlocksPool.allocate()
+	blk.id = id
+	return blk
 }
 
 // InsertInstruction implements Builder.
@@ -172,13 +169,14 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 
 // Blocks implements Builder.
 func (b *builder) Blocks() []BasicBlock {
-	if b.nextBasicBlock >= len(b.basicBlocksView) {
-		b.basicBlocksView = append(b.basicBlocksView, make([]BasicBlock, b.nextBasicBlock)...)
+	blkNum := b.basicBlocksPool.allocated
+	if blkNum >= len(b.basicBlocksView) {
+		b.basicBlocksView = append(b.basicBlocksView, make([]BasicBlock, blkNum)...)
 	}
-	for i := 0; i < b.nextBasicBlock; i++ {
-		b.basicBlocksView[i] = &b.basicBlocks[i]
+	for i := 0; i < blkNum; i++ {
+		b.basicBlocksView[i] = b.basicBlocksPool.view(i)
 	}
-	return b.basicBlocksView[:b.nextBasicBlock]
+	return b.basicBlocksView[:blkNum]
 }
 
 // DefineVariable implements Builder.
@@ -226,6 +224,23 @@ func (b *builder) AllocateVariable() (ret Variable) {
 	ret = b.nextVariable
 	b.nextVariable++
 	return
+}
+
+// String implements fmt.Stringer.
+func (b *builder) String() string {
+	str := strings.Builder{}
+	for _, blk := range b.Blocks() {
+		header := blk.String()
+		str.WriteByte('\n')
+		str.WriteString(header)
+		str.WriteByte('\n')
+		for cur := blk.Root(); cur != nil; cur = cur.Next() {
+			str.WriteByte('\t')
+			str.WriteString(cur.String())
+			str.WriteByte('\n')
+		}
+	}
+	return str.String()
 }
 
 // BasicBlock is an identifier of a basic block in a SSA-transformed function.
@@ -307,45 +322,6 @@ func (bb *basicBlock) String() string {
 	} else {
 		return fmt.Sprintf("blk%d: (%s)", bb.id, strings.Join(ps, ", "))
 	}
-}
-
-const instructionsPoolPageSize = 128
-
-type (
-	instructionsPoolPage = [instructionsPoolPageSize]Instruction
-	instructionsPool     struct {
-		pages []*instructionsPoolPage
-		index int
-	}
-)
-
-func (n *instructionsPool) allocateInstruction() *Instruction {
-	if n.index == instructionsPoolPageSize {
-		if len(n.pages) == cap(n.pages) {
-			n.pages = append(n.pages, new(instructionsPoolPage))
-		} else {
-			i := len(n.pages)
-			n.pages = n.pages[:i+1]
-			if n.pages[i] == nil {
-				n.pages[i] = new(instructionsPoolPage)
-			}
-		}
-		n.index = 0
-	}
-	ret := &n.pages[len(n.pages)-1][n.index]
-	n.index++
-	return ret
-}
-
-func (n *instructionsPool) reset() {
-	for _, ns := range n.pages {
-		pages := ns[:]
-		for i := range pages {
-			pages[i] = Instruction{}
-		}
-	}
-	n.pages = n.pages[:0]
-	n.index = instructionsPoolPageSize
 }
 
 // blockParam implements Value and represents a parameter to a basicBlock.
