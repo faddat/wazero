@@ -30,6 +30,10 @@ type BasicBlock interface {
 
 	// Root returns the root instruction of this block.
 	Root() *Instruction
+
+	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
+	// After calling this, AddPred will be forbidden.
+	Seal()
 }
 
 // BasicBlock is an identifier of a basic block in a SSA-transformed function.
@@ -42,6 +46,8 @@ type basicBlock struct {
 	singlePred *basicBlock
 	// lastDefinitions maps Variable to its last definition in this block.
 	lastDefinitions map[Variable]Value
+
+	sealed bool
 }
 
 // AddParam implements BasicBlock.
@@ -91,11 +97,19 @@ func (bb *basicBlock) reset() {
 
 // AddPred implements BasicBlock.
 func (bb *basicBlock) AddPred(blk BasicBlock) {
-	pred := blk.(*basicBlock)
-	if len(bb.preds) == 0 {
-		bb.singlePred = pred
+	if bb.sealed {
+		panic("BUG: trying to add predecessor to a sealed block: " + bb.String())
 	}
+	pred := blk.(*basicBlock)
 	bb.preds = append(bb.preds, pred)
+}
+
+// Seal implements BasicBlock.
+func (bb *basicBlock) Seal() {
+	if len(bb.preds) == 1 {
+		bb.singlePred = bb.preds[0]
+	}
+	bb.sealed = true
 }
 
 // String implements fmt.Stringer. Only used for debugging.

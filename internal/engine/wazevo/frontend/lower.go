@@ -22,7 +22,7 @@ type (
 		// originalStackLen holds the number of values on the Wasm stack
 		// when start executing this control frame minus params for the block.
 		originalStackLenWithoutParam int
-		// blk is the loop body if this is loop, and is the else-block if this is a if frame.
+		// blk is the loop header if this is loop, and is the else-block if this is an if frame.
 		blk,
 		// followingBlock is the basic block we enter if we reach "end" of block.
 		followingBlock ssa.BasicBlock
@@ -115,6 +115,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	switch op {
 	case wasm.OpcodeLocalGet:
 		index := c.readU32()
+		if state.unreachable {
+			return
+		}
 		variable := c.localVariable(index)
 		v := builder.FindValue(variable)
 		state.push(v)
@@ -147,14 +150,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		loopBodyBlk, afterLoopBlock := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
-		c.addBlockParamsFromWasmTypes(bt.Params, loopBodyBlk)
+		loopHeader, afterLoopBlock := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+		c.addBlockParamsFromWasmTypes(bt.Params, loopHeader)
 		c.addBlockParamsFromWasmTypes(bt.Results, afterLoopBlock)
 
 		state.ctrlPush(controlFrame{
 			originalStackLenWithoutParam: len(state.values) - len(bt.Params),
 			kind:                         controlFrameKindLoop,
-			blk:                          loopBodyBlk,
+			blk:                          loopHeader,
 			followingBlock:               afterLoopBlock,
 			blockType:                    bt,
 		})
@@ -164,13 +167,13 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			args = cloneValuesList(state.values[len(state.values)-1-len(bt.Params):])
 		}
 
-		// Insert the jump to the body of loop.
+		// Insert the jump to the header of loop.
 		br := builder.AllocateInstruction()
-		br.AsJump(args, loopBodyBlk)
+		br.AsJump(args, loopHeader)
 		builder.InsertInstruction(br)
-		loopBodyBlk.AddPred(builder.CurrentBlock())
+		loopHeader.AddPred(builder.CurrentBlock())
 
-		c.ssaBuilder.SetCurrentBlock(loopBodyBlk)
+		c.ssaBuilder.SetCurrentBlock(loopHeader)
 
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()
@@ -220,6 +223,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		c.ssaBuilder.SetCurrentBlock(thenBlk)
 
+		// Then and Else (if exists) have only one predecessor.
+		thenBlk.Seal()
+		elseBlk.Seal()
 	case wasm.OpcodeElse:
 		ifctrl := state.ctrlPeekAt(0)
 		ifctrl.kind = controlFrameKindIfWithElse
@@ -247,28 +253,39 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		c.ssaBuilder.SetCurrentBlock(elseBlk)
-	case wasm.OpcodeReturn:
-		c.insertReturn()
-		state.unreachable = true
 
 	case wasm.OpcodeEnd:
-		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
+		unreachable := state.unreachable
+		if unreachable && state.unreachableDepth > 0 {
 			state.unreachableDepth--
 			return
-		} else if unreachable {
-			ctrl := state.ctrlPop()
+		}
+
+		ctrl := state.ctrlPop()
+		followingBlk := ctrl.followingBlock
+
+		if unreachable {
 			if ctrl.isReturn() {
 				// This is the very end of function body.
 				return
 			}
 
-			followingBlk := ctrl.followingBlock
-			// If this is the end of Then block, we have to emit the empty Else block.
-			if ctrl.kind == controlFrameKindIfWithoutElse {
+			switch ctrl.kind {
+			case controlFrameKindLoop:
+				// Loop header block can be reached from any br/br_table contained in the loop,
+				// so now that we've reached End of it, we can seal it.
+				ctrl.blk.Seal()
+			case controlFrameKindIfWithoutElse:
+				// If this is the end of Then block, we have to emit the empty Else block.
 				elseBlk := ctrl.blk
 				builder.SetCurrentBlock(elseBlk)
 				c.jumpToBlock(nil, elseBlk, followingBlk)
-				panic("TODO add unit test to cover this branch")
+
+				fallthrough // Regardless of the existence of Else, we can seal the following block.
+			case controlFrameKindIfWithElse:
+				// The block after if-then-else-end can only be reached inside Then or Else blocks,
+				// so we've now known all the predecessors to the following block.
+				ctrl.followingBlock.Seal()
 			}
 
 			// We do not need branching here because this is unreachable.
@@ -277,27 +294,32 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		ctrl := state.ctrlPop()
 		if ctrl.isReturn() {
 			c.insertReturn()
 			return
 		}
 
-		followingBlk := ctrl.followingBlock
-
 		// Top n-th args will be used as a result of the current control frame.
 		args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
 
-		currentBlk := builder.CurrentBlock()
-
 		// Insert the unconditional branch to the target.
-		c.jumpToBlock(args, currentBlk, followingBlk)
+		c.jumpToBlock(args, builder.CurrentBlock(), followingBlk)
 
-		// If this is the end of Then block, we have to emit the empty Else block.
-		if ctrl.kind == controlFrameKindIfWithoutElse {
+		switch ctrl.kind {
+		case controlFrameKindLoop:
+			// Loop header block can be reached from any br/br_table contained in the loop,
+			// so now that we've reached End of it, we can seal it.
+			ctrl.blk.Seal()
+		case controlFrameKindIfWithoutElse:
+			// If this is the end of Then block, we have to emit the empty Else block.
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
 			c.jumpToBlock(nil, elseBlk, followingBlk)
+			fallthrough // Regardless of the existence of Else, we can seal the following block.
+		case controlFrameKindIfWithElse:
+			// The block after if-then-else-end can only be reached inside Then or Else blocks,
+			// so we've now known all the predecessors to the following block.
+			ctrl.followingBlock.Seal()
 		}
 
 		// Ready to start translating the following block.
@@ -328,6 +350,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		state.unreachable = true
 	case wasm.OpcodeNop:
+	case wasm.OpcodeReturn:
+		c.insertReturn()
+		state.unreachable = true
 	default:
 		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))
 	}
@@ -359,11 +384,6 @@ func (c *Compiler) jumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.Basic
 	builder := c.ssaBuilder
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
-	for i := 0; i < targetBlk.Params(); i++ {
-		variable, _ := targetBlk.Param(i)
-		builder.DefineVariable(variable, args[i], currentBlk)
-	}
-
 	builder.InsertInstruction(jmp)
 	targetBlk.AddPred(currentBlk)
 }
@@ -373,6 +393,9 @@ func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
 	c.loweringState.values = c.loweringState.values[:originalStackLen]
 
 	c.ssaBuilder.SetCurrentBlock(targetBlk)
+
+	// At this point, blocks params consist only of the Wasm-level parameters,
+	// (since it's added only when we are trying to resolve variable *inside* this block).
 	for i := 0; i < targetBlk.Params(); i++ {
 		_, value := targetBlk.Param(i)
 		c.loweringState.push(value)

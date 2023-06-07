@@ -217,7 +217,7 @@ blk3: () <-- (blk1)
 `,
 		},
 		{
-			name: "single predecessor local ref", m: &wasm.Module{
+			name: "single predecessor local refs", m: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{vv, v_i32},
 				FunctionSection: []wasm.Index{1},
 				CodeSection: []wasm.Code{{
@@ -255,6 +255,17 @@ blk3: () <-- (blk2)
 	Return v1
 `,
 		},
+		// TODO: add test case for the following:
+		//
+		//	(loop
+		//	  (block
+		//	    (local.get 0)
+		//	  )
+		//	  (block <--- this is the predecessor of loop body unknown at the time when getting locals[2] above^.
+		//	    (br 1)
+		//	  )
+		//	)
+		//
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

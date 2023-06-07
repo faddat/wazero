@@ -63,7 +63,6 @@ func NewBuilder() Builder {
 //
 // with the stricter assumption that our input is always a "complete" CFG.
 type builder struct {
-	nextVariable     Variable
 	basicBlocksPool  basicBlocksPool
 	instructionsPool instructionsPool
 
@@ -72,8 +71,10 @@ type builder struct {
 
 	// variables track the types for Variable with the index regarded Variable.
 	variables []Type
-
+	// nextValue is used by builder.AllocateValue.
 	nextValue Value
+	// nextVariable is used by builder.AllocateVariable.
+	nextVariable Variable
 }
 
 // Reset implements Builder.
@@ -209,17 +210,19 @@ func (b *builder) AllocateValue() (v Value) {
 
 // FindValue implements Builder.
 func (b *builder) FindValue(variable Variable) Value {
-	return b.findValueInBlk(variable, b.currentBB)
+	return b.findValue(variable, b.currentBB)
 }
 
-func (b *builder) findValueInBlk(variable Variable, blk *basicBlock) Value {
+// findValue recursively tries to find the latest definition of a `variable`.
+// The algorithm is described in the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
+func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 	defs := blk.lastDefinitions
 	if val, ok := defs[variable]; ok {
 		return val
 	}
 
-	if len(blk.preds) == 1 {
-		return b.findValueInBlk(variable, blk.singlePred)
+	if pred := blk.singlePred; pred != nil {
+		return b.findValue(variable, pred)
 	}
 
 	panic("TODO")
