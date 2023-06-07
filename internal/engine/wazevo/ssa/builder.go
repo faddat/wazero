@@ -97,7 +97,6 @@ type builder struct {
 	// lastDefinitions track last definitions of a variable in each block.
 	lastDefinitions          []map[Variable]Value
 	lastDefinitionsResetTemp []Variable
-	instructions             []Instruction
 
 	instructionsPool instructionsPool
 	nextValue        Value

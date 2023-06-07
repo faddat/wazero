@@ -2,11 +2,12 @@ package frontend
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"strings"
-	"testing"
 )
 
 func TestNewFrontendCompiler(t *testing.T) {

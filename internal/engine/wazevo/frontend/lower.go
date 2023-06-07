@@ -54,7 +54,6 @@ func (l *loweringState) pop() (ret ssa.Value) {
 
 func (l *loweringState) push(ret ssa.Value) {
 	l.values = append(l.values, ret)
-	return
 }
 
 func (l *loweringState) peek() ssa.Value {
@@ -77,7 +76,6 @@ func (l *loweringState) ctrlPop() (ret controlFrame) {
 
 func (l *loweringState) ctrlPush(ret controlFrame) {
 	l.controlFrames = append(l.controlFrames, ret)
-	return
 }
 
 func (l *loweringState) ctrlPeekAt(n int) (ret controlFrame) {

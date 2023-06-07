@@ -2,9 +2,10 @@ package frontend
 
 import (
 	"bytes"
+	"strings"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"strings"
 )
 
 // Compiler is in charge of lowering Wasm to SSA IR, and does the optimization
