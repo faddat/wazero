@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -66,11 +67,6 @@ func (l *loweringState) pop() (ret ssa.Value) {
 
 func (l *loweringState) push(ret ssa.Value) {
 	l.values = append(l.values, ret)
-}
-
-func (l *loweringState) peek() ssa.Value {
-	i := len(l.values) - 1
-	return l.values[i]
 }
 
 func (l *loweringState) nPeekDup(n int) []ssa.Value {
@@ -172,8 +168,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		v := state.pop()
-		thenBlk, elseBlk, followingBlk :=
-			builder.AllocateBasicBlock(), builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+		thenBlk, elseBlk, followingBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
 
 		currentBlk := builder.CurrentBlock()
 

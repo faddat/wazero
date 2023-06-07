@@ -16,7 +16,7 @@ func (v Variable) String() string {
 	return fmt.Sprintf("var%d", v)
 }
 
-// Value represents an SSA value. The relationship wit Variable is 1: N
+// Value represents an SSA value. The relationship with Variable is 1: N (including 0),
 // that means there might be multiple Variable(s) for a Value.
 type Value uint32
 

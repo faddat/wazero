@@ -79,6 +79,10 @@ type builder struct {
 // Reset implements Builder.
 func (b *builder) Reset() {
 	b.instructionsPool.reset()
+
+	for i := 0; i < b.basicBlocksPool.allocated; i++ {
+		b.basicBlocksPool.view(i).reset()
+	}
 	b.basicBlocksPool.reset()
 
 	for i := Variable(0); i < b.nextVariable; i++ {

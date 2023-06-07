@@ -38,7 +38,7 @@ type basicBlock struct {
 	rootInstr, currentInstr *Instruction
 	params                  []blockParam
 	preds                   []*basicBlock
-	// lastDefinitions track last definitions of a variable in each block.
+	// lastDefinitions maps Variable to its last definition in this block.
 	lastDefinitions map[Variable]Value
 }
 
