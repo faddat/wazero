@@ -38,6 +38,8 @@ type basicBlock struct {
 	rootInstr, currentInstr *Instruction
 	params                  []blockParam
 	preds                   []*basicBlock
+	// singlePred is the alias to preds[0] for fast lookup.
+	singlePred *basicBlock
 	// lastDefinitions maps Variable to its last definition in this block.
 	lastDefinitions map[Variable]Value
 }
@@ -90,6 +92,9 @@ func (bb *basicBlock) reset() {
 // AddPred implements BasicBlock.
 func (bb *basicBlock) AddPred(blk BasicBlock) {
 	pred := blk.(*basicBlock)
+	if len(bb.preds) == 0 {
+		bb.singlePred = pred
+	}
 	bb.preds = append(bb.preds, pred)
 }
 

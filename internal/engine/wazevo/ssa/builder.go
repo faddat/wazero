@@ -102,6 +102,7 @@ func (b *builder) AllocateBasicBlock() BasicBlock {
 	id := b.basicBlocksPool.allocated
 	blk := b.basicBlocksPool.allocate()
 	blk.id = id
+	blk.lastDefinitions = map[Variable]Value{}
 	return blk
 }
 
@@ -151,9 +152,6 @@ func (b *builder) DefineVariable(variable Variable, value Value, block BasicBloc
 	}
 
 	bb := block.(*basicBlock)
-	if bb.lastDefinitions == nil {
-		bb.lastDefinitions = make(map[Variable]Value, 1)
-	}
 	bb.lastDefinitions[variable] = value
 }
 
@@ -211,11 +209,17 @@ func (b *builder) AllocateValue() (v Value) {
 
 // FindValue implements Builder.
 func (b *builder) FindValue(variable Variable) Value {
-	currentDefs := b.currentBB.lastDefinitions
-	if currentDefs != nil {
-		if val, ok := currentDefs[variable]; ok {
-			return val
-		}
+	return b.findValueInBlk(variable, b.currentBB)
+}
+
+func (b *builder) findValueInBlk(variable Variable, blk *basicBlock) Value {
+	defs := blk.lastDefinitions
+	if val, ok := defs[variable]; ok {
+		return val
+	}
+
+	if len(blk.preds) == 1 {
+		return b.findValueInBlk(variable, blk.singlePred)
 	}
 
 	panic("TODO")

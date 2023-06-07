@@ -159,6 +159,19 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			blockType:                    bt,
 		})
 
+		var args []ssa.Value
+		if len(bt.Params) > 0 {
+			args = cloneValuesList(state.values[len(state.values)-1-len(bt.Params):])
+		}
+
+		// Insert the jump to the body of loop.
+		br := builder.AllocateInstruction()
+		br.AsJump(args, loopBodyBlk)
+		builder.InsertInstruction(br)
+		loopBodyBlk.AddPred(builder.CurrentBlock())
+
+		c.ssaBuilder.SetCurrentBlock(loopBodyBlk)
+
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()
 

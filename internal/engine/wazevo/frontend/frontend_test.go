@@ -25,6 +25,7 @@ const (
 
 func TestCompiler_LowerToSSA(t *testing.T) {
 	vv := wasm.FunctionType{}
+	v_i32 := wasm.FunctionType{Results: []wasm.ValueType{i32}}
 	i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
 	i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
 	i32f32f64_v := wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
@@ -123,6 +124,24 @@ blk1: () <-- (blk0)
 `,
 		},
 		{
+			name: "loop - br", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeLoop, 0,
+				wasm.OpcodeBr, 0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{}),
+			exp: `
+blk0: ()
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	Jump blk1
+
+blk2: ()
+	Return
+`,
+		},
+		{
 			name: "block - block - br", m: singleFunctionModule(vv, []byte{
 				wasm.OpcodeBlock, 0,
 				wasm.OpcodeBlock, 0,
@@ -197,13 +216,53 @@ blk3: () <-- (blk1)
 	Return
 `,
 		},
+		{
+			name: "single predecessor local ref", m: &wasm.Module{
+				TypeSection:     []wasm.FunctionType{vv, v_i32},
+				FunctionSection: []wasm.Index{1},
+				CodeSection: []wasm.Code{{
+					LocalTypes: []wasm.ValueType{i32, i32, i32},
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeIf, 0,
+						// This is defined in the first block which is the sole predecessor of If.
+						wasm.OpcodeLocalGet, 2,
+						wasm.OpcodeReturn,
+						wasm.OpcodeElse,
+						wasm.OpcodeEnd,
+						// This is defined in the first block which is the sole predecessor of this block.
+						// Note that If block will never reach here because it's returning early.
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeEnd,
+					},
+				}},
+			},
+			exp: `
+blk0: ()
+	v1 = Iconst_32 0x0
+	v2 = Iconst_32 0x0
+	v3 = Iconst_32 0x0
+	Brz v1, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Return v3
+
+blk2: () <-- (blk0)
+	Jump blk3
+
+blk3: () <-- (blk2)
+	Return v1
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			b := ssa.NewBuilder()
 			fc := NewFrontendCompiler(tc.m, b)
+			typeIndex := tc.m.FunctionSection[0]
 			code := &tc.m.CodeSection[0]
-			fc.Init(0, &tc.m.TypeSection[0], code.LocalTypes, code.Body)
+			fc.Init(0, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
 			err := fc.LowerToSSA()
 			require.NoError(t, err)
 			exp := strings.TrimPrefix(tc.exp, "\n\n")
