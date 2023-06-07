@@ -93,9 +93,9 @@ func (l *loweringState) ctrlPush(ret controlFrame) {
 	l.controlFrames = append(l.controlFrames, ret)
 }
 
-func (l *loweringState) ctrlPeekAt(n int) (ret controlFrame) {
+func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	tail := len(l.controlFrames) - 1
-	return l.controlFrames[tail-n]
+	return &l.controlFrames[tail-n]
 }
 
 func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
@@ -104,9 +104,9 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
+		fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 		c.lowerOpcode(op)
 		// TODO: delete.
-		fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 		fmt.Println(c.ssaBuilder.String())
 		fmt.Println("--------------------------")
 		c.loweringState.pc++
@@ -213,14 +213,15 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.ssaBuilder.SetCurrentBlock(thenBlk)
 
 	case wasm.OpcodeElse:
+		ifctrl := state.ctrlPeekAt(0)
+		ifctrl.kind = controlFrameKindIfWithElse
+
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
 			// If it is currently in unreachable and is a nested if,
 			// we just remove the entire else block.
 			return
 		}
 
-		ifctrl := state.ctrlPeekAt(0)
-		ifctrl.kind = controlFrameKindIfWithElse
 		if !state.unreachable {
 			// If this Then block is currently reachable, we have to insert the branching to the following BB.
 			followingBlk := ifctrl.followingBlock // == the BB after if-then-else.
@@ -252,8 +253,18 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 				// This is the very end of function body.
 				return
 			}
+
+			followingBlk := ctrl.followingBlock
+			// If this is the end of Then block, we have to emit the empty Else block.
+			if ctrl.kind == controlFrameKindIfWithoutElse {
+				elseBlk := ctrl.blk
+				builder.SetCurrentBlock(elseBlk)
+				c.jumpToBlock(nil, elseBlk, followingBlk)
+				panic("TODO add unit test to cover this branch")
+			}
+
 			// We do not need branching here because this is unreachable.
-			c.switchTo(ctrl.originalStackLenWithoutParam, ctrl.followingBlock)
+			c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
 			state.unreachable = false
 			return
 		}
