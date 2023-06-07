@@ -980,7 +980,7 @@ var numReturns = [...]*struct {
 	num     int
 	unknown bool
 }{
-	OpcodeJump:     {num: 1, unknown: false},
+	OpcodeJump:     {num: 0, unknown: false},
 	OpcodeIconst:   {num: 1, unknown: false},
 	OpcodeF32const: {num: 1, unknown: false},
 	OpcodeF64const: {num: 1, unknown: false},

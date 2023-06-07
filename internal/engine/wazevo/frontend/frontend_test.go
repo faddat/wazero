@@ -90,7 +90,7 @@ entrypoint: ()
 	v2 = Iconst_64 0x0
 	v3 = F32const 0.000000
 	v4 = F64const 0.000000
-	v5 = Jump blk1, ()
+	Jump blk1, ()
 
 blk1: () <-- (blk0)
 	Return ()
