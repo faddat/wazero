@@ -372,9 +372,8 @@ blk3: (v4: i32) <-- (blk1,blk2)
 	Jump blk_ret, v4
 `,
 		},
-
-		// TODO:
 		{
+			// TODO:
 			name: "reference value from unsealed block",
 			m: singleFunctionModule(i32_i32, []byte{
 				wasm.OpcodeLoop, blockSignature_vv,
@@ -383,6 +382,7 @@ blk3: (v4: i32) <-- (blk1,blk2)
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeReturn,
 				wasm.OpcodeEnd,
+				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{i32}),
 			exp: ``,

@@ -95,16 +95,14 @@ func (bb *basicBlock) AddParam(b Builder, typ Type) Variable {
 
 // addParamOn adds a parameter to this block whose variable is already defined.
 // This is only used in the variable resolution.
-func (bb *basicBlock) addParamOn(b *builder, variable Variable) Value {
+func (bb *basicBlock) addParamOn(b *builder, variable Variable, value Value) {
 	typ := b.variables[variable]
 	if typ == TypeInvalid {
 		panic("BUG: variable " + variable.String() + " not declared yet")
 	}
 	n := len(bb.params)
-	paramValue := b.AllocateValue()
-	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: paramValue})
-	b.DefineVariable(variable, paramValue, bb)
-	return paramValue
+	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: value})
+	b.DefineVariable(variable, value, bb)
 }
 
 // Params implements BasicBlock.Params.

@@ -27,6 +27,8 @@ func (v Value) String() string {
 	return fmt.Sprintf("v%d", v)
 }
 
+// Valid returns true if this value is valid.
+// TODO: needs to be exported?
 func (v Value) Valid() bool {
 	return v != valueInvalid
 }

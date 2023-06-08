@@ -28,6 +28,7 @@ const (
 	// TODO: SIMD, ref types!
 )
 
+// String implements fmt.Stringer.
 func (t Type) String() (ret string) {
 	switch t {
 	case TypeI8:

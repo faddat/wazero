@@ -225,7 +225,8 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 	// and treat them as an argument to this block. So the first thing we do now is
 	// define a new parameter to this block which may or may not be redundant, but
 	// later we eliminate trivial params in an optimization pass.
-	paramValue := blk.addParamOn(b, variable)
+	paramValue := b.AllocateValue()
+	blk.addParamOn(b, variable, paramValue)
 	// After the new "phi" param is added, we have to manipulate the original branching instructions
 	// in predecessors so that they would pass the definition of `variable` as the argument to
 	// the newly added phi.
@@ -240,17 +241,18 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 
 // Seal implements Builder.Seal.
 func (b *builder) Seal(raw BasicBlock) {
-	bb := raw.(*basicBlock)
-	if len(bb.preds) == 1 {
-		bb.singlePred = bb.preds[0].blk
+	blk := raw.(*basicBlock)
+	if len(blk.preds) == 1 {
+		blk.singlePred = blk.preds[0].blk
 	}
-	bb.sealed = true
+	blk.sealed = true
 
-	for variable, phiValue := range bb.unknownValues {
-
-	}
-
-	if len(bb.unknownValues) > 0 {
-		panic("TODO")
+	for variable, phiValue := range blk.unknownValues {
+		blk.addParamOn(b, variable, phiValue)
+		for i := range blk.preds {
+			pred := &blk.preds[i]
+			predValue := b.findValue(variable, pred.blk)
+			pred.branch.addArgument(predValue)
+		}
 	}
 }
