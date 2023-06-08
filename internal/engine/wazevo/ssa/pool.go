@@ -2,24 +2,13 @@ package ssa
 
 const poolPageSize = 128
 
-type (
-	pool[T any] struct {
-		pages            []*[poolPageSize]T
-		allocated, index int
-	}
-
-	instructionsPool = pool[Instruction]
-	basicBlocksPool  = pool[basicBlock]
-)
-
-func newInstructionsPool() instructionsPool {
-	ret := instructionsPool{}
-	ret.reset()
-	return ret
+type pool[T any] struct {
+	pages            []*[poolPageSize]T
+	allocated, index int
 }
 
-func newBasicBlocksPool() basicBlocksPool {
-	ret := basicBlocksPool{}
+func newPool[T any]() pool[T] {
+	var ret pool[T]
 	ret.reset()
 	return ret
 }

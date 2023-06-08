@@ -2,17 +2,8 @@
 // and ISA.
 package ssa
 
-import (
-	"fmt"
-	"strings"
-)
-
-type
-
 // Builder is used to builds SSA consisting of Basic Blocks per function.
-Builder interface {
-	fmt.Stringer
-
+type Builder interface {
 	// Reset must be called to reuse this builder for the next function.
 	Reset()
 
@@ -55,8 +46,8 @@ Builder interface {
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool: newInstructionsPool(),
-		basicBlocksPool:  newBasicBlocksPool(),
+		instructionsPool: newPool[Instruction](),
+		basicBlocksPool:  newPool[basicBlock](),
 	}
 }
 
@@ -67,8 +58,8 @@ func NewBuilder() Builder {
 //
 // with the stricter assumption that our input is always a "complete" CFG.
 type builder struct {
-	basicBlocksPool  basicBlocksPool
-	instructionsPool instructionsPool
+	basicBlocksPool  pool[basicBlock]
+	instructionsPool pool[Instruction]
 
 	basicBlocksView []BasicBlock
 	currentBB       *basicBlock
@@ -104,7 +95,7 @@ func (b *builder) AllocateInstruction() *Instruction {
 
 // AllocateBasicBlock implements Builder.
 func (b *builder) AllocateBasicBlock() BasicBlock {
-	id := b.basicBlocksPool.allocated
+	id := basicBlockID(b.basicBlocksPool.allocated)
 	blk := b.basicBlocksPool.allocate()
 	blk.id = id
 	blk.lastDefinitions = map[Variable]Value{}
@@ -140,14 +131,15 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 
 // Blocks implements Builder.
 func (b *builder) Blocks() []BasicBlock {
-	blkNum := b.basicBlocksPool.allocated
-	if blkNum >= len(b.basicBlocksView) {
-		b.basicBlocksView = append(b.basicBlocksView, make([]BasicBlock, blkNum)...)
+	b.basicBlocksView = b.basicBlocksView[:0]
+	for i := 0; i < b.basicBlocksPool.allocated; i++ {
+		blk := b.basicBlocksPool.view(i)
+		if blk.ReturnBlock() {
+			continue
+		}
+		b.basicBlocksView = append(b.basicBlocksView, blk)
 	}
-	for i := 0; i < blkNum; i++ {
-		b.basicBlocksView[i] = b.basicBlocksPool.view(i)
-	}
-	return b.basicBlocksView[:blkNum]
+	return b.basicBlocksView
 }
 
 // DefineVariable implements Builder.
@@ -191,23 +183,6 @@ func (b *builder) AllocateVariable() (ret Variable) {
 	ret = b.nextVariable
 	b.nextVariable++
 	return
-}
-
-// String implements fmt.Stringer.
-func (b *builder) String() string {
-	str := strings.Builder{}
-	for _, blk := range b.Blocks() {
-		header := blk.String()
-		str.WriteByte('\n')
-		str.WriteString(header)
-		str.WriteByte('\n')
-		for cur := blk.Root(); cur != nil; cur = cur.Next() {
-			str.WriteByte('\t')
-			str.WriteString(cur.String())
-			str.WriteByte('\n')
-		}
-	}
-	return str.String()
 }
 
 // AllocateValue implements Builder.

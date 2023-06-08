@@ -94,18 +94,22 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
-func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
-	// Pushes the empty control frame which corresponds to the function return.
-	c.loweringState.ctrlPush(controlFrame{kind: controlFrameKindFunction})
+func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
+	entryBlk.Seal()
 
-	c.ssaBuilder.CurrentBlock().Seal()
+	// Pushes the empty control frame which corresponds to the function return.
+	c.loweringState.ctrlPush(controlFrame{
+		kind:           controlFrameKindFunction,
+		blockType:      c.wasmFunctionTyp,
+		followingBlock: ssa.BasicBlockReturn,
+	})
 
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
 		// TODO: delete prints.
 		fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 		c.lowerOpcode(op)
-		fmt.Println(c.ssaBuilder.String())
+		fmt.Println(c.formatBuilder())
 		fmt.Println("--------------------------")
 		c.loweringState.pc++
 	}
@@ -269,15 +273,11 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		followingBlk := ctrl.followingBlock
 
 		if !state.unreachable {
-			if ctrl.isReturn() {
-				c.insertReturn()
-			} else {
-				// Top n-th args will be used as a result of the current control frame.
-				args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
+			// Top n-th args will be used as a result of the current control frame.
+			args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
 
-				// Insert the unconditional branch to the target.
-				c.insertJumpToBlock(args, builder.CurrentBlock(), followingBlk)
-			}
+			// Insert the unconditional branch to the target.
+			c.insertJumpToBlock(args, builder.CurrentBlock(), followingBlk)
 		} else { // unreachable.
 			if state.unreachableDepth > 0 {
 				state.unreachableDepth--
@@ -312,18 +312,12 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
 
 	case wasm.OpcodeBr:
-		v := c.readU32()
+		labelIndex := c.readU32()
 		if state.unreachable {
 			return
 		}
 
-		targetFrame := state.ctrlPeekAt(int(v))
-		if targetFrame.isReturn() {
-			c.insertReturn()
-			state.unreachable = true
-			return
-		}
-
+		targetFrame := state.ctrlPeekAt(int(labelIndex))
 		var targetBlk ssa.BasicBlock
 		var argNum int
 		if targetFrame.isLoop() {
@@ -335,9 +329,35 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.insertJumpToBlock(args, builder.CurrentBlock(), targetBlk)
 
 		state.unreachable = true
+
+	case wasm.OpcodeBrIf:
+		//labelIndex := c.readU32()
+		//if state.unreachable {
+		//	return
+		//}
+		//
+		//targetFrame := state.ctrlPeekAt(int(labelIndex))
+		//if targetFrame.isReturn() {
+		//	c.insertReturn()
+		//	state.unreachable = true
+		//	return
+		//}
+		//
+		//// Insert the conditional jump to the Else block.
+		//brz := builder.AllocateInstruction()
+		//brz.AsBrz(v, nil, elseBlk)
+		//builder.InsertInstruction(brz)
+		//elseBlk.AddPred(currentBlk, brz)
+		//
+		//followingBlk := builder.AllocateBasicBlock()
+
 	case wasm.OpcodeNop:
 	case wasm.OpcodeReturn:
-		c.insertReturn()
+		results := c.loweringState.nPeekDup(c.results())
+		instr := c.ssaBuilder.AllocateInstruction()
+
+		instr.AsReturn(results)
+		c.ssaBuilder.InsertInstruction(instr)
 		state.unreachable = true
 	default:
 		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))
@@ -386,17 +406,6 @@ func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
 		_, value := targetBlk.Param(i)
 		c.loweringState.push(value)
 	}
-}
-
-func (c *Compiler) insertReturn() {
-	results := c.loweringState.nPeekDup(c.results())
-	instr := c.ssaBuilder.AllocateInstruction()
-
-	// Results is the view over c.loweringState.values, so we need to copy it.
-	// TODO: reuse the slice.
-	vs := cloneValuesList(results)
-	instr.AsReturn(vs)
-	c.ssaBuilder.InsertInstruction(instr)
 }
 
 func cloneValuesList(in []ssa.Value) (ret []ssa.Value) {

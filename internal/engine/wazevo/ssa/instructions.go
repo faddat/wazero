@@ -978,15 +978,16 @@ const (
 )
 
 var numReturns = [...]*struct {
-	num     int
+	num int
+	// unknown is true if the number of returns cannot be determined by opcode (e.g. function call).
 	unknown bool
 }{
-	OpcodeJump:     {num: 0, unknown: false},
-	OpcodeIconst:   {num: 1, unknown: false},
-	OpcodeF32const: {num: 1, unknown: false},
-	OpcodeF64const: {num: 1, unknown: false},
-	OpcodeReturn:   {num: 0, unknown: false},
-	OpcodeBrz:      {num: 0, unknown: false},
+	OpcodeJump:     {num: 0},
+	OpcodeIconst:   {num: 1},
+	OpcodeF32const: {num: 1},
+	OpcodeF64const: {num: 1},
+	OpcodeReturn:   {num: 0},
+	OpcodeBrz:      {num: 0},
 	opcodeEnd:      nil,
 }
 
@@ -1074,7 +1075,7 @@ func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 func init() {
 	instructionFormats[OpcodeJump] = func(i *Instruction) (ret string) {
 		vs := make([]string, len(i.vs)+1)
-		vs[0] = fmt.Sprintf(" blk%d", i.blk.(*basicBlock).id)
+		vs[0] = " " + i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
 			vs[idx+1] = i.vs[idx].String()
 		}
@@ -1091,11 +1092,18 @@ func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 	i.blk = target
 }
 
+func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
+	i.opcode = OpcodeBrnz
+	i.v = v
+	i.vs = args
+	i.blk = target
+}
+
 func init() {
 	instructionFormats[OpcodeBrz] = func(i *Instruction) (ret string) {
 		vs := make([]string, len(i.vs)+2)
 		vs[0] = " " + i.v.String()
-		vs[1] = fmt.Sprintf("blk%d", i.blk.(*basicBlock).id)
+		vs[1] = i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
 			vs[idx+2] = i.vs[idx].String()
 		}
@@ -1103,6 +1111,7 @@ func init() {
 		ret = strings.Join(vs, ", ")
 		return
 	}
+	instructionFormats[OpcodeBrnz] = instructionFormats[OpcodeBrz]
 }
 
 // String implements fmt.Stringer.

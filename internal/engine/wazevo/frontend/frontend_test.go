@@ -43,7 +43,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 			name: "empty", m: singleFunctionModule(vv, []byte{wasm.OpcodeEnd}, nil),
 			exp: `
 blk0: ()
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -67,7 +67,7 @@ blk0: (v1: i32, v2: f32, v3: f64)
 			}, nil),
 			exp: `
 blk0: (v1: i32)
-	Return v1
+	Jump blk_ret, v1
 `,
 		},
 		{
@@ -79,7 +79,7 @@ blk0: ()
 	v2 = Iconst_64 0x0
 	v3 = F32const 0.000000
 	v4 = F64const 0.000000
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -91,7 +91,7 @@ blk0: (v1: i32, v2: f32, v3: f64)
 	v5 = Iconst_64 0x0
 	v6 = F32const 0.000000
 	v7 = F64const 0.000000
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -104,7 +104,7 @@ blk0: (v1: i32, v2: f32, v3: f64)
 			exp: `
 blk0: (v1: i32)
 	v2 = Iconst_32 0x0
-	Return v1, v2
+	Jump blk_ret, v1, v2
 `,
 		},
 		{
@@ -115,7 +115,7 @@ blk0: (v1: i32)
 			}, nil),
 			exp: `
 blk0: (v1: i32, v2: i32)
-	Return v2, v1
+	Jump blk_ret, v2, v1
 `,
 		},
 		{
@@ -135,7 +135,7 @@ blk0: (v1: i32, v2: i32)
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Return v2, v1
+	Jump blk_ret, v2, v1
 `,
 		},
 		{
@@ -155,7 +155,7 @@ blk0: ()
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -173,7 +173,7 @@ blk1: () <-- (blk0,blk1)
 	Jump blk1
 
 blk2: ()
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -195,7 +195,7 @@ blk0: ()
 	Jump blk1
 
 blk1: () <-- (blk0,blk2)
-	Return
+	Jump blk_ret
 
 blk2: ()
 	Jump blk1
@@ -222,7 +222,7 @@ blk2: () <-- (blk0)
 	Jump blk3
 
 blk3: () <-- (blk1,blk2)
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -245,10 +245,10 @@ blk1: () <-- (blk0)
 	Jump blk3
 
 blk2: () <-- (blk0)
-	Return
+	Jump blk_ret
 
 blk3: () <-- (blk1)
-	Return
+	Jump blk_ret
 `,
 		},
 		{
@@ -287,10 +287,9 @@ blk2: () <-- (blk0)
 	Jump blk3
 
 blk3: () <-- (blk2)
-	Return v1
+	Jump blk_ret, v1
 `,
 		},
-
 		{
 			name: "multi predecessors local ref",
 			m: singleFunctionModule(i32i32_i32, []byte{
@@ -322,20 +321,22 @@ blk2: () <-- (blk0)
 	Jump blk3, v2
 
 blk3: (v4: i32) <-- (blk1,blk2)
-	Return v4
+	Jump blk_ret, v4
 `,
 		},
-		// TODO: add test case for the following:
-		//
-		//	(loop
-		//	  (block
-		//	    (local.get 0)
-		//	  )
-		//	  (block <--- this is the predecessor of loop body unknown at the time when getting locals[2] above^.
-		//	    (br 1)
-		//	  )
-		//	)
-		//
+		//{
+		//	name: "reference value from unsealed block",
+		//	m: singleFunctionModule(i32_i32, []byte{
+		//		wasm.OpcodeLoop, blockSignature_vv,
+		//		// Loop will not be sealed until we reach the end,
+		//		// so this will result in referencing the unsealed definition search.
+		//		wasm.OpcodeLocalGet, 0,
+		//		wasm.OpcodeReturn,
+		//		wasm.OpcodeEnd,
+		//		wasm.OpcodeEnd,
+		//	}, []wasm.ValueType{i32}),
+		//	exp: `TODO`,
+		//},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

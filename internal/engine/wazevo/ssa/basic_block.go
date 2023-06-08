@@ -35,25 +35,50 @@ type BasicBlock interface {
 	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
 	// After calling this, AddPred will be forbidden.
 	Seal()
+
+	// ReturnBlock returns ture if this block represents the function return.
+	ReturnBlock() bool
 }
 
-// BasicBlock is an identifier of a basic block in a SSA-transformed function.
-type basicBlock struct {
-	id                      int
-	rootInstr, currentInstr *Instruction
-	params                  []blockParam
-	preds                   []basicBlockPredecessorInfo
-	// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
-	singlePred *basicBlock
-	// lastDefinitions maps Variable to its last definition in this block.
-	lastDefinitions map[Variable]Value
-	// sealed is true if this is sealed (all the predecessors are known).
-	sealed bool
+type (
+	// basicBlock is a basic block in a SSA-transformed function.
+	basicBlock struct {
+		id                      basicBlockID
+		rootInstr, currentInstr *Instruction
+		params                  []blockParam
+		preds                   []basicBlockPredecessorInfo
+		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
+		singlePred *basicBlock
+		// lastDefinitions maps Variable to its last definition in this block.
+		lastDefinitions map[Variable]Value
+		// sealed is true if this is sealed (all the predecessors are known).
+		sealed bool
+	}
+	basicBlockID uint32
+)
+
+const basicBlockIDReturnBlock = 0xffffffff
+
+// BasicBlockReturn is a special BasicBlock which represents a function return which
+// can be a virtual target of branch instructions.
+var BasicBlockReturn BasicBlock = &basicBlock{id: basicBlockIDReturnBlock}
+
+func (bb *basicBlock) Name() string {
+	if bb.id == basicBlockIDReturnBlock {
+		return fmt.Sprintf("blk_ret")
+	} else {
+		return fmt.Sprintf("blk%d", bb.id)
+	}
 }
 
 type basicBlockPredecessorInfo struct {
 	blk    *basicBlock
 	branch *Instruction
+}
+
+// ReturnBlock implements BasicBlock.
+func (bb *basicBlock) ReturnBlock() bool {
+	return bb.id == basicBlockIDReturnBlock
 }
 
 // AddParam implements BasicBlock.
@@ -116,6 +141,10 @@ func (bb *basicBlock) reset() {
 
 // AddPred implements BasicBlock.
 func (bb *basicBlock) AddPred(blk BasicBlock, branch *Instruction) {
+	if blk.ReturnBlock() {
+		// Return Block does not need to know the predecessors.
+		return
+	}
 	if bb.sealed {
 		panic("BUG: trying to add predecessor to a sealed block: " + bb.String())
 	}
