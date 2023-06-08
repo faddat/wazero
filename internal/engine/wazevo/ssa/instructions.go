@@ -1129,6 +1129,15 @@ func (i *Instruction) String() (ret string) {
 	}
 }
 
+func (i *Instruction) addArgument(v Value) {
+	switch i.opcode {
+	case OpcodeJump, OpcodeBrz:
+		i.vs = append(i.vs, v)
+	default:
+		panic("BUG: " + i.String())
+	}
+}
+
 // String implements fmt.Stringer.
 func (o Opcode) String() (ret string) {
 	switch o {

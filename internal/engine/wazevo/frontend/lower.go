@@ -181,7 +181,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		br := builder.AllocateInstruction()
 		br.AsJump(args, loopHeader)
 		builder.InsertInstruction(br)
-		loopHeader.AddPred(builder.CurrentBlock())
+		loopHeader.AddPred(builder.CurrentBlock(), br)
 
 		c.ssaBuilder.SetCurrentBlock(loopHeader)
 
@@ -214,13 +214,13 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		brz := builder.AllocateInstruction()
 		brz.AsBrz(v, nil, elseBlk)
 		builder.InsertInstruction(brz)
-		elseBlk.AddPred(currentBlk)
+		elseBlk.AddPred(currentBlk, brz)
 
 		// Then, insert the jump to the Then block.
 		br := builder.AllocateInstruction()
 		br.AsJump(nil, thenBlk)
 		builder.InsertInstruction(br)
-		thenBlk.AddPred(currentBlk)
+		thenBlk.AddPred(currentBlk, br)
 
 		state.ctrlPush(controlFrame{
 			kind:                         controlFrameKindIfWithoutElse,
@@ -371,7 +371,7 @@ func (c *Compiler) insertJumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
 	builder.InsertInstruction(jmp)
-	targetBlk.AddPred(currentBlk)
+	targetBlk.AddPred(currentBlk, jmp)
 }
 
 func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {

@@ -310,21 +310,19 @@ blk3: () <-- (blk2)
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{i32}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	v2 = Iconst_32 0x0
+blk0: (v1: i32, v2: i32)
 	v3 = Iconst_32 0x0
 	Brz v1, blk2
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Return v3
+	Jump blk3, v1
 
 blk2: () <-- (blk0)
-	Jump blk3
+	Jump blk3, v2
 
-blk3: () <-- (blk2)
-	Return v1
+blk3: (v4: i32) <-- (blk1,blk2)
+	Return v4
 `,
 		},
 		// TODO: add test case for the following:

@@ -241,5 +241,19 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 		return b.findValue(variable, pred)
 	}
 
-	panic("TODO")
+	// If this block has multiple predecessors, we have to gather the definitions,
+	// and treat them as an argument to this block. So the first thing we do now is
+	// define a new parameter to this block which may or may not be redundant, but
+	// later we eliminate trivial params in an optimization pass.
+	paramValue := blk.addParamOn(b, variable)
+	// After the new "phi" param is added, we have to manipulate the original branching instructions
+	// in predecessors so that they would pass the definition of `variable` as the argument to
+	// the newly added phi.
+	for i := range blk.preds {
+		pred := &blk.preds[i]
+		// Find the definition in the predecessor recursively.
+		value := b.findValue(variable, pred.blk)
+		pred.branch.addArgument(value)
+	}
+	return paramValue
 }
