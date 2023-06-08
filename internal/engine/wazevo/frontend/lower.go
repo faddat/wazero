@@ -255,57 +255,31 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.ssaBuilder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeEnd:
-		unreachable := state.unreachable
-		if unreachable && state.unreachableDepth > 0 {
-			state.unreachableDepth--
-			return
-		}
-
 		ctrl := state.ctrlPop()
 		followingBlk := ctrl.followingBlock
 
-		if unreachable {
+		if !state.unreachable {
 			if ctrl.isReturn() {
-				// This is the very end of function body.
+				c.insertReturn()
+			} else {
+				// Top n-th args will be used as a result of the current control frame.
+				args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
+
+				// Insert the unconditional branch to the target.
+				c.jumpToBlock(args, builder.CurrentBlock(), followingBlk)
+			}
+		} else { // unreachable.
+			if state.unreachableDepth > 0 {
+				state.unreachableDepth--
 				return
+			} else {
+				state.unreachable = false
 			}
-
-			switch ctrl.kind {
-			case controlFrameKindLoop:
-				// Loop header block can be reached from any br/br_table contained in the loop,
-				// so now that we've reached End of it, we can seal it.
-				ctrl.blk.Seal()
-			case controlFrameKindIfWithoutElse:
-				// If this is the end of Then block, we have to emit the empty Else block.
-				elseBlk := ctrl.blk
-				builder.SetCurrentBlock(elseBlk)
-				c.jumpToBlock(nil, elseBlk, followingBlk)
-
-				fallthrough // Regardless of the existence of Else, we can seal the following block.
-			case controlFrameKindIfWithElse:
-				// The block after if-then-else-end can only be reached inside Then or Else blocks,
-				// so we've now known all the predecessors to the following block.
-				ctrl.followingBlock.Seal()
-			}
-
-			// We do not need branching here because this is unreachable.
-			c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
-			state.unreachable = false
-			return
 		}
-
-		if ctrl.isReturn() {
-			c.insertReturn()
-			return
-		}
-
-		// Top n-th args will be used as a result of the current control frame.
-		args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
-
-		// Insert the unconditional branch to the target.
-		c.jumpToBlock(args, builder.CurrentBlock(), followingBlk)
 
 		switch ctrl.kind {
+		case controlFrameKindFunction:
+			return // This is the very end of function.
 		case controlFrameKindLoop:
 			// Loop header block can be reached from any br/br_table contained in the loop,
 			// so now that we've reached End of it, we can seal it.
