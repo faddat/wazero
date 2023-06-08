@@ -95,7 +95,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 }
 
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
-	entryBlk.Seal()
+	c.ssaBuilder.Seal(entryBlk)
 
 	// Pushes the empty control frame which corresponds to the function return.
 	c.loweringState.ctrlPush(controlFrame{
@@ -199,7 +199,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(br)
 		loopHeader.AddPred(builder.CurrentBlock(), br)
 
-		c.ssaBuilder.SetCurrentBlock(loopHeader)
+		builder.SetCurrentBlock(loopHeader)
 
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()
@@ -247,11 +247,11 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			clonedArgs:                   args,
 		})
 
-		c.ssaBuilder.SetCurrentBlock(thenBlk)
+		builder.SetCurrentBlock(thenBlk)
 
 		// Then and Else (if exists) have only one predecessor.
-		thenBlk.Seal()
-		elseBlk.Seal()
+		builder.Seal(thenBlk)
+		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
 		ifctrl := state.ctrlPeekAt(0)
 		ifctrl.kind = controlFrameKindIfWithElse
@@ -278,7 +278,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			state.push(arg)
 		}
 
-		c.ssaBuilder.SetCurrentBlock(elseBlk)
+		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeEnd:
 		ctrl := state.ctrlPop()
@@ -305,7 +305,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		case controlFrameKindLoop:
 			// Loop header block can be reached from any br/br_table contained in the loop,
 			// so now that we've reached End of it, we can seal it.
-			ctrl.blk.Seal()
+			builder.Seal(ctrl.blk)
 		case controlFrameKindIfWithoutElse:
 			// If this is the end of Then block, we have to emit the empty Else block.
 			elseBlk := ctrl.blk
@@ -315,9 +315,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		case controlFrameKindIfWithElse:
 			// The block after if-then-else-end can only be reached inside Then or Else blocks,
 			// so we've now known all the predecessors to the following block.
-			ctrl.followingBlock.Seal()
+			builder.Seal(ctrl.followingBlock)
 		case controlFrameKindBlock:
-			ctrl.followingBlock.Seal()
+			builder.Seal(ctrl.followingBlock)
 		}
 
 		// Ready to start translating the following block.
@@ -372,15 +372,15 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.insertJumpToBlock(args, currentBlk, elseBlk)
 
 		// Now start translating the instructions after br_if.
-		c.ssaBuilder.SetCurrentBlock(elseBlk)
+		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeNop:
 	case wasm.OpcodeReturn:
 		results := c.loweringState.nPeekDup(c.results())
-		instr := c.ssaBuilder.AllocateInstruction()
+		instr := builder.AllocateInstruction()
 
 		instr.AsReturn(results)
-		c.ssaBuilder.InsertInstruction(instr)
+		builder.InsertInstruction(instr)
 		state.unreachable = true
 	default:
 		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))

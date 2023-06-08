@@ -11,6 +11,9 @@ import (
 type BasicBlock interface {
 	fmt.Stringer
 
+	// Name returns the unique string ID of this block. e.g. blk0, blk1, ...
+	Name() string
+
 	// AddParam adds the parameter to the block whose type specified by `t`.
 	AddParam(b Builder, t Type) Variable
 
@@ -32,10 +35,6 @@ type BasicBlock interface {
 	// Root returns the root instruction of this block.
 	Root() *Instruction
 
-	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
-	// After calling this, AddPred will be forbidden.
-	Seal()
-
 	// ReturnBlock returns ture if this block represents the function return.
 	ReturnBlock() bool
 }
@@ -53,6 +52,8 @@ type (
 		lastDefinitions map[Variable]Value
 		// sealed is true if this is sealed (all the predecessors are known).
 		sealed bool
+		// unknownsValues are used in builder.findValue. The usage is well-described in the paper.
+		unknownValues map[Variable]Value
 	}
 	basicBlockID uint32
 )
@@ -63,6 +64,7 @@ const basicBlockIDReturnBlock = 0xffffffff
 // can be a virtual target of branch instructions.
 var BasicBlockReturn BasicBlock = &basicBlock{id: basicBlockIDReturnBlock}
 
+// Name implements BasicBlock.Name.
 func (bb *basicBlock) Name() string {
 	if bb.id == basicBlockIDReturnBlock {
 		return fmt.Sprintf("blk_ret")
@@ -76,12 +78,12 @@ type basicBlockPredecessorInfo struct {
 	branch *Instruction
 }
 
-// ReturnBlock implements BasicBlock.
+// ReturnBlock implements BasicBlock.ReturnBlock.
 func (bb *basicBlock) ReturnBlock() bool {
 	return bb.id == basicBlockIDReturnBlock
 }
 
-// AddParam implements BasicBlock.
+// AddParam implements BasicBlock.AddParam.
 func (bb *basicBlock) AddParam(b Builder, typ Type) Variable {
 	variable := b.DeclareVariable(typ)
 	n := len(bb.params)
@@ -105,18 +107,18 @@ func (bb *basicBlock) addParamOn(b *builder, variable Variable) Value {
 	return paramValue
 }
 
-// Params implements BasicBlock.
+// Params implements BasicBlock.Params.
 func (bb *basicBlock) Params() int {
 	return len(bb.params)
 }
 
-// Param implements BasicBlock.
+// Param implements BasicBlock.Param.
 func (bb *basicBlock) Param(i int) (Variable, Value) {
 	p := &bb.params[i]
 	return p.variable, p.value
 }
 
-// InsertInstruction implements BasicBlock.
+// InsertInstruction implements BasicBlock.InsertInstruction.
 func (bb *basicBlock) InsertInstruction(next *Instruction) {
 	current := bb.currentInstr
 	if current != nil {
@@ -128,7 +130,7 @@ func (bb *basicBlock) InsertInstruction(next *Instruction) {
 	bb.currentInstr = next
 }
 
-// Root implements BasicBlock.
+// Root implements BasicBlock.Root.
 func (bb *basicBlock) Root() *Instruction {
 	return bb.rootInstr
 }
@@ -137,9 +139,12 @@ func (bb *basicBlock) reset() {
 	bb.params = bb.params[:0]
 	bb.rootInstr, bb.currentInstr = nil, nil
 	bb.preds = bb.preds[:0]
+	// TODO: reuse the map!
+	bb.unknownValues = make(map[Variable]Value)
+	bb.lastDefinitions = make(map[Variable]Value)
 }
 
-// AddPred implements BasicBlock.
+// AddPred implements BasicBlock.AddPred.
 func (bb *basicBlock) AddPred(blk BasicBlock, branch *Instruction) {
 	if blk.ReturnBlock() {
 		// Return Block does not need to know the predecessors.
@@ -153,14 +158,6 @@ func (bb *basicBlock) AddPred(blk BasicBlock, branch *Instruction) {
 		blk:    pred,
 		branch: branch,
 	})
-}
-
-// Seal implements BasicBlock.
-func (bb *basicBlock) Seal() {
-	if len(bb.preds) == 1 {
-		bb.singlePred = bb.preds[0].blk
-	}
-	bb.sealed = true
 }
 
 // String implements fmt.Stringer. Only used for debugging.
@@ -198,7 +195,7 @@ type blockParam struct {
 	n int
 }
 
-// String implements Value.
+// String implements fmt.Stringer.
 func (p *blockParam) String() (ret string) {
 	return fmt.Sprintf("%s: %s", p.value, p.typ)
 }

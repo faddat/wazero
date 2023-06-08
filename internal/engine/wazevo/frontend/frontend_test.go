@@ -374,19 +374,19 @@ blk3: (v4: i32) <-- (blk1,blk2)
 		},
 
 		// TODO:
-		//{
-		//	name: "reference value from unsealed block",
-		//	m: singleFunctionModule(i32_i32, []byte{
-		//		wasm.OpcodeLoop, blockSignature_vv,
-		//		// Loop will not be sealed until we reach the end,
-		//		// so this will result in referencing the unsealed definition search.
-		//		wasm.OpcodeLocalGet, 0,
-		//		wasm.OpcodeReturn,
-		//		wasm.OpcodeEnd,
-		//		wasm.OpcodeEnd,
-		//	}, []wasm.ValueType{i32}),
-		//	exp: ``,
-		//},
+		{
+			name: "reference value from unsealed block",
+			m: singleFunctionModule(i32_i32, []byte{
+				wasm.OpcodeLoop, blockSignature_vv,
+				// Loop will not be sealed until we reach the end,
+				// so this will result in referencing the unsealed definition search.
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{i32}),
+			exp: ``,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

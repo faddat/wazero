@@ -41,6 +41,10 @@ type Builder interface {
 
 	// FindValue searches the latest definition of the given Variable and returns the result.
 	FindValue(variable Variable) Value
+
+	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
+	// After calling this, AddPred will be forbidden.
+	Seal(blk BasicBlock)
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -52,11 +56,6 @@ func NewBuilder() Builder {
 }
 
 // builder implements Builder interface.
-//
-// We use the algorithm described in the paper:
-// "Simple and Efficient Construction of Static Single Assignment Form" https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf
-//
-// with the stricter assumption that our input is always a "complete" CFG.
 type builder struct {
 	basicBlocksPool  pool[basicBlock]
 	instructionsPool pool[Instruction]
@@ -72,7 +71,7 @@ type builder struct {
 	nextVariable Variable
 }
 
-// Reset implements Builder.
+// Reset implements Builder.Reset.
 func (b *builder) Reset() {
 	b.instructionsPool.reset()
 
@@ -88,21 +87,22 @@ func (b *builder) Reset() {
 	b.nextValue = valueInvalid + 1
 }
 
-// AllocateInstruction implements Builder.
+// AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
 	return b.instructionsPool.allocate()
 }
 
-// AllocateBasicBlock implements Builder.
+// AllocateBasicBlock implements Builder.AllocateBasicBlock.
 func (b *builder) AllocateBasicBlock() BasicBlock {
 	id := basicBlockID(b.basicBlocksPool.allocated)
 	blk := b.basicBlocksPool.allocate()
 	blk.id = id
-	blk.lastDefinitions = map[Variable]Value{}
+	blk.lastDefinitions = make(map[Variable]Value)
+	blk.unknownValues = make(map[Variable]Value)
 	return blk
 }
 
-// InsertInstruction implements Builder.
+// InsertInstruction implements Builder.InsertInstruction.
 func (b *builder) InsertInstruction(instr *Instruction) {
 	b.currentBB.InsertInstruction(instr)
 	num, unknown := instr.opcode.numReturns()
@@ -129,7 +129,7 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 	}
 }
 
-// Blocks implements Builder.
+// Blocks implements Builder.Blocks.
 func (b *builder) Blocks() []BasicBlock {
 	b.basicBlocksView = b.basicBlocksView[:0]
 	for i := 0; i < b.basicBlocksPool.allocated; i++ {
@@ -142,7 +142,7 @@ func (b *builder) Blocks() []BasicBlock {
 	return b.basicBlocksView
 }
 
-// DefineVariable implements Builder.
+// DefineVariable implements Builder.DefineVariable.
 func (b *builder) DefineVariable(variable Variable, value Value, block BasicBlock) {
 	if b.variables[variable] == TypeInvalid {
 		panic("BUG: trying to define variable " + variable.String() + " but is not declared yet")
@@ -152,24 +152,24 @@ func (b *builder) DefineVariable(variable Variable, value Value, block BasicBloc
 	bb.lastDefinitions[variable] = value
 }
 
-// DefineVariableInCurrentBB implements Builder.
+// DefineVariableInCurrentBB implements Builder.DefineVariableInCurrentBB.
 func (b *builder) DefineVariableInCurrentBB(variable Variable, value Value) {
 	b.DefineVariable(variable, value, b.currentBB)
 }
 
-// SetCurrentBlock implements Builder.
+// SetCurrentBlock implements Builder.SetCurrentBlock.
 func (b *builder) SetCurrentBlock(bb BasicBlock) {
 	b.currentBB = bb.(*basicBlock)
 }
 
-// CurrentBlock implements Builder.
+// CurrentBlock implements Builder.CurrentBlock.
 func (b *builder) CurrentBlock() BasicBlock {
 	return b.currentBB
 }
 
-// DeclareVariable implements Builder.
+// DeclareVariable implements Builder.DeclareVariable.
 func (b *builder) DeclareVariable(typ Type) Variable {
-	v := b.AllocateVariable()
+	v := b.allocateVariable()
 	iv := int(v)
 	if l := len(b.variables); l <= iv {
 		b.variables = append(b.variables, make([]Type, 2*(l+1))...)
@@ -178,39 +178,44 @@ func (b *builder) DeclareVariable(typ Type) Variable {
 	return v
 }
 
-// AllocateVariable implements Builder.
-func (b *builder) AllocateVariable() (ret Variable) {
+func (b *builder) allocateVariable() (ret Variable) {
 	ret = b.nextVariable
 	b.nextVariable++
 	return
 }
 
-// AllocateValue implements Builder.
+// AllocateValue implements Builder.AllocateValue.
 func (b *builder) AllocateValue() (v Value) {
 	v = b.nextValue
 	b.nextValue++
 	return
 }
 
-// FindValue implements Builder.
+// FindValue implements Builder.FindValue.
 func (b *builder) FindValue(variable Variable) Value {
 	return b.findValue(variable, b.currentBB)
 }
 
-// findValue recursively tries to find the latest definition of a `variable`.
-// The algorithm is described in the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
+// findValue recursively tries to find the latest definition of a `variable`. The algorithm is described in
+// the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
 //
 // TODO: reimplement this in iterative, not recursive, to avoid stack overflow.
 func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
-	if !blk.sealed {
-		// Incomplete CFG.
-		panic("TODO: unsealed block reading")
-	}
-
 	if val, ok := blk.lastDefinitions[variable]; ok {
 		// The value is already defined in this block!
 		return val
-	} else if pred := blk.singlePred; pred != nil {
+	} else if !blk.sealed { // Incomplete CFG as in the paper.
+		// If this is not sealed, that means it might have additional unknown predecessor later on.
+		// So we temporarily define the placeholder value here (not add as a parameter yet!),
+		// and record it as unknown.
+		// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
+		value := b.AllocateValue()
+		blk.lastDefinitions[variable] = value
+		blk.unknownValues[variable] = value
+		return value
+	}
+
+	if pred := blk.singlePred; pred != nil {
 		// If this block is sealed and have only one predecessor,
 		// we can use the value in that block without ambiguity on definition.
 		return b.findValue(variable, pred)
@@ -231,4 +236,21 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 		pred.branch.addArgument(value)
 	}
 	return paramValue
+}
+
+// Seal implements Builder.Seal.
+func (b *builder) Seal(raw BasicBlock) {
+	bb := raw.(*basicBlock)
+	if len(bb.preds) == 1 {
+		bb.singlePred = bb.preds[0].blk
+	}
+	bb.sealed = true
+
+	for variable, phiValue := range bb.unknownValues {
+
+	}
+
+	if len(bb.unknownValues) > 0 {
+		panic("TODO")
+	}
 }
