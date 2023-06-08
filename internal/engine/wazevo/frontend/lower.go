@@ -98,11 +98,13 @@ func (c *Compiler) lowerBody(_entryBlock ssa.BasicBlock) {
 	// Pushes the empty control frame which corresponds to the function return.
 	c.loweringState.ctrlPush(controlFrame{kind: controlFrameKindFunction})
 
+	c.ssaBuilder.CurrentBlock().Seal()
+
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
+		// TODO: delete prints.
 		fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 		c.lowerOpcode(op)
-		// TODO: delete.
 		fmt.Println(c.ssaBuilder.String())
 		fmt.Println("--------------------------")
 		c.loweringState.pc++
@@ -121,6 +123,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		variable := c.localVariable(index)
 		v := builder.FindValue(variable)
 		state.push(v)
+	case wasm.OpcodeLocalSet:
+		index := c.readU32()
+		if state.unreachable {
+			return
+		}
+		variable := c.localVariable(index)
+		v := state.pop()
+		builder.DefineVariableInCurrentBB(variable, v)
 	case wasm.OpcodeBlock:
 		// Note: we do not need to create a BB for this as that would always have only one predecessor
 		// which is the current BB, and therefore it's always ok to merge them in any way.
@@ -240,7 +250,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			// If this Then block is currently reachable, we have to insert the branching to the following BB.
 			followingBlk := ifctrl.followingBlock // == the BB after if-then-else.
 			args := c.loweringState.nPeekDup(len(ifctrl.blockType.Results))
-			c.jumpToBlock(args, builder.CurrentBlock(), followingBlk)
+			c.insertJumpToBlock(args, builder.CurrentBlock(), followingBlk)
 		} else {
 			state.unreachable = false
 		}
@@ -266,7 +276,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 				args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
 
 				// Insert the unconditional branch to the target.
-				c.jumpToBlock(args, builder.CurrentBlock(), followingBlk)
+				c.insertJumpToBlock(args, builder.CurrentBlock(), followingBlk)
 			}
 		} else { // unreachable.
 			if state.unreachableDepth > 0 {
@@ -288,11 +298,13 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			// If this is the end of Then block, we have to emit the empty Else block.
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
-			c.jumpToBlock(nil, elseBlk, followingBlk)
+			c.insertJumpToBlock(nil, elseBlk, followingBlk)
 			fallthrough // Regardless of the existence of Else, we can seal the following block.
 		case controlFrameKindIfWithElse:
 			// The block after if-then-else-end can only be reached inside Then or Else blocks,
 			// so we've now known all the predecessors to the following block.
+			ctrl.followingBlock.Seal()
+		case controlFrameKindBlock:
 			ctrl.followingBlock.Seal()
 		}
 
@@ -320,7 +332,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
 		}
 		args := c.loweringState.nPeekDup(argNum)
-		c.jumpToBlock(args, builder.CurrentBlock(), targetBlk)
+		c.insertJumpToBlock(args, builder.CurrentBlock(), targetBlk)
 
 		state.unreachable = true
 	case wasm.OpcodeNop:
@@ -354,7 +366,7 @@ func (c *Compiler) readBlockType() *wasm.FunctionType {
 	return bt
 }
 
-func (c *Compiler) jumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.BasicBlock) {
+func (c *Compiler) insertJumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.BasicBlock) {
 	builder := c.ssaBuilder
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)

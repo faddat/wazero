@@ -35,6 +35,10 @@ Builder interface {
 	// The defining instruction will be inserted into the `block`.
 	DefineVariable(variable Variable, value Value, block BasicBlock)
 
+	// DefineVariableInCurrentBB is the same as DefineVariable except the definition is
+	// inserted into the current BasicBlock. Alias to DefineVariable(x, y, CurrentBlock()).
+	DefineVariableInCurrentBB(variable Variable, value Value)
+
 	// AllocateInstruction returns a new Instruction.
 	AllocateInstruction() *Instruction
 
@@ -156,6 +160,11 @@ func (b *builder) DefineVariable(variable Variable, value Value, block BasicBloc
 	bb.lastDefinitions[variable] = value
 }
 
+// DefineVariableInCurrentBB implements Builder.
+func (b *builder) DefineVariableInCurrentBB(variable Variable, value Value) {
+	b.DefineVariable(variable, value, b.currentBB)
+}
+
 // SetCurrentBlock implements Builder.
 func (b *builder) SetCurrentBlock(bb BasicBlock) {
 	b.currentBB = bb.(*basicBlock)
@@ -216,12 +225,17 @@ func (b *builder) FindValue(variable Variable) Value {
 // findValue recursively tries to find the latest definition of a `variable`.
 // The algorithm is described in the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
 func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
-	defs := blk.lastDefinitions
-	if val, ok := defs[variable]; ok {
-		return val
+	if !blk.sealed {
+		// Incomplete CFG.
+		panic("TODO: unsealed block reading")
 	}
 
-	if pred := blk.singlePred; pred != nil {
+	if val, ok := blk.lastDefinitions[variable]; ok {
+		// The value is already defined in this block!
+		return val
+	} else if pred := blk.singlePred; pred != nil {
+		// If this block is sealed and have only one predecessor,
+		// we can use the value in that block without ambiguity on definition.
 		return b.findValue(variable, pred)
 	}
 

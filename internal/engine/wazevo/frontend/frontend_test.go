@@ -27,6 +27,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 	vv := wasm.FunctionType{}
 	v_i32 := wasm.FunctionType{Results: []wasm.ValueType{i32}}
 	i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	i32i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}
 	i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
 	i32f32f64_v := wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
 
@@ -101,6 +102,37 @@ blk0: (v1: i32, v2: f32, v3: f64)
 blk0: (v1: i32)
 	v2 = Iconst_32 0x0
 	Return v1, v2
+`,
+		},
+		{
+			name: "swap param and return", m: singleFunctionModule(i32i32_i32i32, []byte{
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeEnd,
+			}, nil),
+			exp: `
+blk0: (v1: i32, v2: i32)
+	Return v2, v1
+`,
+		},
+		{
+			name: "swap params and return", m: singleFunctionModule(i32i32_i32i32, []byte{
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalSet, 1,
+				wasm.OpcodeLocalSet, 0,
+				wasm.OpcodeBlock, 0x40,
+				wasm.OpcodeEnd,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeEnd,
+			}, nil),
+			exp: `
+blk0: (v1: i32, v2: i32)
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Return v2, v1
 `,
 		},
 		{
