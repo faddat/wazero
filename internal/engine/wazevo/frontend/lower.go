@@ -119,8 +119,20 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	builder := c.ssaBuilder
 	state := &c.loweringState
 	switch op {
+	case wasm.OpcodeI32Const:
+		c := c.readI32s()
+		if state.unreachable {
+			return
+		}
+
+		iconst := builder.AllocateInstruction()
+		iconst.AsIconst32(uint32(c))
+		builder.InsertInstruction(iconst)
+		value, _ := iconst.Returns()
+		state.push(value)
+
 	case wasm.OpcodeLocalGet:
-		index := c.readU32()
+		index := c.readI32u()
 		if state.unreachable {
 			return
 		}
@@ -128,7 +140,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		v := builder.FindValue(variable)
 		state.push(v)
 	case wasm.OpcodeLocalSet:
-		index := c.readU32()
+		index := c.readI32u()
 		if state.unreachable {
 			return
 		}
@@ -312,7 +324,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
 
 	case wasm.OpcodeBr:
-		labelIndex := c.readU32()
+		labelIndex := c.readI32u()
 		if state.unreachable {
 			return
 		}
@@ -331,25 +343,36 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.unreachable = true
 
 	case wasm.OpcodeBrIf:
-		//labelIndex := c.readU32()
-		//if state.unreachable {
-		//	return
-		//}
-		//
-		//targetFrame := state.ctrlPeekAt(int(labelIndex))
-		//if targetFrame.isReturn() {
-		//	c.insertReturn()
-		//	state.unreachable = true
-		//	return
-		//}
-		//
-		//// Insert the conditional jump to the Else block.
-		//brz := builder.AllocateInstruction()
-		//brz.AsBrz(v, nil, elseBlk)
-		//builder.InsertInstruction(brz)
-		//elseBlk.AddPred(currentBlk, brz)
-		//
-		//followingBlk := builder.AllocateBasicBlock()
+		labelIndex := c.readI32u()
+		if state.unreachable {
+			return
+		}
+
+		currentBlk := builder.CurrentBlock()
+		v := state.pop()
+
+		targetFrame := state.ctrlPeekAt(int(labelIndex))
+		var targetBlk ssa.BasicBlock
+		var argNum int
+		if targetFrame.isLoop() {
+			targetBlk, argNum = targetFrame.blk, len(targetFrame.blockType.Params)
+		} else {
+			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
+		}
+		args := c.loweringState.nPeekDup(argNum)
+
+		// Insert the conditional jump to the target block.
+		brnz := builder.AllocateInstruction()
+		brnz.AsBrz(v, args, targetBlk)
+		builder.InsertInstruction(brnz)
+		targetBlk.AddPred(currentBlk, brnz)
+
+		// Insert the unconditional jump to the Else block which corresponds to after br_if.
+		elseBlk := builder.AllocateBasicBlock()
+		c.insertJumpToBlock(args, currentBlk, elseBlk)
+
+		// Now start translating the instructions after br_if.
+		c.ssaBuilder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeNop:
 	case wasm.OpcodeReturn:
@@ -364,8 +387,17 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	}
 }
 
-func (c *Compiler) readU32() uint32 {
+func (c *Compiler) readI32u() uint32 {
 	v, n, err := leb128.LoadUint32(c.wasmFunctionBody[c.loweringState.pc+1:])
+	if err != nil {
+		panic(err) // shouldn't be reached since compilation comes after validation.
+	}
+	c.loweringState.pc += int(n)
+	return v
+}
+
+func (c *Compiler) readI32s() int32 {
+	v, n, err := leb128.LoadInt32(c.wasmFunctionBody[c.loweringState.pc+1:])
 	if err != nil {
 		panic(err) // shouldn't be reached since compilation comes after validation.
 	}

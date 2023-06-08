@@ -159,6 +159,29 @@ blk1: () <-- (blk0)
 `,
 		},
 		{
+			name: "block - br_if", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeBlock, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeBrIf, 0,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			},
+				[]wasm.ValueType{i32}),
+			exp: `
+blk0: ()
+	v1 = Iconst_32 0x0
+	Brz v1, blk1
+	Jump blk2
+
+blk1: () <-- (blk0)
+	Jump blk_ret
+
+blk2: () <-- (blk0)
+	Return
+`,
+		},
+		{
 			name: "loop - br", m: singleFunctionModule(vv, []byte{
 				wasm.OpcodeLoop, 0,
 				wasm.OpcodeBr, 0,
@@ -174,6 +197,31 @@ blk1: () <-- (blk0,blk1)
 
 blk2: ()
 	Jump blk_ret
+`,
+		},
+		{
+			name: "loop - br_if", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeLoop, 0,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeBrIf, 0,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{}),
+			exp: `
+blk0: ()
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	v1 = Iconst_32 0x1
+	Brz v1, blk1
+	Jump blk3
+
+blk2: ()
+	Jump blk_ret
+
+blk3: () <-- (blk1)
+	Return
 `,
 		},
 		{
@@ -324,6 +372,8 @@ blk3: (v4: i32) <-- (blk1,blk2)
 	Jump blk_ret, v4
 `,
 		},
+
+		// TODO:
 		//{
 		//	name: "reference value from unsealed block",
 		//	m: singleFunctionModule(i32_i32, []byte{
@@ -335,7 +385,7 @@ blk3: (v4: i32) <-- (blk1,blk2)
 		//		wasm.OpcodeEnd,
 		//		wasm.OpcodeEnd,
 		//	}, []wasm.ValueType{i32}),
-		//	exp: `TODO`,
+		//	exp: ``,
 		//},
 	} {
 		tc := tc
