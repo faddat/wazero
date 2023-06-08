@@ -21,12 +21,15 @@ const (
 	i64 = wasm.ValueTypeI64
 	f32 = wasm.ValueTypeF32
 	f64 = wasm.ValueTypeF64
+
+	blockSignature_vv = 0x40 // 0x40 is the v_v signature in 33-bit signed. See wasm.DecodeBlockType.
 )
 
 func TestCompiler_LowerToSSA(t *testing.T) {
 	vv := wasm.FunctionType{}
 	v_i32 := wasm.FunctionType{Results: []wasm.ValueType{i32}}
 	i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	i32i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
 	i32i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}
 	i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
 	i32f32f64_v := wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
@@ -121,7 +124,7 @@ blk0: (v1: i32, v2: i32)
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalSet, 1,
 				wasm.OpcodeLocalSet, 0,
-				wasm.OpcodeBlock, 0x40,
+				wasm.OpcodeBlock, blockSignature_vv,
 				wasm.OpcodeEnd,
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
@@ -269,6 +272,43 @@ blk3: () <-- (blk1)
 					},
 				}},
 			},
+			exp: `
+blk0: ()
+	v1 = Iconst_32 0x0
+	v2 = Iconst_32 0x0
+	v3 = Iconst_32 0x0
+	Brz v1, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Return v3
+
+blk2: () <-- (blk0)
+	Jump blk3
+
+blk3: () <-- (blk2)
+	Return v1
+`,
+		},
+
+		{
+			name: "multi predecessors local ref",
+			m: singleFunctionModule(i32i32_i32, []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeIf, blockSignature_vv,
+				// Set the first param to the local.
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalSet, 2,
+				wasm.OpcodeElse,
+				// Set the second param to the local.
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalSet, 2,
+				wasm.OpcodeEnd,
+
+				// Return the local as a result which has multiple definitions in predecessors (Then and Else).
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{i32}),
 			exp: `
 blk0: ()
 	v1 = Iconst_32 0x0

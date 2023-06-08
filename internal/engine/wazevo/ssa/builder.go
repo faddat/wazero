@@ -224,6 +224,8 @@ func (b *builder) FindValue(variable Variable) Value {
 
 // findValue recursively tries to find the latest definition of a `variable`.
 // The algorithm is described in the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
+//
+// TODO: reimplement this in iterative, not recursive, to avoid stack overflow.
 func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 	if !blk.sealed {
 		// Incomplete CFG.
