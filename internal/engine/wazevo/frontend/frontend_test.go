@@ -28,6 +28,7 @@ const (
 func TestCompiler_LowerToSSA(t *testing.T) {
 	vv := wasm.FunctionType{}
 	v_i32 := wasm.FunctionType{Results: []wasm.ValueType{i32}}
+	i32_v := wasm.FunctionType{Params: []wasm.ValueType{i32}}
 	i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
 	i32i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
 	i32i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}
@@ -373,7 +374,6 @@ blk3: (v4: i32) <-- (blk1,blk2)
 `,
 		},
 		{
-			// TODO:
 			name: "reference value from unsealed block",
 			m: singleFunctionModule(i32_i32, []byte{
 				wasm.OpcodeLoop, blockSignature_vv,
@@ -385,7 +385,86 @@ blk3: (v4: i32) <-- (blk1,blk2)
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{i32}),
-			exp: ``,
+			exp: `
+blk0: (v1: i32)
+	v2 = Iconst_32 0x0
+	Jump blk1, v1
+
+blk1: (v3: i32) <-- (blk0)
+	Return v3
+
+blk2: (v4: i32)
+	Jump blk_ret, v4
+`,
+		},
+		{
+			name: "reference value from unsealed block - #2",
+			m: singleFunctionModule(i32_i32, []byte{
+				wasm.OpcodeLoop, blockSignature_vv,
+				wasm.OpcodeBlock, blockSignature_vv,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeBrIf, 1,
+				wasm.OpcodeEnd,
+
+				wasm.OpcodeEnd,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{}),
+			exp: `
+blk0: (v1: i32)
+	Jump blk1, v1
+
+blk1: (v2: i32) <-- (blk0,blk1)
+	Brz v2, blk1, v2
+	Jump blk4
+
+blk2: () <-- (blk3)
+	v3 = Iconst_32 0x0
+	Jump blk_ret, v3
+
+blk3: () <-- (blk4)
+	Jump blk2
+
+blk4: () <-- (blk1)
+	Jump blk3
+`,
+		},
+		{
+			name: "reference value from unsealed block - #2",
+			m: singleFunctionModule(i32_v, []byte{
+				wasm.OpcodeLoop, blockSignature_vv,
+				wasm.OpcodeBlock, blockSignature_vv,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeBrIf, 2,
+				wasm.OpcodeEnd,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeLocalSet, 0,
+				wasm.OpcodeBr, 0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{}),
+			exp: `
+blk0: (v1: i32)
+	Jump blk1, v1
+
+blk1: (v2: i32) <-- (blk0,blk3)
+	Brz v2, blk_ret
+	Jump blk4
+
+blk2: ()
+	v4 = Iconst_32 0x0
+	Jump blk_ret
+
+blk3: () <-- (blk4)
+	v3 = Iconst_32 0x1
+	Jump blk1, v3
+
+blk4: () <-- (blk1)
+	Jump blk3
+`,
 		},
 	} {
 		tc := tc

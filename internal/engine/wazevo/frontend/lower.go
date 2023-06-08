@@ -311,14 +311,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
 			c.insertJumpToBlock(nil, elseBlk, followingBlk)
-			fallthrough // Regardless of the existence of Else, we can seal the following block.
-		case controlFrameKindIfWithElse:
-			// The block after if-then-else-end can only be reached inside Then or Else blocks,
-			// so we've now known all the predecessors to the following block.
-			builder.Seal(ctrl.followingBlock)
-		case controlFrameKindBlock:
-			builder.Seal(ctrl.followingBlock)
 		}
+
+		builder.Seal(ctrl.followingBlock)
 
 		// Ready to start translating the following block.
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
