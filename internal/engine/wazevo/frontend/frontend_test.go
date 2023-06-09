@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -455,7 +456,6 @@ blk4: () <-- (blk1)
 				wasm.OpcodeLocalSet, 0,
 				wasm.OpcodeBr, 0,
 				wasm.OpcodeEnd,
-				wasm.OpcodeI32Const, 0,
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{}),
 			exp: `
@@ -467,7 +467,6 @@ blk1: (v4: i32) <-- (blk0,blk3)
 	Jump blk4
 
 blk2: ()
-	v6 = Iconst_32 0x0
 	Jump blk_ret
 
 blk3: () <-- (blk4)
@@ -481,13 +480,18 @@ blk4: () <-- (blk1)
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			// Just in case let's check the test module is valid.
+			err := tc.m.Validate(api.CoreFeaturesV2)
+			require.NoError(t, err, "invalid test case module!")
+
 			b := ssa.NewBuilder()
 			od := wazevoapi.NewOffsetData(tc.m)
+
 			fc := NewFrontendCompiler(od, tc.m, b)
 			typeIndex := tc.m.FunctionSection[0]
 			code := &tc.m.CodeSection[0]
 			fc.Init(0, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
-			err := fc.LowerToSSA()
+			err = fc.LowerToSSA()
 			require.NoError(t, err)
 			exp := strings.TrimPrefix(tc.exp, "\n\n")
 			exp = strings.TrimSuffix(exp, "\n\n")

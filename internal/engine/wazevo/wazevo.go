@@ -3,7 +3,6 @@ package wazevo
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"runtime"
 	"sync"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/frontend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
