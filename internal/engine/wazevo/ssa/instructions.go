@@ -17,6 +17,7 @@ type Instruction struct {
 	opcode     Opcode
 	u64        uint64
 	v          Value
+	v2         Value
 	vs         []Value
 	typ        Type
 	blk        BasicBlock
@@ -53,8 +54,6 @@ func (i *Instruction) SourcePos() (p uint64) {
 	return i.srcPos
 }
 
-var instructionFormats = [opcodeEnd]func(builder Builder, instruction *Instruction) string{}
-
 // Followings match the generated code from https://github.com/bytecodealliance/wasmtime/blob/v9.0.3/cranelift/codegen/meta/src/shared/instructions.rs
 // TODO: complete opcode comments.
 // TODO: there should be unnecessary opcodes.
@@ -76,8 +75,7 @@ const (
 	// OpcodeTrap exit the execution immediately.
 	OpcodeTrap
 
-	// OpcodeReturn ...
-	// `return rvals`.
+	// OpcodeReturn returns from the function: `return rvalues`.
 	OpcodeReturn
 
 	// OpcodeCall ...
@@ -959,6 +957,8 @@ var numReturns = [...]*struct {
 	OpcodeIconst:   {num: 1},
 	OpcodeF32const: {num: 1},
 	OpcodeF64const: {num: 1},
+	OpcodeStore:    {num: 0},
+	OpcodeTrap:     {num: 0},
 	OpcodeReturn:   {num: 0},
 	OpcodeBrz:      {num: 0},
 	opcodeEnd:      nil,
@@ -973,6 +973,14 @@ func (o Opcode) numReturns() (num int, unknown bool) {
 	}
 }
 
+func (i *Instruction) AsStore(value, ptr Value, offset uint32) {
+	i.opcode = OpcodeStore
+	i.typ = TypeI64
+	i.v = value
+	i.v2 = ptr
+	i.u64 = uint64(offset)
+}
+
 func (i *Instruction) AsIconst64(v uint64) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
@@ -983,18 +991,6 @@ func (i *Instruction) AsIconst32(v uint32) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u64 = uint64(v)
-}
-
-func init() {
-	instructionFormats[OpcodeIconst] = func(builder Builder, i *Instruction) (ret string) {
-		switch i.typ {
-		case TypeI32:
-			ret = fmt.Sprintf("_32 %#x", uint32(i.u64))
-		case TypeI64:
-			ret = fmt.Sprintf("_64 %#x", i.u64)
-		}
-		return
-	}
 }
 
 func (i *Instruction) AsF32const(f float32) {
@@ -1009,17 +1005,6 @@ func (i *Instruction) AsF64const(f float64) {
 	i.u64 = math.Float64bits(f)
 }
 
-func init() {
-	instructionFormats[OpcodeF32const] = func(builder Builder, i *Instruction) (ret string) {
-		ret = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u64)))
-		return
-	}
-	instructionFormats[OpcodeF64const] = func(builder Builder, i *Instruction) (ret string) {
-		ret = fmt.Sprintf(" %f", math.Float64frombits(i.u64))
-		return
-	}
-}
-
 func (i *Instruction) AsReturn(vs []Value) {
 	i.opcode = OpcodeReturn
 	i.vs = vs
@@ -1029,39 +1014,10 @@ func (i *Instruction) AsTrap() {
 	i.opcode = OpcodeTrap
 }
 
-func init() {
-	instructionFormats[OpcodeReturn] = func(builder Builder, i *Instruction) (ret string) {
-		if len(i.vs) == 0 {
-			return
-		}
-		vs := make([]string, len(i.vs))
-		for idx := range vs {
-			vs[idx] = i.vs[idx].Format(builder)
-		}
-		ret = fmt.Sprintf(" %s", strings.Join(vs, ", "))
-		return
-	}
-
-	instructionFormats[OpcodeTrap] = func(Builder, *Instruction) (ret string) { return }
-}
-
 func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.opcode = OpcodeJump
 	i.vs = vs
 	i.blk = target
-}
-
-func init() {
-	instructionFormats[OpcodeJump] = func(builder Builder, i *Instruction) (ret string) {
-		vs := make([]string, len(i.vs)+1)
-		vs[0] = " " + i.blk.(*basicBlock).Name()
-		for idx := range i.vs {
-			vs[idx+1] = i.vs[idx].Format(builder)
-		}
-
-		ret = strings.Join(vs, ", ")
-		return
-	}
 }
 
 func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
@@ -1078,27 +1034,53 @@ func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
 	i.blk = target
 }
 
-func init() {
-	instructionFormats[OpcodeBrz] = func(builder Builder, i *Instruction) (ret string) {
+func (i *Instruction) Format(builder Builder) string {
+	var instSuffix string
+	switch i.opcode {
+	case OpcodeTrap:
+	case OpcodeStore:
+		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(builder), i.v2.Format(builder), int32(i.u64))
+	case OpcodeIconst:
+		switch i.typ {
+		case TypeI32:
+			instSuffix = fmt.Sprintf("_32 %#x", uint32(i.u64))
+		case TypeI64:
+			instSuffix = fmt.Sprintf("_64 %#x", i.u64)
+		}
+	case OpcodeF32const:
+		instSuffix = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u64)))
+	case OpcodeF64const:
+		instSuffix = fmt.Sprintf(" %f", math.Float64frombits(i.u64))
+	case OpcodeReturn:
+		if len(i.vs) == 0 {
+			break
+		}
+		vs := make([]string, len(i.vs))
+		for idx := range vs {
+			vs[idx] = i.vs[idx].Format(builder)
+		}
+		instSuffix = fmt.Sprintf(" %s", strings.Join(vs, ", "))
+	case OpcodeJump:
+		vs := make([]string, len(i.vs)+1)
+		vs[0] = " " + i.blk.(*basicBlock).Name()
+		for idx := range i.vs {
+			vs[idx+1] = i.vs[idx].Format(builder)
+		}
+
+		instSuffix = strings.Join(vs, ", ")
+	case OpcodeBrz, OpcodeBrnz:
 		vs := make([]string, len(i.vs)+2)
 		vs[0] = " " + i.v.Format(builder)
 		vs[1] = i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
 			vs[idx+2] = i.vs[idx].Format(builder)
 		}
-
-		ret = strings.Join(vs, ", ")
-		return
-	}
-	instructionFormats[OpcodeBrnz] = instructionFormats[OpcodeBrz]
-}
-
-func (i *Instruction) Format(builder Builder) (ret string) {
-	fn := instructionFormats[i.opcode]
-	if fn == nil {
+		instSuffix = strings.Join(vs, ", ")
+	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
-	instr := i.opcode.String() + fn(builder, i)
+
+	instr := i.opcode.String() + instSuffix
 
 	var rvs []string
 	if rv := i.rValue; rv.valid() {

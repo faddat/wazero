@@ -13,7 +13,8 @@ import (
 // on top of it in architecture-independent way.
 type Compiler struct {
 	// Per-module data that is used across all functions.
-	m *wasm.Module
+	m       *wasm.Module
+	offsets wazevoapi.OffsetData
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
 
@@ -36,13 +37,14 @@ type Compiler struct {
 	// br is reused during lowering.
 	br *bytes.Reader
 
-	execCtxPtrVariable, moduleCtxPtrVariable ssa.Variable
+	execCtxPtrValue, moduleCtxPtrValue ssa.Value
 }
 
 // NewFrontendCompiler returns a frontend Compiler.
-func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
+func NewFrontendCompiler(od wazevoapi.OffsetData, m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
 	return &Compiler{
 		m:                   m,
+		offsets:             od,
 		ssaBuilder:          ssaBuilder,
 		br:                  bytes.NewReader(nil),
 		wasmLocalToVariable: make(map[wasm.Index]ssa.Variable),
@@ -94,11 +96,11 @@ func (c *Compiler) LowerToSSA() error {
 	//
 	// Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
 	const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
-	execCtxPtrVar, execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
-	moduleCtxPtrVar, moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
+	_, execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
+	_, moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
 	builder.AnnotateValue(execCtxPtrValue, "exec_ctx")
 	builder.AnnotateValue(moduleCtxPtrValue, "module_ctx")
-	c.moduleCtxPtrVariable, c.execCtxPtrVariable = moduleCtxPtrVar, execCtxPtrVar
+	c.execCtxPtrValue, c.moduleCtxPtrValue = execCtxPtrValue, moduleCtxPtrValue
 
 	for i, typ := range c.wasmFunctionTyp.Params {
 		st := wasmToSSA(typ)
@@ -197,17 +199,25 @@ func (c *Compiler) getOrCreateTrapBlock(code wazevoapi.TrapCode) ssa.BasicBlock 
 
 func (c *Compiler) emitTrapBlocks() {
 	builder := c.ssaBuilder
-	for i := wazevoapi.TrapCode(0); i < wazevoapi.TrapCodeCount; i++ {
-		blk := c.trapBlocks[i]
+	for trapCode := wazevoapi.TrapCode(0); trapCode < wazevoapi.TrapCodeCount; trapCode++ {
+		blk := c.trapBlocks[trapCode]
 		if blk == nil {
 			continue
 		}
-
-		// TODO: set the status to vmContext.
-
 		builder.SetCurrentBlock(blk)
-		instr := builder.AllocateInstruction()
-		instr.AsTrap()
-		builder.InsertInstruction(instr)
+
+		trapCodeInstr := builder.AllocateInstruction()
+		trapCodeInstr.AsIconst32(uint32(trapCode))
+		builder.InsertInstruction(trapCodeInstr)
+		trapCodeVal, _ := trapCodeInstr.Returns()
+
+		execCtx := c.execCtxPtrValue
+		store := builder.AllocateInstruction()
+		store.AsStore(trapCodeVal, execCtx, c.offsets.ExecutionContextTrapCodeOffset.U32())
+		builder.InsertInstruction(store)
+
+		trap := builder.AllocateInstruction()
+		trap.AsTrap()
+		builder.InsertInstruction(trap)
 	}
 }

@@ -6,15 +6,10 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
-
-func TestNewFrontendCompiler(t *testing.T) {
-	b := ssa.NewBuilder()
-	fc := NewFrontendCompiler(&wasm.Module{}, b)
-	require.NotNil(t, fc)
-}
 
 const (
 	i32 = wasm.ValueTypeI32
@@ -45,6 +40,18 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 			exp: `
 blk0: (exec_ctx: i64, module_ctx: i64)
 	Jump blk_ret
+`,
+		},
+		{
+			name: "unreachable", m: singleFunctionModule(vv, []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}, nil),
+			exp: `
+blk0: (exec_ctx: i64, module_ctx: i64)
+	Jump blk1
+
+blk1: () <-- (blk0)
+	v3 = Iconst_32 0x0
+	Store v3, exec_ctx, 0x0
+	Trap
 `,
 		},
 		{
@@ -164,7 +171,7 @@ blk1: () <-- (blk0)
 				wasm.OpcodeBlock, 0,
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeBrIf, 0,
-				wasm.OpcodeReturn,
+				wasm.OpcodeUnreachable,
 				wasm.OpcodeEnd,
 				wasm.OpcodeEnd,
 			},
@@ -179,7 +186,12 @@ blk1: () <-- (blk0)
 	Jump blk_ret
 
 blk2: () <-- (blk0)
-	Return
+	Jump blk3
+
+blk3: () <-- (blk2)
+	v4 = Iconst_32 0x0
+	Store v4, exec_ctx, 0x0
+	Trap
 `,
 		},
 		{
@@ -470,7 +482,8 @@ blk4: () <-- (blk1)
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			b := ssa.NewBuilder()
-			fc := NewFrontendCompiler(tc.m, b)
+			od := wazevoapi.NewOffsetData(tc.m)
+			fc := NewFrontendCompiler(od, tc.m, b)
 			typeIndex := tc.m.FunctionSection[0]
 			code := &tc.m.CodeSection[0]
 			fc.Init(0, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)

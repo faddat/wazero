@@ -3,6 +3,7 @@ package wazevo
 import (
 	"context"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"runtime"
 	"sync"
 
@@ -38,7 +39,9 @@ type (
 	// TODO:
 	moduleContextOpaque struct{}
 	// TODO:
-	executionContext struct{}
+	executionContext struct {
+		TrapCode byte
+	}
 )
 
 var _ wasm.Engine = (*engine)(nil)
@@ -58,11 +61,13 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		return nil
 	}
 
+	offsets := wazevoapi.NewOffsetData(module)
+
 	var totalSize int
 	bodies := make([][]byte, localFns)
 
 	ssaBuilder := ssa.NewBuilder()
-	fe, be := frontend.NewFrontendCompiler(module, ssaBuilder), backend.NewBackendCompiler(ssaBuilder)
+	fe, be := frontend.NewFrontendCompiler(offsets, module, ssaBuilder), backend.NewBackendCompiler(ssaBuilder)
 	for i := range module.CodeSection {
 		typ := &module.TypeSection[module.FunctionSection[i]]
 
