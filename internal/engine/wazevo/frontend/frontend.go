@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"bytes"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -15,6 +16,10 @@ type Compiler struct {
 	m *wasm.Module
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
+
+	// trapBlocks maps wazevoapi.TrapCode to the corresponding BasicBlock which
+	// exits the execution with the code.
+	trapBlocks [wazevoapi.TrapCodeCount]ssa.BasicBlock
 
 	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
 	// to the corresponding ssa.Variable.
@@ -30,6 +35,8 @@ type Compiler struct {
 
 	// br is reused during lowering.
 	br *bytes.Reader
+
+	execCtxPtrVariable, moduleCtxPtrVariable ssa.Variable
 }
 
 // NewFrontendCompiler returns a frontend Compiler.
@@ -46,6 +53,7 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
 func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []wasm.ValueType, body []byte) {
 	c.ssaBuilder.Reset()
 	c.loweringState.reset()
+	c.trapBlocks = [wazevoapi.TrapCodeCount]ssa.BasicBlock{}
 
 	c.wasmLocalFunctionIndex = idx
 	c.wasmFunctionTyp = typ
@@ -59,18 +67,48 @@ func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []was
 //
 // Note that this only does the naive lowering, and do not do any optimization, instead the caller is expected to do so.
 func (c *Compiler) LowerToSSA() error {
+	builder := c.ssaBuilder
+
 	// Set up the entry block.
-	entryBlock := c.ssaBuilder.AllocateBasicBlock()
-	c.ssaBuilder.SetCurrentBlock(entryBlock)
-	// TODO: add moduleContext param as a first argument.
+	entryBlock := builder.AllocateBasicBlock()
+	builder.SetCurrentBlock(entryBlock)
+
+	// Functions always take two parameters in addition to Wasm-level parameters:
+	//
+	// 	1. moduleContextPtr: pointer to the *moduleContextOpaque in wazevo package.
+	//	  This will be used to access memory, etc. Also, this will be used during host function calls.
+	//
+	//  2. executionContextPtr: pointer to the *executionContext in wazevo package.
+	//    This will be used to exit the execution in the face of trap, plus used for host function calls.
+	//
+	// Note: it's clear that sometimes a function won't need them. For example,
+	//  if the function doesn't trap and doesn't make function call, then
+	// 	we might be able to eliminate the parameter. However, if that function
+	//	can be called via call_indirect, then we cannot eliminate because the
+	//  signature won't match with the expected one.
+	//  TODO: maybe there's some way to do this optimization without glitches, but so far I have no clue about the feasibility.
+	//
+	// Note: In Wasmtime or many other runtimes, moduleContextPtr is called "vmContext". Also note that `moduleContextPtr`
+	//  is wazero-specific since other runtimes can naturally use the OS-level signal to do this job thanks to the fact that
+	//  they can use native stack vs wazero cannot use Go-routine stack and have to use Go-runtime allocated []byte as a stack.
+	//
+	// Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
+	const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
+	execCtxPtrVar, execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
+	moduleCtxPtrVar, moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
+	builder.AnnotateValue(execCtxPtrValue, "exec_ctx")
+	builder.AnnotateValue(moduleCtxPtrValue, "module_ctx")
+	c.moduleCtxPtrVariable, c.execCtxPtrVariable = moduleCtxPtrVar, execCtxPtrVar
+
 	for i, typ := range c.wasmFunctionTyp.Params {
 		st := wasmToSSA(typ)
-		variable := entryBlock.AddParam(c.ssaBuilder, st)
+		variable, _ := entryBlock.AddParam(builder, st)
 		c.wasmLocalToVariable[wasm.Index(i)] = variable
 	}
 	c.declareWasmLocals(entryBlock)
 
 	c.lowerBody(entryBlock)
+	c.emitTrapBlocks()
 	return nil
 }
 
@@ -123,7 +161,7 @@ func wasmToSSA(vt wasm.ValueType) ssa.Type {
 func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.BasicBlock) {
 	for _, typ := range tps {
 		st := wasmToSSA(typ)
-		_ = blk.AddParam(c.ssaBuilder, st)
+		blk.AddParam(c.ssaBuilder, st)
 	}
 }
 
@@ -135,15 +173,41 @@ func (c *Compiler) formatBuilder() string {
 
 	str := strings.Builder{}
 	for _, b := range builder.Blocks() {
-		header := b.String()
+		header := b.FormatHeader(builder)
 		str.WriteByte('\n')
 		str.WriteString(header)
 		str.WriteByte('\n')
 		for cur := b.Root(); cur != nil; cur = cur.Next() {
 			str.WriteByte('\t')
-			str.WriteString(cur.String())
+			str.WriteString(cur.Format(builder))
 			str.WriteByte('\n')
 		}
 	}
 	return str.String()
+}
+
+func (c *Compiler) getOrCreateTrapBlock(code wazevoapi.TrapCode) ssa.BasicBlock {
+	blk := c.trapBlocks[code]
+	if blk == nil {
+		blk = c.ssaBuilder.AllocateBasicBlock()
+		c.trapBlocks[code] = blk
+	}
+	return blk
+}
+
+func (c *Compiler) emitTrapBlocks() {
+	builder := c.ssaBuilder
+	for i := wazevoapi.TrapCode(0); i < wazevoapi.TrapCodeCount; i++ {
+		blk := c.trapBlocks[i]
+		if blk == nil {
+			continue
+		}
+
+		// TODO: set the status to vmContext.
+
+		builder.SetCurrentBlock(blk)
+		instr := builder.AllocateInstruction()
+		instr.AsTrap()
+		builder.InsertInstruction(instr)
+	}
 }

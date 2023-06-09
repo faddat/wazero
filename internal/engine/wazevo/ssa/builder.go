@@ -45,6 +45,9 @@ type Builder interface {
 	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
 	// After calling this, AddPred will be forbidden.
 	Seal(blk BasicBlock)
+
+	// AnnotateValue is for debugging purpose.
+	AnnotateValue(value Value, annotation string)
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -52,6 +55,7 @@ func NewBuilder() Builder {
 	return &builder{
 		instructionsPool: newPool[Instruction](),
 		basicBlocksPool:  newPool[basicBlock](),
+		valueAnnotations: make(map[Value]string),
 	}
 }
 
@@ -69,6 +73,8 @@ type builder struct {
 	nextValue Value
 	// nextVariable is used by builder.AllocateVariable.
 	nextVariable Variable
+
+	valueAnnotations map[Value]string
 }
 
 // Reset implements Builder.Reset.
@@ -84,7 +90,15 @@ func (b *builder) Reset() {
 		b.variables[i] = TypeInvalid
 	}
 
+	for v := Value(0); v < b.nextValue; v++ {
+		delete(b.valueAnnotations, v)
+	}
 	b.nextValue = valueInvalid + 1
+}
+
+// AnnotateValue implements Builder.AnnotateValue.
+func (b *builder) AnnotateValue(value Value, a string) {
+	b.valueAnnotations[value] = a
 }
 
 // AllocateInstruction implements Builder.AllocateInstruction.

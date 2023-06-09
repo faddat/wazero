@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -41,10 +42,6 @@ const (
 	controlFrameKindIfWithoutElse
 	controlFrameKindBlock
 )
-
-func (ctrl *controlFrame) isReturn() bool {
-	return ctrl.kind == controlFrameKindFunction
-}
 
 func (ctrl *controlFrame) isLoop() bool {
 	return ctrl.kind == controlFrameKindLoop
@@ -376,6 +373,11 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		instr.AsReturn(results)
 		builder.InsertInstruction(instr)
+		state.unreachable = true
+
+	case wasm.OpcodeUnreachable:
+		trapBlk := c.getOrCreateTrapBlock(wazevoapi.TrapCodeUnreachable)
+		c.insertJumpToBlock(nil, builder.CurrentBlock(), trapBlk)
 		state.unreachable = true
 	default:
 		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))

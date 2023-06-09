@@ -20,15 +20,16 @@ func (v Variable) String() string {
 // that means there might be multiple Variable(s) for a Value.
 type Value uint32
 
-const valueInvalid = 0
+const valueInvalid Value = 0
 
-// String implements fmt.Stringer.
-func (v Value) String() string {
+func (v Value) Format(b Builder) string {
+	if annotation, ok := b.(*builder).valueAnnotations[v]; ok {
+		return annotation
+	}
 	return fmt.Sprintf("v%d", v)
 }
 
-// Valid returns true if this value is valid.
-// TODO: needs to be exported?
-func (v Value) Valid() bool {
+// valid returns true if this value is valid.
+func (v Value) valid() bool {
 	return v != valueInvalid
 }

@@ -43,21 +43,21 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 		{
 			name: "empty", m: singleFunctionModule(vv, []byte{wasm.OpcodeEnd}, nil),
 			exp: `
-blk0: ()
+blk0: (exec_ctx: i64, module_ctx: i64)
 	Jump blk_ret
 `,
 		},
 		{
 			name: "only return", m: singleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil),
 			exp: `
-blk0: ()
+blk0: (exec_ctx: i64, module_ctx: i64)
 	Return
 `,
 		},
 		{
 			name: "params", m: singleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil),
 			exp: `
-blk0: (v1: i32, v2: f32, v3: f64)
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32, v4: f32, v5: f64)
 	Return
 `,
 		},
@@ -67,19 +67,19 @@ blk0: (v1: i32, v2: f32, v3: f64)
 				wasm.OpcodeEnd,
 			}, nil),
 			exp: `
-blk0: (v1: i32)
-	Jump blk_ret, v1
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32)
+	Jump blk_ret, v3
 `,
 		},
 		{
 			name: "locals", m: singleFunctionModule(vv, []byte{wasm.OpcodeEnd},
 				[]wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	v2 = Iconst_64 0x0
-	v3 = F32const 0.000000
-	v4 = F64const 0.000000
+blk0: (exec_ctx: i64, module_ctx: i64)
+	v3 = Iconst_32 0x0
+	v4 = Iconst_64 0x0
+	v5 = F32const 0.000000
+	v6 = F64const 0.000000
 	Jump blk_ret
 `,
 		},
@@ -87,11 +87,11 @@ blk0: ()
 			name: "locals + params", m: singleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeEnd},
 				[]wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
-blk0: (v1: i32, v2: f32, v3: f64)
-	v4 = Iconst_32 0x0
-	v5 = Iconst_64 0x0
-	v6 = F32const 0.000000
-	v7 = F64const 0.000000
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32, v4: f32, v5: f64)
+	v6 = Iconst_32 0x0
+	v7 = Iconst_64 0x0
+	v8 = F32const 0.000000
+	v9 = F64const 0.000000
 	Jump blk_ret
 `,
 		},
@@ -103,9 +103,9 @@ blk0: (v1: i32, v2: f32, v3: f64)
 			},
 				[]wasm.ValueType{i32}),
 			exp: `
-blk0: (v1: i32)
-	v2 = Iconst_32 0x0
-	Jump blk_ret, v1, v2
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32)
+	v4 = Iconst_32 0x0
+	Jump blk_ret, v3, v4
 `,
 		},
 		{
@@ -115,8 +115,8 @@ blk0: (v1: i32)
 				wasm.OpcodeEnd,
 			}, nil),
 			exp: `
-blk0: (v1: i32, v2: i32)
-	Jump blk_ret, v2, v1
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32, v4: i32)
+	Jump blk_ret, v4, v3
 `,
 		},
 		{
@@ -132,11 +132,11 @@ blk0: (v1: i32, v2: i32)
 				wasm.OpcodeEnd,
 			}, nil),
 			exp: `
-blk0: (v1: i32, v2: i32)
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32, v4: i32)
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Jump blk_ret, v2, v1
+	Jump blk_ret, v4, v3
 `,
 		},
 		{
@@ -148,11 +148,11 @@ blk1: () <-- (blk0)
 			},
 				[]wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	v2 = Iconst_64 0x0
-	v3 = F32const 0.000000
-	v4 = F64const 0.000000
+blk0: (exec_ctx: i64, module_ctx: i64)
+	v3 = Iconst_32 0x0
+	v4 = Iconst_64 0x0
+	v5 = F32const 0.000000
+	v6 = F64const 0.000000
 	Jump blk1
 
 blk1: () <-- (blk0)
@@ -170,9 +170,9 @@ blk1: () <-- (blk0)
 			},
 				[]wasm.ValueType{i32}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	Brz v1, blk1
+blk0: (exec_ctx: i64, module_ctx: i64)
+	v3 = Iconst_32 0x0
+	Brz v3, blk1
 	Jump blk2
 
 blk1: () <-- (blk0)
@@ -190,7 +190,7 @@ blk2: () <-- (blk0)
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{}),
 			exp: `
-blk0: ()
+blk0: (exec_ctx: i64, module_ctx: i64)
 	Jump blk1
 
 blk1: () <-- (blk0,blk1)
@@ -210,12 +210,12 @@ blk2: ()
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{}),
 			exp: `
-blk0: ()
+blk0: (exec_ctx: i64, module_ctx: i64)
 	Jump blk1
 
 blk1: () <-- (blk0,blk1)
-	v1 = Iconst_32 0x1
-	Brz v1, blk1
+	v3 = Iconst_32 0x1
+	Brz v3, blk1
 	Jump blk3
 
 blk2: ()
@@ -236,11 +236,11 @@ blk3: () <-- (blk1)
 			},
 				[]wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	v2 = Iconst_64 0x0
-	v3 = F32const 0.000000
-	v4 = F64const 0.000000
+blk0: (exec_ctx: i64, module_ctx: i64)
+	v3 = Iconst_32 0x0
+	v4 = Iconst_64 0x0
+	v5 = F32const 0.000000
+	v6 = F64const 0.000000
 	Jump blk1
 
 blk1: () <-- (blk0,blk2)
@@ -259,9 +259,9 @@ blk2: ()
 			},
 				[]wasm.ValueType{i32}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	Brz v1, blk2
+blk0: (exec_ctx: i64, module_ctx: i64)
+	v3 = Iconst_32 0x0
+	Brz v3, blk2
 	Jump blk1
 
 blk1: () <-- (blk0)
@@ -285,9 +285,9 @@ blk3: () <-- (blk1,blk2)
 			},
 				[]wasm.ValueType{i32}),
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	Brz v1, blk2
+blk0: (exec_ctx: i64, module_ctx: i64)
+	v3 = Iconst_32 0x0
+	Brz v3, blk2
 	Jump blk1
 
 blk1: () <-- (blk0)
@@ -322,21 +322,21 @@ blk3: () <-- (blk1)
 				}},
 			},
 			exp: `
-blk0: ()
-	v1 = Iconst_32 0x0
-	v2 = Iconst_32 0x0
+blk0: (exec_ctx: i64, module_ctx: i64)
 	v3 = Iconst_32 0x0
-	Brz v1, blk2
+	v4 = Iconst_32 0x0
+	v5 = Iconst_32 0x0
+	Brz v3, blk2
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Return v3
+	Return v5
 
 blk2: () <-- (blk0)
 	Jump blk3
 
 blk3: () <-- (blk2)
-	Jump blk_ret, v1
+	Jump blk_ret, v3
 `,
 		},
 		{
@@ -358,19 +358,19 @@ blk3: () <-- (blk2)
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{i32}),
 			exp: `
-blk0: (v1: i32, v2: i32)
-	v3 = Iconst_32 0x0
-	Brz v1, blk2
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32, v4: i32)
+	v5 = Iconst_32 0x0
+	Brz v3, blk2
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Jump blk3, v1
+	Jump blk3, v3
 
 blk2: () <-- (blk0)
-	Jump blk3, v2
+	Jump blk3, v4
 
-blk3: (v4: i32) <-- (blk1,blk2)
-	Jump blk_ret, v4
+blk3: (v6: i32) <-- (blk1,blk2)
+	Jump blk_ret, v6
 `,
 		},
 		{
@@ -386,15 +386,15 @@ blk3: (v4: i32) <-- (blk1,blk2)
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{i32}),
 			exp: `
-blk0: (v1: i32)
-	v2 = Iconst_32 0x0
-	Jump blk1, v1
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32)
+	v4 = Iconst_32 0x0
+	Jump blk1, v3
 
-blk1: (v3: i32) <-- (blk0)
-	Return v3
+blk1: (v5: i32) <-- (blk0)
+	Return v5
 
-blk2: (v4: i32)
-	Jump blk_ret, v4
+blk2: (v6: i32)
+	Jump blk_ret, v6
 `,
 		},
 		{
@@ -412,16 +412,16 @@ blk2: (v4: i32)
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{}),
 			exp: `
-blk0: (v1: i32)
-	Jump blk1, v1
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32)
+	Jump blk1, v3
 
-blk1: (v2: i32) <-- (blk0,blk1)
-	Brz v2, blk1, v2
+blk1: (v4: i32) <-- (blk0,blk1)
+	Brz v4, blk1, v4
 	Jump blk4
 
 blk2: () <-- (blk3)
-	v3 = Iconst_32 0x0
-	Jump blk_ret, v3
+	v5 = Iconst_32 0x0
+	Jump blk_ret, v5
 
 blk3: () <-- (blk4)
 	Jump blk2
@@ -447,20 +447,20 @@ blk4: () <-- (blk1)
 				wasm.OpcodeEnd,
 			}, []wasm.ValueType{}),
 			exp: `
-blk0: (v1: i32)
-	Jump blk1, v1
+blk0: (exec_ctx: i64, module_ctx: i64, v3: i32)
+	Jump blk1, v3
 
-blk1: (v2: i32) <-- (blk0,blk3)
-	Brz v2, blk_ret
+blk1: (v4: i32) <-- (blk0,blk3)
+	Brz v4, blk_ret
 	Jump blk4
 
 blk2: ()
-	v4 = Iconst_32 0x0
+	v6 = Iconst_32 0x0
 	Jump blk_ret
 
 blk3: () <-- (blk4)
-	v3 = Iconst_32 0x1
-	Jump blk1, v3
+	v5 = Iconst_32 0x1
+	Jump blk1, v5
 
 blk4: () <-- (blk1)
 	Jump blk3

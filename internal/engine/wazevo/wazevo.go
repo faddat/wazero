@@ -32,6 +32,13 @@ type (
 	compiledFunction struct {
 		offsetInExecutable int
 	}
+
+	// TODO:
+	moduleContext struct{}
+	// TODO:
+	moduleContextOpaque struct{}
+	// TODO:
+	executionContext struct{}
 )
 
 var _ wasm.Engine = (*engine)(nil)

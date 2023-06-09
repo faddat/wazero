@@ -9,13 +9,11 @@ import (
 // In traditional SSA terminology, the block "params" here are called phi values,
 // and there does not exist "params". However, for simplicity, we handle them as parameters to a BB.
 type BasicBlock interface {
-	fmt.Stringer
-
 	// Name returns the unique string ID of this block. e.g. blk0, blk1, ...
 	Name() string
 
 	// AddParam adds the parameter to the block whose type specified by `t`.
-	AddParam(b Builder, t Type) Variable
+	AddParam(b Builder, t Type) (Variable, Value)
 
 	// Params returns the number of parameters to this block.
 	Params() int
@@ -37,6 +35,9 @@ type BasicBlock interface {
 
 	// ReturnBlock returns ture if this block represents the function return.
 	ReturnBlock() bool
+
+	// FormatHeader returns the debug string of this block, not including instruction.
+	FormatHeader(b Builder) string
 }
 
 type (
@@ -67,7 +68,7 @@ var BasicBlockReturn BasicBlock = &basicBlock{id: basicBlockIDReturnBlock}
 // Name implements BasicBlock.Name.
 func (bb *basicBlock) Name() string {
 	if bb.id == basicBlockIDReturnBlock {
-		return fmt.Sprintf("blk_ret")
+		return "blk_ret"
 	} else {
 		return fmt.Sprintf("blk%d", bb.id)
 	}
@@ -84,13 +85,13 @@ func (bb *basicBlock) ReturnBlock() bool {
 }
 
 // AddParam implements BasicBlock.AddParam.
-func (bb *basicBlock) AddParam(b Builder, typ Type) Variable {
+func (bb *basicBlock) AddParam(b Builder, typ Type) (Variable, Value) {
 	variable := b.DeclareVariable(typ)
 	n := len(bb.params)
 	paramValue := b.AllocateValue()
 	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: paramValue})
 	b.DefineVariable(variable, paramValue, bb)
-	return variable
+	return variable, paramValue
 }
 
 // addParamOn adds a parameter to this block whose variable is already defined.
@@ -149,7 +150,7 @@ func (bb *basicBlock) AddPred(blk BasicBlock, branch *Instruction) {
 		return
 	}
 	if bb.sealed {
-		panic("BUG: trying to add predecessor to a sealed block: " + bb.String())
+		panic("BUG: trying to add predecessor to a sealed block: " + bb.Name())
 	}
 	pred := blk.(*basicBlock)
 	bb.preds = append(bb.preds, basicBlockPredecessorInfo{
@@ -158,11 +159,11 @@ func (bb *basicBlock) AddPred(blk BasicBlock, branch *Instruction) {
 	})
 }
 
-// String implements fmt.Stringer. Only used for debugging.
-func (bb *basicBlock) String() string {
+// FormatHeader implements BasicBlock.FormatHeader.
+func (bb *basicBlock) FormatHeader(b Builder) string {
 	ps := make([]string, len(bb.params))
 	for i, p := range bb.params {
-		ps[i] = p.String()
+		ps[i] = p.format(b)
 	}
 
 	if len(bb.preds) > 0 {
@@ -193,7 +194,6 @@ type blockParam struct {
 	n int
 }
 
-// String implements fmt.Stringer.
-func (p *blockParam) String() (ret string) {
-	return fmt.Sprintf("%s: %s", p.value, p.typ)
+func (p *blockParam) format(b Builder) (ret string) {
+	return fmt.Sprintf("%s: %s", p.value.Format(b), p.typ)
 }
