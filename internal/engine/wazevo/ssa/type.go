@@ -31,6 +31,8 @@ const (
 // String implements fmt.Stringer.
 func (t Type) String() (ret string) {
 	switch t {
+	case TypeInvalid:
+		return "invalid"
 	case TypeI8:
 		return "i8"
 	case TypeI16:
@@ -43,6 +45,12 @@ func (t Type) String() (ret string) {
 		return "f32"
 	case TypeF64:
 		return "f64"
+	default:
+		panic(int(t))
 	}
 	return
+}
+
+func (t Type) invalid() bool {
+	return t == TypeInvalid
 }

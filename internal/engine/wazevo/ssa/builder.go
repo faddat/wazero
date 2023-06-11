@@ -2,6 +2,10 @@
 // and ISA.
 package ssa
 
+import (
+	"fmt"
+)
+
 // Builder is used to builds SSA consisting of Basic Blocks per function.
 type Builder interface {
 	// Reset must be called to reuse this builder for the next function.
@@ -36,8 +40,8 @@ type Builder interface {
 	// InsertInstruction executes BasicBlock.InsertInstruction for the currently handled basic block.
 	InsertInstruction(raw *Instruction)
 
-	// AllocateValue allocates an unused Value.
-	AllocateValue() Value
+	// allocateValue allocates an unused Value.
+	allocateValue(typ Type) Value
 
 	// FindValue searches the latest definition of the given Variable and returns the result.
 	FindValue(variable Variable) Value
@@ -55,7 +59,7 @@ func NewBuilder() Builder {
 	return &builder{
 		instructionsPool: newPool[Instruction](),
 		basicBlocksPool:  newPool[basicBlock](),
-		valueAnnotations: make(map[Value]string),
+		valueAnnotations: make(map[valueID]string),
 	}
 }
 
@@ -69,12 +73,12 @@ type builder struct {
 
 	// variables track the types for Variable with the index regarded Variable.
 	variables []Type
-	// nextValue is used by builder.AllocateValue.
-	nextValue Value
+	// nextValueID is used by builder.AllocateValue.
+	nextValueID valueID
 	// nextVariable is used by builder.AllocateVariable.
 	nextVariable Variable
 
-	valueAnnotations map[Value]string
+	valueAnnotations map[valueID]string
 }
 
 // Reset implements Builder.Reset.
@@ -90,15 +94,15 @@ func (b *builder) Reset() {
 		b.variables[i] = TypeInvalid
 	}
 
-	for v := Value(0); v < b.nextValue; v++ {
+	for v := valueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
 	}
-	b.nextValue = valueInvalid + 1
+	b.nextValueID = valueIDInvalid + 1
 }
 
 // AnnotateValue implements Builder.AnnotateValue.
 func (b *builder) AnnotateValue(value Value, a string) {
-	b.valueAnnotations[value] = a
+	b.valueAnnotations[value.id()] = a
 }
 
 // AllocateInstruction implements Builder.AllocateInstruction.
@@ -119,27 +123,29 @@ func (b *builder) AllocateBasicBlock() BasicBlock {
 // InsertInstruction implements Builder.InsertInstruction.
 func (b *builder) InsertInstruction(instr *Instruction) {
 	b.currentBB.InsertInstruction(instr)
-	num, unknown := instr.opcode.numReturns()
-	if unknown {
-		panic("TODO: unknown returns")
+
+	resultTypesFn := instructionReturnTypes[instr.opcode]
+	if resultTypesFn == nil {
+		panic("TODO: " + instr.Format(b))
 	}
 
-	if num == 0 {
+	t1, ts := resultTypesFn(b, instr)
+	if t1.invalid() {
 		return
 	}
 
-	r1 := b.AllocateValue()
+	r1 := b.allocateValue(t1)
 	instr.rValue = r1
-	num--
 
-	if num == 0 {
+	tsl := len(ts)
+	if tsl == 0 {
 		return
 	}
 
 	// TODO: reuse slices, though this seems not to be common.
-	instr.rValues = make([]Value, num)
-	for i := 0; i < num; i++ {
-		instr.rValues[i] = b.AllocateValue()
+	instr.rValues = make([]Value, tsl)
+	for i := 0; i < tsl; i++ {
+		instr.rValues[i] = b.allocateValue(ts[i])
 	}
 }
 
@@ -198,23 +204,25 @@ func (b *builder) allocateVariable() (ret Variable) {
 	return
 }
 
-// AllocateValue implements Builder.AllocateValue.
-func (b *builder) AllocateValue() (v Value) {
-	v = b.nextValue
-	b.nextValue++
+// allocateValue implements Builder.AllocateValue.
+func (b *builder) allocateValue(typ Type) (v Value) {
+	v = Value(b.nextValueID)
+	v.setType(typ)
+	b.nextValueID++
 	return
 }
 
 // FindValue implements Builder.FindValue.
 func (b *builder) FindValue(variable Variable) Value {
-	return b.findValue(variable, b.currentBB)
+	typ := b.definedVariableType(variable)
+	return b.findValue(typ, variable, b.currentBB)
 }
 
 // findValue recursively tries to find the latest definition of a `variable`. The algorithm is described in
 // the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
 //
 // TODO: reimplement this in iterative, not recursive, to avoid stack overflow.
-func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
+func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value {
 	if val, ok := blk.lastDefinitions[variable]; ok {
 		// The value is already defined in this block!
 		return val
@@ -223,7 +231,7 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 		// So we temporarily define the placeholder value here (not add as a parameter yet!),
 		// and record it as unknown.
 		// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
-		value := b.AllocateValue()
+		value := b.allocateValue(typ)
 		blk.lastDefinitions[variable] = value
 		blk.unknownValues[variable] = value
 		return value
@@ -232,14 +240,14 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 	if pred := blk.singlePred; pred != nil {
 		// If this block is sealed and have only one predecessor,
 		// we can use the value in that block without ambiguity on definition.
-		return b.findValue(variable, pred)
+		return b.findValue(typ, variable, pred)
 	}
 
 	// If this block has multiple predecessors, we have to gather the definitions,
 	// and treat them as an argument to this block. So the first thing we do now is
 	// define a new parameter to this block which may or may not be redundant, but
 	// later we eliminate trivial params in an optimization pass.
-	paramValue := b.AllocateValue()
+	paramValue := b.allocateValue(typ)
 	blk.addParamOn(b, variable, paramValue)
 	// After the new "phi" param is added, we have to manipulate the original branching instructions
 	// in predecessors so that they would pass the definition of `variable` as the argument to
@@ -247,7 +255,7 @@ func (b *builder) findValue(variable Variable, blk *basicBlock) Value {
 	for i := range blk.preds {
 		pred := &blk.preds[i]
 		// Find the definition in the predecessor recursively.
-		value := b.findValue(variable, pred.blk)
+		value := b.findValue(typ, variable, pred.blk)
 		pred.branch.addArgument(value)
 	}
 	return paramValue
@@ -262,11 +270,20 @@ func (b *builder) Seal(raw BasicBlock) {
 	blk.sealed = true
 
 	for variable, phiValue := range blk.unknownValues {
+		typ := b.definedVariableType(variable)
 		blk.addParamOn(b, variable, phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
-			predValue := b.findValue(variable, pred.blk)
+			predValue := b.findValue(typ, variable, pred.blk)
 			pred.branch.addArgument(predValue)
 		}
 	}
+}
+
+func (b *builder) definedVariableType(variable Variable) Type {
+	typ := b.variables[variable]
+	if typ == TypeInvalid {
+		panic(fmt.Sprintf("%s is not defined yet", variable))
+	}
+	return typ
 }

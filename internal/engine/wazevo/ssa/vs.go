@@ -16,20 +16,49 @@ func (v Variable) String() string {
 	return fmt.Sprintf("var%d", v)
 }
 
-// Value represents an SSA value. The relationship with Variable is 1: N (including 0),
+// Value represents an SSA value with a type information. The relationship with Variable is 1: N (including 0),
 // that means there might be multiple Variable(s) for a Value.
-type Value uint32
+//
+// Higher 32-bit is used to store Type for this value.
+type Value uint64
 
-const valueInvalid Value = 0
+// valueID is the lower 32bit of Value, which is the pure identifier of Value without type info.
+type valueID uint32
 
-func (v Value) Format(b Builder) string {
-	if annotation, ok := b.(*builder).valueAnnotations[v]; ok {
+const valueIDInvalid valueID = 0
+
+// Format creates a debug string for this Value using the data stored in Builder.
+func (v *Value) format(b Builder) string {
+	if annotation, ok := b.(*builder).valueAnnotations[v.id()]; ok {
 		return annotation
 	}
-	return fmt.Sprintf("v%d", v)
+	return fmt.Sprintf("v%d", v.id())
+}
+
+func (v *Value) formatWithType(b Builder) string {
+	if annotation, ok := b.(*builder).valueAnnotations[v.id()]; ok {
+		return annotation + ":" + v._Type().String()
+	} else {
+		return fmt.Sprintf("v%d:%s", v.id(), v._Type())
+	}
 }
 
 // valid returns true if this value is valid.
-func (v Value) valid() bool {
-	return v != valueInvalid
+func (v *Value) valid() bool {
+	return v.id() != valueIDInvalid
+}
+
+// _Type returns the Type of this value.
+func (v *Value) _Type() Type {
+	return Type(*v >> 32)
+}
+
+// id returns the valueID of this value.
+func (v *Value) id() valueID {
+	return valueID(*v)
+}
+
+// setType sets a type of this Value.
+func (v *Value) setType(typ Type) {
+	*v |= Value(typ) << 32
 }

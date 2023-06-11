@@ -948,29 +948,24 @@ const (
 	opcodeEnd
 )
 
-var numReturns = [...]*struct {
-	num int
-	// unknown is true if the number of returns cannot be determined by opcode (e.g. function call).
-	unknown bool
-}{
-	OpcodeJump:     {num: 0},
-	OpcodeIconst:   {num: 1},
-	OpcodeF32const: {num: 1},
-	OpcodeF64const: {num: 1},
-	OpcodeStore:    {num: 0},
-	OpcodeTrap:     {num: 0},
-	OpcodeReturn:   {num: 0},
-	OpcodeBrz:      {num: 0},
-	opcodeEnd:      nil,
-}
+type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
 
-func (o Opcode) numReturns() (num int, unknown bool) {
-	rs := numReturns[o]
-	if rs == nil {
-		panic("TODO: " + o.String())
-	} else {
-		return rs.num, rs.unknown
-	}
+var (
+	returnTypesFnNoReturns returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeInvalid, nil }
+	returnTypesFnF32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
+	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
+)
+
+var instructionReturnTypes = [...]returnTypesFn{
+	OpcodeJump:     returnTypesFnNoReturns,
+	OpcodeIconst:   func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil },
+	OpcodeF32const: returnTypesFnF32,
+	OpcodeF64const: returnTypesFnF64,
+	OpcodeStore:    returnTypesFnNoReturns,
+	OpcodeTrap:     returnTypesFnNoReturns,
+	OpcodeReturn:   returnTypesFnNoReturns,
+	OpcodeBrz:      returnTypesFnNoReturns,
+	opcodeEnd:      nil,
 }
 
 func (i *Instruction) AsStore(value, ptr Value, offset uint32) {
@@ -1039,7 +1034,7 @@ func (i *Instruction) Format(builder Builder) string {
 	switch i.opcode {
 	case OpcodeTrap:
 	case OpcodeStore:
-		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(builder), i.v2.Format(builder), int32(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.format(builder), i.v2.format(builder), int32(i.u64))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:
@@ -1057,23 +1052,23 @@ func (i *Instruction) Format(builder Builder) string {
 		}
 		vs := make([]string, len(i.vs))
 		for idx := range vs {
-			vs[idx] = i.vs[idx].Format(builder)
+			vs[idx] = i.vs[idx].format(builder)
 		}
 		instSuffix = fmt.Sprintf(" %s", strings.Join(vs, ", "))
 	case OpcodeJump:
 		vs := make([]string, len(i.vs)+1)
 		vs[0] = " " + i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
-			vs[idx+1] = i.vs[idx].Format(builder)
+			vs[idx+1] = i.vs[idx].format(builder)
 		}
 
 		instSuffix = strings.Join(vs, ", ")
 	case OpcodeBrz, OpcodeBrnz:
 		vs := make([]string, len(i.vs)+2)
-		vs[0] = " " + i.v.Format(builder)
+		vs[0] = " " + i.v.format(builder)
 		vs[1] = i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
-			vs[idx+2] = i.vs[idx].Format(builder)
+			vs[idx+2] = i.vs[idx].format(builder)
 		}
 		instSuffix = strings.Join(vs, ", ")
 	default:
@@ -1084,11 +1079,11 @@ func (i *Instruction) Format(builder Builder) string {
 
 	var rvs []string
 	if rv := i.rValue; rv.valid() {
-		rvs = append(rvs, rv.Format(builder))
+		rvs = append(rvs, rv.formatWithType(builder))
 	}
 
 	for _, v := range i.rValues {
-		rvs = append(rvs, v.Format(builder))
+		rvs = append(rvs, v.formatWithType(builder))
 	}
 
 	if len(rvs) > 0 {

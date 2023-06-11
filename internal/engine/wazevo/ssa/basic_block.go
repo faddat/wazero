@@ -88,7 +88,7 @@ func (bb *basicBlock) ReturnBlock() bool {
 func (bb *basicBlock) AddParam(b Builder, typ Type) (Variable, Value) {
 	variable := b.DeclareVariable(typ)
 	n := len(bb.params)
-	paramValue := b.AllocateValue()
+	paramValue := b.allocateValue(typ)
 	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: paramValue})
 	b.DefineVariable(variable, paramValue, bb)
 	return variable, paramValue
@@ -97,10 +97,7 @@ func (bb *basicBlock) AddParam(b Builder, typ Type) (Variable, Value) {
 // addParamOn adds a parameter to this block whose variable is already defined.
 // This is only used in the variable resolution.
 func (bb *basicBlock) addParamOn(b *builder, variable Variable, value Value) {
-	typ := b.variables[variable]
-	if typ == TypeInvalid {
-		panic("BUG: variable " + variable.String() + " not declared yet")
-	}
+	typ := b.definedVariableType(variable)
 	n := len(bb.params)
 	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: value})
 	b.DefineVariable(variable, value, bb)
@@ -163,7 +160,7 @@ func (bb *basicBlock) AddPred(blk BasicBlock, branch *Instruction) {
 func (bb *basicBlock) FormatHeader(b Builder) string {
 	ps := make([]string, len(bb.params))
 	for i, p := range bb.params {
-		ps[i] = p.format(b)
+		ps[i] = p.value.formatWithType(b)
 	}
 
 	if len(bb.preds) > 0 {
@@ -192,8 +189,4 @@ type blockParam struct {
 	typ   Type
 	// n is the index of this blockParam in the bb.
 	n int
-}
-
-func (p *blockParam) format(b Builder) (ret string) {
-	return fmt.Sprintf("%s: %s", p.value.Format(b), p.typ)
 }
