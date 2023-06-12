@@ -384,30 +384,30 @@ func (c *arm64Compiler) compileReturnFunction() error {
 }
 
 func (c *arm64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
-	if target := c.compiledTrapTargets[status]; target == nil {
-		if target := c.compiledTrapTargets[status]; target == nil {
-			skip := c.assembler.CompileJump(skipCondition)
-			// Save the trap target for future reference.
-			c.compiledTrapTargets[status] = c.compileNOP()
-			c.compileExitFromNativeCode(status)
-			c.assembler.SetJumpTargetOnNext(skip)
-		} else {
-			// We've already compiled this.
-			// Invert the condition to jump into the appropriate target.
-			var trapCondition asm.Instruction
-			switch skipCondition {
-			case arm64.BCONDEQ:
-				trapCondition = arm64.BCONDNE
-			case arm64.BCONDNE:
-				trapCondition = arm64.BCONDEQ
-			case arm64.BCONDLO:
-				trapCondition = arm64.BCONDHS
-			default:
-				panic("BUG: couldn't invert condition")
-			}
-			c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
-		}
-	}
+	//if target := c.compiledTrapTargets[status]; target == nil {
+	skip := c.assembler.CompileJump(skipCondition)
+	// Save the trap target for future reference.
+	c.compiledTrapTargets[status] = c.compileNOP()
+	c.compileExitFromNativeCode(status)
+	c.assembler.SetJumpTargetOnNext(skip)
+	//} else {
+	//	// We've already compiled this.
+	//	// Invert the condition to jump into the appropriate target.
+	//	var trapCondition asm.Instruction
+	//	switch skipCondition {
+	//	case arm64.BCONDEQ:
+	//		trapCondition = arm64.BCONDNE
+	//	case arm64.BCONDNE:
+	//		trapCondition = arm64.BCONDEQ
+	//	case arm64.BCONDLO:
+	//		trapCondition = arm64.BCONDHS
+	//	case arm64.BCONDHS:
+	//		trapCondition = arm64.BCONDLO
+	//	default:
+	//		panic("BUG: couldn't invert condition")
+	//	}
+	//	c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
+	//}
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
@@ -1221,10 +1221,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, offsetReg)
-	//brIfInitialized := c.assembler.CompileJump(arm64.BCONDNE)
-	//c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
-	//
-	//c.assembler.SetJumpTargetOnNext(brIfInitialized)
+
 	// Skipped if the target is initialized.
 	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeInvalidTableAccess)
 
@@ -1243,10 +1240,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmp, tmp2)
-	//brIfTypeMatched := c.assembler.CompileJump(arm64.BCONDEQ)
-	//c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
-	//
-	//c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
+	// Skipped if the type matches.
 	c.compileTrapFromNativeCode(arm64.BCONDEQ, nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	targetFunctionType := &c.ir.Types[typeIndex]
