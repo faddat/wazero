@@ -397,6 +397,8 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
 		// into execContext.callerModuleContextPtr in case when the callee is a Go function.
+		//
+		// TODO: maybe this can be optimized out if this is in-module function calls. Investigate later.
 		c.storeCallerModuleContext()
 
 		typIndex := c.m.FunctionSection[fnIndex]
