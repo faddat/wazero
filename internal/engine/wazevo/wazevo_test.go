@@ -2,7 +2,9 @@ package wazevo
 
 import (
 	"context"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -64,4 +66,12 @@ func singleFunctionModule(typ wasm.FunctionType, body []byte, localTypes []wasm.
 			Body:       body,
 		}},
 	}
+}
+
+func Test_offsets(t *testing.T) {
+	offsets := wazevoapi.NewOffsetData(nil)
+
+	var execCtx executionContext
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.trapCode)), offsets.ExecutionContextTrapCodeOffset)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.callerModuleContextPtr)), offsets.ExecutionContextCallerModuleContextPtr)
 }

@@ -40,7 +40,10 @@ type (
 	moduleContextOpaque struct{}
 	// TODO:
 	executionContext struct {
-		TrapCode byte
+		// trapCode holds the wazevoapi.TrapCode if it happens.
+		trapCode wazevoapi.TrapCode
+		// callerModuleContextPtr holds the moduleContextOpaque for Go function calls.
+		callerModuleContextPtr *byte
 	}
 )
 

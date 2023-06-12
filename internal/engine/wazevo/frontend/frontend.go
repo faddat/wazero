@@ -13,27 +13,25 @@ import (
 // on top of it in architecture-independent way.
 type Compiler struct {
 	// Per-module data that is used across all functions.
+
 	m       *wasm.Module
 	offsets wazevoapi.OffsetData
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
-
 	// trapBlocks maps wazevoapi.TrapCode to the corresponding BasicBlock which
 	// exits the execution with the code.
 	trapBlocks [wazevoapi.TrapCodeCount]ssa.BasicBlock
 
-	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
-	// to the corresponding ssa.Variable.
-	wasmLocalToVariable map[wasm.Index]ssa.Variable
-	loweringState       loweringState
-
 	// Followings are reset by per function.
 
+	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
+	// to the corresponding ssa.Variable.
+	wasmLocalToVariable    map[wasm.Index]ssa.Variable
+	loweringState          loweringState
 	wasmLocalFunctionIndex wasm.Index
 	wasmFunctionTyp        *wasm.FunctionType
 	wasmFunctionLocalTypes []wasm.ValueType
 	wasmFunctionBody       []byte
-
 	// br is reused during lowering.
 	br *bytes.Reader
 
