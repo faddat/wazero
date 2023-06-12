@@ -27,6 +27,7 @@ type arm64Compiler struct {
 	stackPointerCeil uint64
 	// assignStackPointerCeilNeeded holds an asm.Node whose AssignDestinationConstant must be called with the determined stack pointer ceiling.
 	assignStackPointerCeilNeeded asm.Node
+	compiledTrapTargets          [nativeCallStatusModuleClosed]asm.Node
 	withListener                 bool
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
@@ -380,6 +381,33 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	c.assembler.CompileJumpToRegister(arm64.B, returnAddress.register)
 	return nil
+}
+
+func (c *arm64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
+	if target := c.compiledTrapTargets[status]; target == nil {
+		if target := c.compiledTrapTargets[status]; target == nil {
+			skip := c.assembler.CompileJump(skipCondition)
+			// Save the trap target for future reference.
+			c.compiledTrapTargets[status] = c.compileNOP()
+			c.compileExitFromNativeCode(status)
+			c.assembler.SetJumpTargetOnNext(skip)
+		} else {
+			// We've already compiled this.
+			// Invert the condition to jump into the appropriate target.
+			var trapCondition asm.Instruction
+			switch skipCondition {
+			case arm64.BCONDEQ:
+				trapCondition = arm64.BCONDNE
+			case arm64.BCONDNE:
+				trapCondition = arm64.BCONDEQ
+			case arm64.BCONDLO:
+				trapCondition = arm64.BCONDHS
+			default:
+				panic("BUG: couldn't invert condition")
+			}
+			c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
+		}
+	}
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
@@ -1163,12 +1191,13 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 	// "cmp tmp2, offset"
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp2, offsetReg)
 
-	// If it exceeds len(table), we exit the execution.
-	brIfOffsetOK := c.assembler.CompileJump(arm64.BCONDLO)
-	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
-
-	// Otherwise, we proceed to do function type check.
-	c.assembler.SetJumpTargetOnNext(brIfOffsetOK)
+	// If it exceeds len(table), we trap.
+	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
+	//brIfOffsetOK := c.assembler.CompileJump(arm64.BCONDLO)
+	//c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
+	//
+	//// Otherwise, we proceed to do function type check.
+	//c.assembler.SetJumpTargetOnNext(brIfOffsetOK)
 
 	// We need to obtain the absolute address of table element.
 	// "tmp = &Tables[tableIndex].table[0]"
@@ -1192,10 +1221,13 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, offsetReg)
-	brIfInitialized := c.assembler.CompileJump(arm64.BCONDNE)
-	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
+	//brIfInitialized := c.assembler.CompileJump(arm64.BCONDNE)
+	//c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
+	//
+	//c.assembler.SetJumpTargetOnNext(brIfInitialized)
+	// Skipped if the target is initialized.
+	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeInvalidTableAccess)
 
-	c.assembler.SetJumpTargetOnNext(brIfInitialized)
 	// next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
 	// "tmp = table[offset].typeID"
 	c.assembler.CompileMemoryToRegister(
@@ -1211,10 +1243,11 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmp, tmp2)
-	brIfTypeMatched := c.assembler.CompileJump(arm64.BCONDEQ)
-	c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
-
-	c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
+	//brIfTypeMatched := c.assembler.CompileJump(arm64.BCONDEQ)
+	//c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
+	//
+	//c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
+	c.compileTrapFromNativeCode(arm64.BCONDEQ, nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	targetFunctionType := &c.ir.Types[typeIndex]
 	if err := c.compileCallImpl(offsetReg, targetFunctionType); err != nil {
