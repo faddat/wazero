@@ -234,32 +234,6 @@ const (
 	// Type inferred from `p`.
 	OpcodeSload32x2
 
-	// OpcodeStackLoad ...
-	// `a = stack_load SS, Offset`.
-	OpcodeStackLoad
-
-	// OpcodeStackStore ...
-	// `stack_store x, SS, Offset`.
-	// Type inferred from `x`.
-	OpcodeStackStore
-
-	// OpcodeStackAddr ...
-	// `addr = stack_addr SS, Offset`.
-	OpcodeStackAddr
-
-	// OpcodeDynamicStackLoad ...
-	// `a = dynamic_stack_load DSS`.
-	OpcodeDynamicStackLoad
-
-	// OpcodeDynamicStackStore ...
-	// `dynamic_stack_store x, DSS`.
-	// Type inferred from `x`.
-	OpcodeDynamicStackStore
-
-	// OpcodeDynamicStackAddr ...
-	// `addr = dynamic_stack_addr DSS`.
-	OpcodeDynamicStackAddr
-
 	// OpcodeGlobalValue ...
 	// `a = global_value GV`.
 	OpcodeGlobalValue
@@ -267,10 +241,6 @@ const (
 	// OpcodeSymbolValue ...
 	// `a = symbol_value GV`.
 	OpcodeSymbolValue
-
-	// OpcodeTlsValue ...
-	// `a = tls_value GV`.
-	OpcodeTlsValue
 
 	// OpcodeHeapAddr ...
 	// `addr = heap_addr H, index, Offset, Size`.
@@ -284,23 +254,6 @@ const (
 	// `heap_store heap_imm, index, a`.
 	// Type inferred from `index`.
 	OpcodeHeapStore
-
-	// OpcodeGetPinnedReg ...
-	// `addr = get_pinned_reg`.
-	OpcodeGetPinnedReg
-
-	// OpcodeSetPinnedReg ...
-	// `set_pinned_reg addr`.
-	// Type inferred from `addr`.
-	OpcodeSetPinnedReg
-
-	// OpcodeGetFramePointer ...
-	// `addr = get_frame_pointer`.
-	OpcodeGetFramePointer
-
-	// OpcodeGetStackPointer ...
-	// `addr = get_stack_pointer`.
-	OpcodeGetStackPointer
 
 	// OpcodeGetReturnAddress ...
 	// `addr = get_return_address`.
@@ -1183,38 +1136,16 @@ func (o Opcode) String() (ret string) {
 		return "Uload32x2"
 	case OpcodeSload32x2:
 		return "Sload32x2"
-	case OpcodeStackLoad:
-		return "StackLoad"
-	case OpcodeStackStore:
-		return "StackStore"
-	case OpcodeStackAddr:
-		return "StackAddr"
-	case OpcodeDynamicStackLoad:
-		return "DynamicStackLoad"
-	case OpcodeDynamicStackStore:
-		return "DynamicStackStore"
-	case OpcodeDynamicStackAddr:
-		return "DynamicStackAddr"
 	case OpcodeGlobalValue:
 		return "GlobalValue"
 	case OpcodeSymbolValue:
 		return "SymbolValue"
-	case OpcodeTlsValue:
-		return "TlsValue"
 	case OpcodeHeapAddr:
 		return "HeapAddr"
 	case OpcodeHeapLoad:
 		return "HeapLoad"
 	case OpcodeHeapStore:
 		return "HeapStore"
-	case OpcodeGetPinnedReg:
-		return "GetPinnedReg"
-	case OpcodeSetPinnedReg:
-		return "SetPinnedReg"
-	case OpcodeGetFramePointer:
-		return "GetFramePointer"
-	case OpcodeGetStackPointer:
-		return "GetStackPointer"
 	case OpcodeGetReturnAddress:
 		return "GetReturnAddress"
 	case OpcodeTableAddr:
