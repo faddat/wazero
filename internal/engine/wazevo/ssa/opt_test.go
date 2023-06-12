@@ -25,7 +25,7 @@ func TestBuilder_Optimize(t *testing.T) {
 	}{
 		{
 			name: "dead code",
-			pass: deadCodeElimination,
+			pass: passDeadCodeElimination,
 			setup: func(b *builder) {
 				entry := b.AllocateBasicBlock()
 				_, value := entry.AddParam(b, TypeI32)
