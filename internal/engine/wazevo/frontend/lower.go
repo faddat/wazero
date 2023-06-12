@@ -66,6 +66,15 @@ func (l *loweringState) push(ret ssa.Value) {
 	l.values = append(l.values, ret)
 }
 
+func (l *loweringState) nPeek(n int) []ssa.Value {
+	if n == 0 {
+		return nil
+	}
+	tail := len(l.values)
+	view := l.values[tail-n : tail]
+	return view
+}
+
 func (l *loweringState) nPeekDup(n int) []ssa.Value {
 	if n == 0 {
 		return nil
@@ -379,9 +388,54 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		trapBlk := c.getOrCreateTrapBlock(wazevoapi.TrapCodeUnreachable)
 		c.insertJumpToBlock(nil, builder.CurrentBlock(), trapBlk)
 		state.unreachable = true
+
+	case wasm.OpcodeCall:
+		fnIndex := c.readI32u()
+		if state.unreachable {
+			return
+		}
+
+		// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
+		// into execContext.callerModuleContextPtr in case when the callee is a Go function.
+		c.storeCallerModuleContext()
+
+		typIndex := c.m.FunctionSection[fnIndex]
+		typ := &c.m.TypeSection[typIndex]
+
+		// TODO: reuse slice?
+		argN := len(typ.Params)
+		args := make([]ssa.Value, argN+2)
+		args[0] = c.execCtxPtrValue
+		args[1] = c.moduleCtxPtrValue
+		copy(args[2:], state.nPeek(argN))
+
+		sig := c.signatures[typ]
+		if fnIndex >= c.m.ImportFunctionCount {
+			call := builder.AllocateInstruction()
+			call.AsCall(ssa.FuncRef(fnIndex), sig, args)
+			builder.InsertInstruction(call)
+
+			first, rest := call.Returns()
+			state.push(first)
+			for _, v := range rest {
+				state.push(v)
+			}
+		} else {
+			panic("TODO: support calling imported functions")
+		}
+	case wasm.OpcodeDrop:
+		_ = state.pop()
 	default:
-		panic("TODO: unsupported in wazevo yet" + wasm.InstructionName(op))
+		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
+}
+
+func (c *Compiler) storeCallerModuleContext() {
+	builder := c.ssaBuilder
+	execCtx := c.execCtxPtrValue
+	store := builder.AllocateInstruction()
+	store.AsStore(c.moduleCtxPtrValue, execCtx, c.offsets.ExecutionContextCallerModuleContextPtr.U32())
+	builder.InsertInstruction(store)
 }
 
 func (c *Compiler) readI32u() uint32 {

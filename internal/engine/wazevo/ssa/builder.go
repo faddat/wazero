@@ -4,6 +4,7 @@ package ssa
 
 import (
 	"fmt"
+	"sort"
 )
 
 // Builder is used to builds SSA consisting of Basic Blocks per function.
@@ -52,6 +53,12 @@ type Builder interface {
 
 	// AnnotateValue is for debugging purpose.
 	AnnotateValue(value Value, annotation string)
+
+	// DeclareSignature appends the *Signature to be referenced by various instructions (e.g. OpcodeCall).
+	DeclareSignature(signature *Signature)
+
+	// UsedSignatures returns the slice of Signatures which are used/referenced by the currently-compiled function.
+	UsedSignatures() []*Signature
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -60,6 +67,7 @@ func NewBuilder() Builder {
 		instructionsPool: newPool[Instruction](),
 		basicBlocksPool:  newPool[basicBlock](),
 		valueAnnotations: make(map[valueID]string),
+		signatures:       make(map[SignatureID]*Signature),
 	}
 }
 
@@ -67,6 +75,7 @@ func NewBuilder() Builder {
 type builder struct {
 	basicBlocksPool  pool[basicBlock]
 	instructionsPool pool[Instruction]
+	signatures       map[SignatureID]*Signature
 
 	basicBlocksView []BasicBlock
 	currentBB       *basicBlock
@@ -84,6 +93,9 @@ type builder struct {
 // Reset implements Builder.Reset.
 func (b *builder) Reset() {
 	b.instructionsPool.reset()
+	for _, sig := range b.signatures {
+		sig.used = false
+	}
 
 	for i := 0; i < b.basicBlocksPool.allocated; i++ {
 		b.basicBlocksPool.view(i).reset()
@@ -108,6 +120,25 @@ func (b *builder) AnnotateValue(value Value, a string) {
 // AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
 	return b.instructionsPool.allocate()
+}
+
+// DeclareSignature implements Builder.AnnotateValue.
+func (b *builder) DeclareSignature(s *Signature) {
+	b.signatures[s.ID] = s
+	s.used = false
+}
+
+func (b *builder) UsedSignatures() (ret []*Signature) {
+	for _, sig := range b.signatures {
+		if sig.used {
+			ret = append(ret, sig)
+		}
+	}
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i].ID < ret[j].ID
+	})
+
+	return
 }
 
 // AllocateBasicBlock implements Builder.AllocateBasicBlock.

@@ -2,11 +2,11 @@ package wazevo
 
 import (
 	"context"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"testing"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )

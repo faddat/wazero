@@ -910,8 +910,23 @@ var (
 )
 
 var instructionReturnTypes = [...]returnTypesFn{
-	OpcodeJump:     returnTypesFnNoReturns,
-	OpcodeIconst:   func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil },
+	OpcodeJump:   returnTypesFnNoReturns,
+	OpcodeIconst: func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil },
+	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
+		sigID := SignatureID(instr.v)
+		sig, ok := b.signatures[sigID]
+		if !ok {
+			panic("BUG")
+		}
+		switch len(sig.Results) {
+		case 0:
+		case 1:
+			t1 = sig.Results[0]
+		default:
+			t1, ts = sig.Results[0], sig.Results[1:]
+		}
+		return
+	},
 	OpcodeF32const: returnTypesFnF32,
 	OpcodeF64const: returnTypesFnF64,
 	OpcodeStore:    returnTypesFnNoReturns,
@@ -982,12 +997,27 @@ func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
 	i.blk = target
 }
 
-func (i *Instruction) Format(builder Builder) string {
+func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
+	i.opcode = OpcodeCall
+	i.typ = TypeF64
+	i.u64 = uint64(ref)
+	i.vs = args
+	i.v = Value(sig.ID)
+	sig.used = true
+}
+
+func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
 	case OpcodeTrap:
+	case OpcodeCall:
+		vs := make([]string, len(i.vs))
+		for idx := range vs {
+			vs[idx] = i.vs[idx].format(b)
+		}
+		instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u64), SignatureID(i.v), strings.Join(vs, ", "))
 	case OpcodeStore:
-		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.format(builder), i.v2.format(builder), int32(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.format(b), i.v2.format(b), int32(i.u64))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:
@@ -1005,23 +1035,23 @@ func (i *Instruction) Format(builder Builder) string {
 		}
 		vs := make([]string, len(i.vs))
 		for idx := range vs {
-			vs[idx] = i.vs[idx].format(builder)
+			vs[idx] = i.vs[idx].format(b)
 		}
 		instSuffix = fmt.Sprintf(" %s", strings.Join(vs, ", "))
 	case OpcodeJump:
 		vs := make([]string, len(i.vs)+1)
 		vs[0] = " " + i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
-			vs[idx+1] = i.vs[idx].format(builder)
+			vs[idx+1] = i.vs[idx].format(b)
 		}
 
 		instSuffix = strings.Join(vs, ", ")
 	case OpcodeBrz, OpcodeBrnz:
 		vs := make([]string, len(i.vs)+2)
-		vs[0] = " " + i.v.format(builder)
+		vs[0] = " " + i.v.format(b)
 		vs[1] = i.blk.(*basicBlock).Name()
 		for idx := range i.vs {
-			vs[idx+2] = i.vs[idx].format(builder)
+			vs[idx+2] = i.vs[idx].format(b)
 		}
 		instSuffix = strings.Join(vs, ", ")
 	default:
@@ -1032,11 +1062,11 @@ func (i *Instruction) Format(builder Builder) string {
 
 	var rvs []string
 	if rv := i.rValue; rv.valid() {
-		rvs = append(rvs, rv.formatWithType(builder))
+		rvs = append(rvs, rv.formatWithType(b))
 	}
 
 	for _, v := range i.rValues {
-		rvs = append(rvs, v.formatWithType(builder))
+		rvs = append(rvs, v.formatWithType(b))
 	}
 
 	if len(rvs) > 0 {

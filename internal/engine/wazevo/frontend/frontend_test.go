@@ -24,6 +24,7 @@ const (
 func TestCompiler_LowerToSSA(t *testing.T) {
 	vv := wasm.FunctionType{}
 	v_i32 := wasm.FunctionType{Results: []wasm.ValueType{i32}}
+	v_i32i32 := wasm.FunctionType{Results: []wasm.ValueType{i32, i32}}
 	i32_v := wasm.FunctionType{Params: []wasm.ValueType{i32}}
 	i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
 	i32i32_i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
@@ -477,6 +478,44 @@ blk4: () <-- (blk1)
 	Jump blk3
 `,
 		},
+		{
+			name: "call",
+			m: &wasm.Module{
+				TypeSection:     []wasm.FunctionType{v_i32i32, v_i32, i32i32_i32, i32_i32i32},
+				FunctionSection: []wasm.Index{0, 1, 2, 3},
+				CodeSection: []wasm.Code{
+					{Body: []byte{
+						// Call v_i32.
+						wasm.OpcodeCall, 1,
+						// Call i32i32_i32.
+						wasm.OpcodeI32Const, 5,
+						wasm.OpcodeCall, 2,
+						// Call i32_i32i32.
+						wasm.OpcodeCall, 3,
+						wasm.OpcodeEnd,
+					}},
+					{Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeEnd}},
+					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
+					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
+				},
+			},
+			exp: `
+signatures:
+	sig1: i64i64_i32
+	sig2: i64i64i32i32_i32
+	sig3: i64i64i32_i32i32
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Store module_ctx, exec_ctx, 0x8
+	v3:i32 = Call f1:sig1, exec_ctx, module_ctx
+	v4:i32 = Iconst_32 0x5
+	Store module_ctx, exec_ctx, 0x8
+	v5:i32 = Call f2:sig2, exec_ctx, module_ctx, v3, v4
+	Store module_ctx, exec_ctx, 0x8
+	v6:i32, v7:i32 = Call f3:sig3, exec_ctx, module_ctx, v5
+	Jump blk_ret, v6, v7
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -493,8 +532,7 @@ blk4: () <-- (blk1)
 			fc.Init(0, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
 			err = fc.LowerToSSA()
 			require.NoError(t, err)
-			exp := strings.TrimPrefix(tc.exp, "\n\n")
-			exp = strings.TrimSuffix(exp, "\n\n")
+			exp := strings.TrimSuffix(tc.exp, "\n\n")
 			actual := fc.formatBuilder()
 			fmt.Println(actual)
 			require.Equal(t, exp, actual)

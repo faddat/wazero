@@ -21,6 +21,7 @@ type Compiler struct {
 	// trapBlocks maps wazevoapi.TrapCode to the corresponding BasicBlock which
 	// exits the execution with the code.
 	trapBlocks [wazevoapi.TrapCodeCount]ssa.BasicBlock
+	signatures map[*wasm.FunctionType]*ssa.Signature
 
 	// Followings are reset by per function.
 
@@ -40,13 +41,35 @@ type Compiler struct {
 
 // NewFrontendCompiler returns a frontend Compiler.
 func NewFrontendCompiler(od wazevoapi.OffsetData, m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
-	return &Compiler{
+	c := &Compiler{
 		m:                   m,
 		offsets:             od,
 		ssaBuilder:          ssaBuilder,
 		br:                  bytes.NewReader(nil),
 		wasmLocalToVariable: make(map[wasm.Index]ssa.Variable),
 	}
+
+	c.signatures = make(map[*wasm.FunctionType]*ssa.Signature, len(m.TypeSection))
+	for i := range m.TypeSection {
+		wasmSig := &m.TypeSection[i]
+		sig := &ssa.Signature{
+			ID: ssa.SignatureID(i),
+			// +2 to pass moduleContextPtr and executionContextPtr. See the inline comment LowerToSSA.
+			Params:  make([]ssa.Type, len(wasmSig.Params)+2),
+			Results: make([]ssa.Type, len(wasmSig.Results)),
+		}
+		sig.Params[0] = executionContextPtrTyp
+		sig.Params[1] = moduleContextPtrTyp
+		for j, typ := range wasmSig.Params {
+			sig.Params[j+2] = wasmToSSA(typ)
+		}
+		for j, typ := range wasmSig.Results {
+			sig.Results[j] = wasmToSSA(typ)
+		}
+		c.signatures[wasmSig] = sig
+		c.ssaBuilder.DeclareSignature(sig)
+	}
+	return c
 }
 
 // Init initializes the state of frontendCompiler and make it ready for a next function.
@@ -60,6 +83,9 @@ func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []was
 	c.wasmFunctionLocalTypes = localTypes
 	c.wasmFunctionBody = body
 }
+
+// Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
+const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
 
 // LowerToSSA lowers the current function to SSA function which will be held by ssaBuilder.
 // After calling this, the caller will be able to access the SSA info in ssa.SSABuilder pased
@@ -91,9 +117,6 @@ func (c *Compiler) LowerToSSA() error {
 	// Note: In Wasmtime or many other runtimes, moduleContextPtr is called "vmContext". Also note that `moduleContextPtr`
 	//  is wazero-specific since other runtimes can naturally use the OS-level signal to do this job thanks to the fact that
 	//  they can use native stack vs wazero cannot use Go-routine stack and have to use Go-runtime allocated []byte as a stack.
-	//
-	// Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
-	const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
 	_, execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
 	_, moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
 	builder.AnnotateValue(execCtxPtrValue, "exec_ctx")
@@ -172,10 +195,21 @@ func (c *Compiler) formatBuilder() string {
 	builder := c.ssaBuilder
 
 	str := strings.Builder{}
-	for _, b := range builder.Blocks() {
-		header := b.FormatHeader(builder)
+
+	usedSigs := builder.UsedSignatures()
+	if len(usedSigs) > 0 {
 		str.WriteByte('\n')
-		str.WriteString(header)
+		str.WriteString("signatures:\n")
+		for _, sig := range usedSigs {
+			str.WriteByte('\t')
+			str.WriteString(sig.String())
+			str.WriteByte('\n')
+		}
+	}
+
+	for _, b := range builder.Blocks() {
+		str.WriteByte('\n')
+		str.WriteString(b.FormatHeader(builder))
 		str.WriteByte('\n')
 		for cur := b.Root(); cur != nil; cur = cur.Next() {
 			str.WriteByte('\t')
