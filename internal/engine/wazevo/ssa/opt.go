@@ -7,10 +7,13 @@ func (b *builder) Optimize() {
 	}
 }
 
+// optimizationPass represents a pass which operates on and manipulates the SSA function
+// constructed in the given builder.
 type optimizationPass func(*builder)
 
+// defaultOptimizationPasses consists of the optimization passes run by default.
 var defaultOptimizationPasses = []optimizationPass{
-	deadCodeElimination,
+	passDeadCodeElimination,
 	// TODO: block coalescing.
 	// TODO: constant phi elimination.
 	// TODO: redundant phi elimination.
@@ -20,8 +23,8 @@ var defaultOptimizationPasses = []optimizationPass{
 	// TODO: Arithmetic simplifications.
 }
 
-// deadCodeElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
-func deadCodeElimination(b *builder) {
+// passDeadCodeElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
+func passDeadCodeElimination(b *builder) {
 	entryBlk := b.basicBlocksPool.view(0)
 	b.blkStack = append(b.blkStack, entryBlk)
 	for len(b.blkStack) > 0 {
