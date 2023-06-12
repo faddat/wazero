@@ -203,7 +203,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		br := builder.AllocateInstruction()
 		br.AsJump(args, loopHeader)
 		builder.InsertInstruction(br)
-		loopHeader.AddPred(builder.CurrentBlock(), br)
 
 		builder.SetCurrentBlock(loopHeader)
 
@@ -217,8 +216,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		v := state.pop()
 		thenBlk, elseBlk, followingBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
-
-		currentBlk := builder.CurrentBlock()
 
 		// We do not make the Wasm-level block parameters as SSA-level block params,
 		// since they won't be phi and the definition is unique.
@@ -236,13 +233,11 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		brz := builder.AllocateInstruction()
 		brz.AsBrz(v, nil, elseBlk)
 		builder.InsertInstruction(brz)
-		elseBlk.AddPred(currentBlk, brz)
 
 		// Then, insert the jump to the Then block.
 		br := builder.AllocateInstruction()
 		br.AsJump(nil, thenBlk)
 		builder.InsertInstruction(br)
-		thenBlk.AddPred(currentBlk, br)
 
 		state.ctrlPush(controlFrame{
 			kind:                         controlFrameKindIfWithoutElse,
@@ -366,7 +361,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		brnz := builder.AllocateInstruction()
 		brnz.AsBrz(v, args, targetBlk)
 		builder.InsertInstruction(brnz)
-		targetBlk.AddPred(currentBlk, brnz)
 
 		// Insert the unconditional jump to the Else block which corresponds to after br_if.
 		elseBlk := builder.AllocateBasicBlock()
@@ -476,7 +470,6 @@ func (c *Compiler) insertJumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
 	builder.InsertInstruction(jmp)
-	targetBlk.AddPred(currentBlk, jmp)
 }
 
 func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {

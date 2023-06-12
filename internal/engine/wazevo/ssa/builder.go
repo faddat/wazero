@@ -75,6 +75,7 @@ func NewBuilder() Builder {
 		basicBlocksPool:  newPool[basicBlock](),
 		valueAnnotations: make(map[valueID]string),
 		signatures:       make(map[SignatureID]*Signature),
+		blkVisited:       make(map[*basicBlock]struct{}),
 	}
 }
 
@@ -95,6 +96,10 @@ type builder struct {
 	nextVariable Variable
 
 	valueAnnotations map[valueID]string
+
+	// The followings are used for optimization passes.
+	blkVisited map[*basicBlock]struct{}
+	blkStack   []*basicBlock
 }
 
 // Reset implements Builder.Reset.
@@ -104,8 +109,12 @@ func (b *builder) Reset() {
 		sig.used = false
 	}
 
+	b.blkStack = b.blkStack[:0]
+
 	for i := 0; i < b.basicBlocksPool.allocated; i++ {
-		b.basicBlocksPool.view(i).reset()
+		blk := b.basicBlocksPool.view(i)
+		blk.reset()
+		delete(b.blkVisited, blk)
 	}
 	b.basicBlocksPool.reset()
 
@@ -192,7 +201,7 @@ func (b *builder) Blocks() []BasicBlock {
 	b.basicBlocksView = b.basicBlocksView[:0]
 	for i := 0; i < b.basicBlocksPool.allocated; i++ {
 		blk := b.basicBlocksPool.view(i)
-		if blk.ReturnBlock() {
+		if blk.ReturnBlock() || blk.invalid {
 			continue
 		}
 		b.basicBlocksView = append(b.basicBlocksView, blk)
