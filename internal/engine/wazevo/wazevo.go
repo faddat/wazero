@@ -87,6 +87,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 			return fmt.Errorf("wasm->ssa: %v", err)
 		}
 
+		// Run SSA-level optimization passes.
+		ssaBuilder.Optimize()
+
 		// Now our ssaBuilder contains the necessary information to further lower them to
 		// machine code.
 		body, err := be.Generate()

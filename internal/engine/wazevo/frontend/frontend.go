@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"bytes"
-	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -191,33 +190,7 @@ func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.Bas
 // formatBuilder outputs the constructed SSA function as a string with a source information.
 func (c *Compiler) formatBuilder() string {
 	// TODO: use source position to add the Wasm-level source info.
-
-	builder := c.ssaBuilder
-
-	str := strings.Builder{}
-
-	usedSigs := builder.UsedSignatures()
-	if len(usedSigs) > 0 {
-		str.WriteByte('\n')
-		str.WriteString("signatures:\n")
-		for _, sig := range usedSigs {
-			str.WriteByte('\t')
-			str.WriteString(sig.String())
-			str.WriteByte('\n')
-		}
-	}
-
-	for _, b := range builder.Blocks() {
-		str.WriteByte('\n')
-		str.WriteString(b.FormatHeader(builder))
-		str.WriteByte('\n')
-		for cur := b.Root(); cur != nil; cur = cur.Next() {
-			str.WriteByte('\t')
-			str.WriteString(cur.Format(builder))
-			str.WriteByte('\n')
-		}
-	}
-	return str.String()
+	return c.ssaBuilder.Format()
 }
 
 func (c *Compiler) getOrCreateTrapBlock(code wazevoapi.TrapCode) ssa.BasicBlock {

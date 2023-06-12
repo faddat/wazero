@@ -5,6 +5,7 @@ package ssa
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // Builder is used to builds SSA consisting of Basic Blocks per function.
@@ -59,6 +60,12 @@ type Builder interface {
 
 	// UsedSignatures returns the slice of Signatures which are used/referenced by the currently-compiled function.
 	UsedSignatures() []*Signature
+
+	// Optimize runs various optimization passes on the constructed SSA function.
+	Optimize()
+
+	// Format returns the debugging string of the SSA function.
+	Format() string
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -317,4 +324,31 @@ func (b *builder) definedVariableType(variable Variable) Type {
 		panic(fmt.Sprintf("%s is not defined yet", variable))
 	}
 	return typ
+}
+
+// Format implements Builder.Format.
+func (b *builder) Format() string {
+	str := strings.Builder{}
+	usedSigs := b.UsedSignatures()
+	if len(usedSigs) > 0 {
+		str.WriteByte('\n')
+		str.WriteString("signatures:\n")
+		for _, sig := range usedSigs {
+			str.WriteByte('\t')
+			str.WriteString(sig.String())
+			str.WriteByte('\n')
+		}
+	}
+
+	for _, blk := range b.Blocks() {
+		str.WriteByte('\n')
+		str.WriteString(blk.FormatHeader(b))
+		str.WriteByte('\n')
+		for cur := blk.Root(); cur != nil; cur = cur.Next() {
+			str.WriteByte('\t')
+			str.WriteString(cur.Format(b))
+			str.WriteByte('\n')
+		}
+	}
+	return str.String()
 }

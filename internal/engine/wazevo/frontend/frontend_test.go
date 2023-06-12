@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -34,8 +33,14 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		m    *wasm.Module
-		exp  string
+		// m is the *wasm.Module who
+		m *wasm.Module
+		// targetIndex is the index of a local function to be compiled in this test.
+		targetIndex wasm.Index
+		// exp is the *unoptimized* expected SSA IR for the function m.FunctionSection[targetIndex].
+		exp string
+		// expAfterOpt is not empty when we want to check the result after optimization passes.
+		expAfterOpt string
 	}{
 		{
 			name: "empty", m: singleFunctionModule(vv, []byte{wasm.OpcodeEnd}, nil),
@@ -527,15 +532,21 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			od := wazevoapi.NewOffsetData(tc.m)
 
 			fc := NewFrontendCompiler(od, tc.m, b)
-			typeIndex := tc.m.FunctionSection[0]
-			code := &tc.m.CodeSection[0]
-			fc.Init(0, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
+			typeIndex := tc.m.FunctionSection[tc.targetIndex]
+			code := &tc.m.CodeSection[tc.targetIndex]
+			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
+
 			err = fc.LowerToSSA()
 			require.NoError(t, err)
-			exp := strings.TrimSuffix(tc.exp, "\n\n")
+
 			actual := fc.formatBuilder()
 			fmt.Println(actual)
-			require.Equal(t, exp, actual)
+			require.Equal(t, tc.exp, actual)
+
+			if tc.expAfterOpt != "" {
+				b.Optimize()
+				require.Equal(t, tc.expAfterOpt, actual)
+			}
 		})
 	}
 }
