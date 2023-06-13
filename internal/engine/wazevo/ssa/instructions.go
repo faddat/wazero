@@ -898,6 +898,8 @@ const (
 	// Type inferred from `x`.
 	OpcodeExtractVector
 
+	OpcodeAlias
+
 	opcodeEnd
 )
 
@@ -1078,7 +1080,7 @@ func (i *Instruction) Format(b Builder) string {
 
 func (i *Instruction) addArgument(v Value) {
 	switch i.opcode {
-	case OpcodeJump, OpcodeBrz:
+	case OpcodeJump, OpcodeBrz, OpcodeBrnz:
 		i.vs = append(i.vs, v)
 	default:
 		panic("BUG: " + i.typ.String())

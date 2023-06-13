@@ -45,6 +45,7 @@ type (
 		id                      basicBlockID
 		rootInstr, currentInstr *Instruction
 		params                  []blockParam
+		aliases                 []valueAlias
 		preds                   []basicBlockPredecessorInfo
 		success                 []*basicBlock
 		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
@@ -89,9 +90,8 @@ func (bb *basicBlock) ReturnBlock() bool {
 // AddParam implements BasicBlock.AddParam.
 func (bb *basicBlock) AddParam(b Builder, typ Type) (Variable, Value) {
 	variable := b.DeclareVariable(typ)
-	n := len(bb.params)
 	paramValue := b.allocateValue(typ)
-	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: paramValue})
+	bb.params = append(bb.params, blockParam{typ: typ, variable: variable, value: paramValue})
 	b.DefineVariable(variable, paramValue, bb)
 	return variable, paramValue
 }
@@ -100,8 +100,7 @@ func (bb *basicBlock) AddParam(b Builder, typ Type) (Variable, Value) {
 // This is only used in the variable resolution.
 func (bb *basicBlock) addParamOn(b *builder, variable Variable, value Value) {
 	typ := b.definedVariableType(variable)
-	n := len(bb.params)
-	bb.params = append(bb.params, blockParam{typ: typ, n: n, variable: variable, value: value})
+	bb.params = append(bb.params, blockParam{typ: typ, variable: variable, value: value})
 	b.DefineVariable(variable, value, bb)
 }
 
@@ -151,6 +150,9 @@ func (bb *basicBlock) reset() {
 	bb.rootInstr, bb.currentInstr = nil, nil
 	bb.preds = bb.preds[:0]
 	bb.success = bb.success[:0]
+	bb.aliases = bb.aliases[:0]
+	bb.invalid, bb.sealed = false, false
+	bb.singlePred = nil
 	// TODO: reuse the map!
 	bb.unknownValues = make(map[Variable]Value)
 	bb.lastDefinitions = make(map[Variable]Value)
@@ -199,6 +201,10 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	}
 }
 
+func (bb *basicBlock) alias(src, dst Value) {
+	bb.aliases = append(bb.aliases, valueAlias{src: src, dst: dst})
+}
+
 // blockParam implements Value and represents a parameter to a basicBlock.
 type blockParam struct {
 	// variable is a Variable for this parameter. This can be used to associate
@@ -208,6 +214,4 @@ type blockParam struct {
 	// and can be considered as phi instruction.
 	value Value
 	typ   Type
-	// n is the index of this blockParam in the bb.
-	n int
 }

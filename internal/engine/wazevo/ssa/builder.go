@@ -71,11 +71,12 @@ type Builder interface {
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool: newPool[Instruction](),
-		basicBlocksPool:  newPool[basicBlock](),
-		valueAnnotations: make(map[valueID]string),
-		signatures:       make(map[SignatureID]*Signature),
-		blkVisited:       make(map[*basicBlock]struct{}),
+		instructionsPool:               newPool[Instruction](),
+		basicBlocksPool:                newPool[basicBlock](),
+		valueAnnotations:               make(map[valueID]string),
+		signatures:                     make(map[SignatureID]*Signature),
+		blkVisited:                     make(map[*basicBlock]struct{}),
+		redundantParameterIndexToValue: make(map[int]Value),
 	}
 }
 
@@ -98,8 +99,10 @@ type builder struct {
 	valueAnnotations map[valueID]string
 
 	// The followings are used for optimization passes.
-	blkVisited map[*basicBlock]struct{}
-	blkStack   []*basicBlock
+	blkVisited                     map[*basicBlock]struct{}
+	blkStack                       []*basicBlock
+	redundantParameterIndexToValue map[int]Value
+	redundantParameterIndexes      []int
 }
 
 // Reset implements Builder.Reset.
@@ -125,7 +128,7 @@ func (b *builder) Reset() {
 	for v := valueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
 	}
-	b.nextValueID = valueIDInvalid + 1
+	b.nextValueID = 0
 }
 
 // AnnotateValue implements Builder.AnnotateValue.
@@ -135,7 +138,9 @@ func (b *builder) AnnotateValue(value Value, a string) {
 
 // AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
-	return b.instructionsPool.allocate()
+	instr := b.instructionsPool.allocate()
+	instr.rValue = Value(valueIDInvalid)
+	return instr
 }
 
 // DeclareSignature implements Builder.AnnotateValue.
@@ -350,10 +355,17 @@ func (b *builder) Format() string {
 	}
 
 	for _, blk := range b.Blocks() {
+		bb := blk.(*basicBlock)
 		str.WriteByte('\n')
-		str.WriteString(blk.FormatHeader(b))
+		str.WriteString(bb.FormatHeader(b))
 		str.WriteByte('\n')
-		for cur := blk.Root(); cur != nil; cur = cur.Next() {
+
+		for i := range bb.aliases {
+			str.WriteString(bb.aliases[i].format(b))
+			str.WriteByte('\n')
+		}
+
+		for cur := bb.Root(); cur != nil; cur = cur.Next() {
 			str.WriteByte('\t')
 			str.WriteString(cur.Format(b))
 			str.WriteByte('\n')
