@@ -6,8 +6,11 @@ import (
 )
 
 // BasicBlock represents the Basic Block of an SSA function.
-// In traditional SSA terminology, the block "params" here are called phi values,
-// and there does not exist "params". However, for simplicity, we handle them as parameters to a BB.
+//
+// Note: we use the "block argument" variant of SSA, instead of PHI functions. See the package level doc comments.
+//
+// Note: we use "parameter/param" as a placeholder which represents a variant of PHI, and "argument/arg" as an actual
+// Value passed to that "parameter/param".
 type BasicBlock interface {
 	// Name returns the unique string ID of this block. e.g. blk0, blk1, ...
 	Name() string
@@ -20,7 +23,7 @@ type BasicBlock interface {
 
 	// Param returns (Variable, Value) which corresponds to the i-th parameter of this block.
 	// The returned Variable can be used to add the definition of it in predecessors,
-	// and the returned Value is the phi definition of a variable in this block.
+	// and the returned Value is the definition of a variable in this block.
 	Param(i int) (Variable, Value)
 
 	// InsertInstruction inserts an instruction that implements Value into the tail of this block.
@@ -212,7 +215,7 @@ type blockParam struct {
 	// the origins of this parameter with the defining instruction if .
 	variable Variable
 	// value represents the very first value that defines .variable in this block,
-	// and can be considered as phi instruction.
+	// and can be considered as an output of PHI instruction in traditional SSA.
 	value Value
 	typ   Type
 }

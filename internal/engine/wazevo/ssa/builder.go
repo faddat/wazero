@@ -1,5 +1,13 @@
 // Package ssa is used to construct SSA function. By nature this is free of Wasm specific thing
 // and ISA.
+//
+// We use the "block argument" variant of SSA: https://en.wikipedia.org/wiki/Static_single-assignment_form#Block_arguments
+// which is equivalent to the traditional PHI function based one, but more convenient during optimizations.
+// However, in this package's source code comment, we might use PHI whenever it seems necessary in order to be aligned with
+// existing literatures, e.g. SSA level optimization algorithms are often described using PHI nodes.
+//
+// The rationale doc for the choice of "block argument" by MLIR of LLVM is worth a read:
+// https://mlir.llvm.org/docs/Rationale/Rationale/#block-arguments-vs-phi-nodes
 package ssa
 
 import (
@@ -301,9 +309,9 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 	// later we eliminate trivial params in an optimization pass.
 	paramValue := b.allocateValue(typ)
 	blk.addParamOn(b, variable, paramValue)
-	// After the new "phi" param is added, we have to manipulate the original branching instructions
+	// After the new PHI param is added, we have to manipulate the original branching instructions
 	// in predecessors so that they would pass the definition of `variable` as the argument to
-	// the newly added phi.
+	// the newly added PHI.
 	for i := range blk.preds {
 		pred := &blk.preds[i]
 		// Find the definition in the predecessor recursively.

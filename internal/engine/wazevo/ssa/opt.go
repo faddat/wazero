@@ -47,7 +47,7 @@ func passDeadCodeElimination(b *builder) {
 	}
 }
 
-// passRedundantPhiElimination eliminates the redundant phis (in our terminology, parameters of a block).
+// passRedundantPhiElimination eliminates the redundant PHIs (in our terminology, parameters of a block).
 func passRedundantPhiElimination(b *builder) {
 	// Intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
 	for blockIndex := 1; /* skip entry block! */ blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
@@ -68,7 +68,7 @@ func passRedundantPhiElimination(b *builder) {
 			for predIndex := range blk.preds {
 				pred := blk.preds[predIndex].branch.vs[paramIndex]
 				if pred == phiValue {
-					// This is self-referencing: phi from the same phi.
+					// This is self-referencing: PHI from the same PHI.
 					continue
 				}
 
@@ -98,7 +98,7 @@ func passRedundantPhiElimination(b *builder) {
 			continue
 		}
 
-		// Remove the redundant phis from the argument list of branching instructions.
+		// Remove the redundant PHIs from the argument list of branching instructions.
 		for predIndex := range blk.preds {
 			var cur int
 			predBlk := blk.preds[predIndex]
@@ -112,7 +112,7 @@ func passRedundantPhiElimination(b *builder) {
 			branchInst.vs = branchInst.vs[:cur]
 		}
 
-		// Still need to have the definition of the value of the phi (previously as the parameter).
+		// Still need to have the definition of the value of the PHI (previously as the parameter).
 		for _, redundantParamIndex := range b.redundantParameterIndexes {
 			phiValue := blk.params[redundantParamIndex].value
 			newValue := b.redundantParameterIndexToValue[redundantParamIndex]
