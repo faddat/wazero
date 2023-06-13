@@ -26,8 +26,10 @@ type Value uint64
 // valueID is the lower 32bit of Value, which is the pure identifier of Value without type info.
 type valueID uint32
 
-const valueIDInvalid valueID = math.MaxUint32
-const valueInvalid Value = Value(valueIDInvalid)
+const (
+	valueIDInvalid valueID = math.MaxUint32
+	valueInvalid   Value   = Value(valueIDInvalid)
+)
 
 // Format creates a debug string for this Value using the data stored in Builder.
 func (v *Value) format(b Builder) string {

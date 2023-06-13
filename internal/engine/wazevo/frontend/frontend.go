@@ -116,15 +116,17 @@ func (c *Compiler) LowerToSSA() error {
 	// Note: In Wasmtime or many other runtimes, moduleContextPtr is called "vmContext". Also note that `moduleContextPtr`
 	//  is wazero-specific since other runtimes can naturally use the OS-level signal to do this job thanks to the fact that
 	//  they can use native stack vs wazero cannot use Go-routine stack and have to use Go-runtime allocated []byte as a stack.
-	_, execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
-	_, moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
+	execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
+	moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
 	builder.AnnotateValue(execCtxPtrValue, "exec_ctx")
 	builder.AnnotateValue(moduleCtxPtrValue, "module_ctx")
 	c.execCtxPtrValue, c.moduleCtxPtrValue = execCtxPtrValue, moduleCtxPtrValue
 
 	for i, typ := range c.wasmFunctionTyp.Params {
 		st := wasmToSSA(typ)
-		variable, _ := entryBlock.AddParam(builder, st)
+		variable := builder.DeclareVariable(st)
+		value := entryBlock.AddParam(builder, st)
+		builder.DefineVariable(variable, value, entryBlock)
 		c.wasmLocalToVariable[wasm.Index(i)] = variable
 	}
 	c.declareWasmLocals(entryBlock)

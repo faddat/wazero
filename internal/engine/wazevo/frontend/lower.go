@@ -481,7 +481,7 @@ func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
 	// At this point, blocks params consist only of the Wasm-level parameters,
 	// (since it's added only when we are trying to resolve variable *inside* this block).
 	for i := 0; i < targetBlk.Params(); i++ {
-		_, value := targetBlk.Param(i)
+		value := targetBlk.Param(i)
 		c.loweringState.push(value)
 	}
 }

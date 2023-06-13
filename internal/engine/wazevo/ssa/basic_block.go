@@ -16,15 +16,14 @@ type BasicBlock interface {
 	Name() string
 
 	// AddParam adds the parameter to the block whose type specified by `t`.
-	AddParam(b Builder, t Type) (Variable, Value)
+	AddParam(b Builder, t Type) Value
 
 	// Params returns the number of parameters to this block.
 	Params() int
 
 	// Param returns (Variable, Value) which corresponds to the i-th parameter of this block.
-	// The returned Variable can be used to add the definition of it in predecessors,
-	// and the returned Value is the definition of a variable in this block.
-	Param(i int) (Variable, Value)
+	// The returned Value is the definition of the param in this block.
+	Param(i int) Value
 
 	// InsertInstruction inserts an instruction that implements Value into the tail of this block.
 	InsertInstruction(raw *Instruction)
@@ -91,20 +90,15 @@ func (bb *basicBlock) ReturnBlock() bool {
 }
 
 // AddParam implements BasicBlock.AddParam.
-func (bb *basicBlock) AddParam(b Builder, typ Type) (Variable, Value) {
-	variable := b.DeclareVariable(typ)
+func (bb *basicBlock) AddParam(b Builder, typ Type) Value {
 	paramValue := b.allocateValue(typ)
-	bb.params = append(bb.params, blockParam{typ: typ, variable: variable, value: paramValue})
-	b.DefineVariable(variable, paramValue, bb)
-	return variable, paramValue
+	bb.params = append(bb.params, blockParam{typ: typ, value: paramValue})
+	return paramValue
 }
 
-// addParamOn adds a parameter to this block whose variable is already defined.
-// This is only used in the variable resolution.
-func (bb *basicBlock) addParamOn(b *builder, variable Variable, value Value) {
-	typ := b.definedVariableType(variable)
-	bb.params = append(bb.params, blockParam{typ: typ, variable: variable, value: value})
-	b.DefineVariable(variable, value, bb)
+// addParamOn adds a parameter to this block whose value is already allocated.
+func (bb *basicBlock) addParamOn(typ Type, value Value) {
+	bb.params = append(bb.params, blockParam{typ: typ, value: value})
 }
 
 // Params implements BasicBlock.Params.
@@ -113,9 +107,9 @@ func (bb *basicBlock) Params() int {
 }
 
 // Param implements BasicBlock.Param.
-func (bb *basicBlock) Param(i int) (Variable, Value) {
+func (bb *basicBlock) Param(i int) Value {
 	p := &bb.params[i]
-	return p.variable, p.value
+	return p.value
 }
 
 // Valid implements BasicBlock.Valid.
@@ -211,9 +205,6 @@ func (bb *basicBlock) alias(src, dst Value) {
 
 // blockParam implements Value and represents a parameter to a basicBlock.
 type blockParam struct {
-	// variable is a Variable for this parameter. This can be used to associate
-	// the origins of this parameter with the defining instruction if .
-	variable Variable
 	// value represents the very first value that defines .variable in this block,
 	// and can be considered as an output of PHI instruction in traditional SSA.
 	value Value

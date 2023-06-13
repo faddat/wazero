@@ -2,12 +2,12 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestBuilder_Optimize(t *testing.T) {
-
 	for _, tc := range []struct {
 		name string
 		// pass is the optimization pass to run.
@@ -27,7 +27,7 @@ func TestBuilder_Optimize(t *testing.T) {
 			pass: passDeadCodeElimination,
 			setup: func(b *builder) {
 				entry := b.AllocateBasicBlock()
-				_, value := entry.AddParam(b, TypeI32)
+				value := entry.AddParam(b, TypeI32)
 
 				middle1, middle2 := b.AllocateBasicBlock(), b.AllocateBasicBlock()
 				end := b.AllocateBasicBlock()
@@ -108,11 +108,10 @@ blk3: () <-- (blk1,blk2)
 			name: "redundant phis",
 			pass: passRedundantPhiElimination,
 			setup: func(b *builder) {
-
 				entry, loopHeader, end := b.AllocateBasicBlock(), b.AllocateBasicBlock(), b.AllocateBasicBlock()
 
 				loopHeader.AddParam(b, TypeI32)
-				var var1 = b.DeclareVariable(TypeI32)
+				var1 := b.DeclareVariable(TypeI32)
 
 				b.SetCurrentBlock(entry)
 				{

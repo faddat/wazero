@@ -64,7 +64,7 @@ func passRedundantPhiElimination(b *builder) {
 			phiValue := blk.params[paramIndex].value
 			redundant := true
 
-			var nonSelfReferencingValue = valueInvalid
+			nonSelfReferencingValue := valueInvalid
 			for predIndex := range blk.preds {
 				pred := blk.preds[predIndex].branch.vs[paramIndex]
 				if pred == phiValue {

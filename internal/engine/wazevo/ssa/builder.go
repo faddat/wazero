@@ -307,9 +307,9 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 	// and treat them as an argument to this block. So the first thing we do now is
 	// define a new parameter to this block which may or may not be redundant, but
 	// later we eliminate trivial params in an optimization pass.
-	paramValue := b.allocateValue(typ)
-	blk.addParamOn(b, variable, paramValue)
-	// After the new PHI param is added, we have to manipulate the original branching instructions
+	paramValue := blk.AddParam(b, typ)
+	b.DefineVariable(variable, paramValue, blk)
+	// After the new param is added, we have to manipulate the original branching instructions
 	// in predecessors so that they would pass the definition of `variable` as the argument to
 	// the newly added PHI.
 	for i := range blk.preds {
@@ -331,7 +331,7 @@ func (b *builder) Seal(raw BasicBlock) {
 
 	for variable, phiValue := range blk.unknownValues {
 		typ := b.definedVariableType(variable)
-		blk.addParamOn(b, variable, phiValue)
+		blk.addParamOn(typ, phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
 			predValue := b.findValue(typ, variable, pred.blk)
