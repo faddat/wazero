@@ -205,7 +205,7 @@ func (bb *basicBlock) alias(src, dst Value) {
 
 // blockParam implements Value and represents a parameter to a basicBlock.
 type blockParam struct {
-	// value represents the very first value that defines .variable in this block,
+	// value is the Value that corresponds to the parameter in this block,
 	// and can be considered as an output of PHI instruction in traditional SSA.
 	value Value
 	typ   Type
