@@ -186,7 +186,8 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 		preds := make([]string, 0, len(bb.preds))
 		for _, pred := range bb.preds {
 			if len(pred.branch.vs) != len(bb.params) {
-				panic("BUG: len(argument) != len(params)")
+				panic(fmt.Sprintf("BUG: len(argument) != len(params): %d != %d",
+					len(pred.branch.vs), len(bb.params)))
 			}
 			if pred.blk.invalid {
 				continue
@@ -195,7 +196,7 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 
 		}
 		return fmt.Sprintf("blk%d: (%s) <-- (%s)",
-			bb.id, strings.Join(ps, ",v"), strings.Join(preds, ","))
+			bb.id, strings.Join(ps, ","), strings.Join(preds, ","))
 	} else {
 		return fmt.Sprintf("blk%d: (%s)", bb.id, strings.Join(ps, ", "))
 	}

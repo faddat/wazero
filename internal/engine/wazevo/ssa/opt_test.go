@@ -108,9 +108,11 @@ blk3: () <-- (blk1,blk2)
 			name: "redundant phis",
 			pass: passRedundantPhiElimination,
 			setup: func(b *builder) {
-				var var1 = b.DeclareVariable(TypeI32)
 
 				entry, loopHeader, end := b.AllocateBasicBlock(), b.AllocateBasicBlock(), b.AllocateBasicBlock()
+
+				loopHeader.AddParam(b, TypeI32)
+				var var1 = b.DeclareVariable(TypeI32)
 
 				b.SetCurrentBlock(entry)
 				{
@@ -121,7 +123,7 @@ blk3: () <-- (blk1,blk2)
 					b.DefineVariable(var1, iConst, entry)
 
 					jmp := b.AllocateInstruction()
-					jmp.AsJump(nil, loopHeader)
+					jmp.AsJump([]Value{iConst}, loopHeader)
 					b.InsertInstruction(jmp)
 				}
 				b.Seal(entry)
@@ -131,8 +133,14 @@ blk3: () <-- (blk1,blk2)
 					// At this point, loop is not sealed, so phi will be added to this header. However, the only
 					// input to the phi is iConst above, so there must be an alias to iConst from the phi value.
 					value := b.FindValue(var1)
+
+					tmpInst := b.AllocateInstruction()
+					tmpInst.AsIconst32(0xff)
+					b.InsertInstruction(tmpInst)
+					tmp, _ := tmpInst.Returns()
+
 					brz := b.AllocateInstruction()
-					brz.AsBrz(value, nil, loopHeader) // Loop to itself.
+					brz.AsBrz(value, []Value{tmp}, loopHeader) // Loop to itself.
 					b.InsertInstruction(brz)
 
 					jmp := b.AllocateInstruction()
@@ -150,11 +158,12 @@ blk3: () <-- (blk1,blk2)
 			},
 			before: `
 blk0: ()
-	v0:i32 = Iconst_32 0xff
-	Jump blk1, v0
+	v1:i32 = Iconst_32 0xff
+	Jump blk1, v1, v1
 
-blk1: (v1:i32) <-- (blk0,blk1)
-	Brz v1, blk1, v1
+blk1: (v0:i32,v2:i32) <-- (blk0,blk1)
+	v3:i32 = Iconst_32 0xff
+	Brz v2, blk1, v3, v2
 	Jump blk2
 
 blk2: () <-- (blk1)
@@ -162,12 +171,13 @@ blk2: () <-- (blk1)
 `,
 			after: `
 blk0: ()
-	v0:i32 = Iconst_32 0xff
-	Jump blk1
+	v1:i32 = Iconst_32 0xff
+	Jump blk1, v1
 
-blk1: () <-- (blk0,blk1)
-	v1 = v0
-	Brz v1, blk1
+blk1: (v0:i32) <-- (blk0,blk1)
+	v2 = v1
+	v3:i32 = Iconst_32 0xff
+	Brz v2, blk1, v3
 	Jump blk2
 
 blk2: () <-- (blk1)

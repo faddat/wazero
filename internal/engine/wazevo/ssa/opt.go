@@ -99,9 +99,10 @@ func passRedundantPhiElimination(b *builder) {
 		}
 
 		// Remove the redundant phis from the argument list of branching instructions.
-		var cur int
 		for predIndex := range blk.preds {
-			branchInst := blk.preds[predIndex].branch
+			var cur int
+			predBlk := blk.preds[predIndex]
+			branchInst := predBlk.branch
 			for argIndex, value := range branchInst.vs {
 				if _, ok := b.redundantParameterIndexToValue[argIndex]; !ok {
 					branchInst.vs[cur] = value
@@ -120,7 +121,7 @@ func passRedundantPhiElimination(b *builder) {
 		}
 
 		// Finally, Remove the param from the blk.
-		cur = 0
+		var cur int
 		for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
 			param := blk.params[paramIndex]
 			if _, ok := b.redundantParameterIndexToValue[paramIndex]; !ok {
