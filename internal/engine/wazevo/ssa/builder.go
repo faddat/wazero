@@ -139,7 +139,7 @@ func (b *builder) AnnotateValue(value Value, a string) {
 // AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
 	instr := b.instructionsPool.allocate()
-	instr.rValue = Value(valueIDInvalid)
+	instr.rValue = valueInvalid
 	return instr
 }
 
@@ -361,6 +361,7 @@ func (b *builder) Format() string {
 		str.WriteByte('\n')
 
 		for i := range bb.aliases {
+			str.WriteByte('\t')
 			str.WriteString(bb.aliases[i].format(b))
 			str.WriteByte('\n')
 		}

@@ -27,6 +27,7 @@ type Value uint64
 type valueID uint32
 
 const valueIDInvalid valueID = math.MaxUint32
+const valueInvalid Value = Value(valueIDInvalid)
 
 // Format creates a debug string for this Value using the data stored in Builder.
 func (v *Value) format(b Builder) string {

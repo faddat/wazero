@@ -2,9 +2,8 @@ package ssa
 
 import (
 	"fmt"
-	"testing"
-
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"testing"
 )
 
 func TestBuilder_Optimize(t *testing.T) {
@@ -103,6 +102,76 @@ blk2: () <-- (blk0)
 
 blk3: () <-- (blk1,blk2)
 	Jump blk1
+`,
+		},
+		{
+			name: "redundant phis",
+			pass: passRedundantPhiElimination,
+			setup: func(b *builder) {
+				var var1 = b.DeclareVariable(TypeI32)
+
+				entry, loopHeader, end := b.AllocateBasicBlock(), b.AllocateBasicBlock(), b.AllocateBasicBlock()
+
+				b.SetCurrentBlock(entry)
+				{
+					constInst := b.AllocateInstruction()
+					constInst.AsIconst32(0xff)
+					b.InsertInstruction(constInst)
+					iConst, _ := constInst.Returns()
+					b.DefineVariable(var1, iConst, entry)
+
+					jmp := b.AllocateInstruction()
+					jmp.AsJump(nil, loopHeader)
+					b.InsertInstruction(jmp)
+				}
+				b.Seal(entry)
+
+				b.SetCurrentBlock(loopHeader)
+				{
+					// At this point, loop is not sealed, so phi will be added to this header. However, the only
+					// input to the phi is iConst above, so there must be an alias to iConst from the phi value.
+					value := b.FindValue(var1)
+					brz := b.AllocateInstruction()
+					brz.AsBrz(value, nil, loopHeader) // Loop to itself.
+					b.InsertInstruction(brz)
+
+					jmp := b.AllocateInstruction()
+					jmp.AsJump(nil, end)
+					b.InsertInstruction(jmp)
+				}
+				b.Seal(loopHeader)
+
+				b.SetCurrentBlock(end)
+				{
+					ret := b.AllocateInstruction()
+					ret.AsReturn(nil)
+					b.InsertInstruction(ret)
+				}
+			},
+			before: `
+blk0: ()
+	v0:i32 = Iconst_32 0xff
+	Jump blk1, v0
+
+blk1: (v1:i32) <-- (blk0,blk1)
+	Brz v1, blk1, v1
+	Jump blk2
+
+blk2: () <-- (blk1)
+	Return
+`,
+			after: `
+blk0: ()
+	v0:i32 = Iconst_32 0xff
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	v1 = v0
+	Brz v1, blk1
+	Jump blk2
+
+blk2: () <-- (blk1)
+	Return
 `,
 		},
 	} {
