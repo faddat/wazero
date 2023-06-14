@@ -111,16 +111,15 @@ func (c *Compiler) LowerToSSA() error {
 	// 	we might be able to eliminate the parameter. However, if that function
 	//	can be called via call_indirect, then we cannot eliminate because the
 	//  signature won't match with the expected one.
-	//  TODO: maybe there's some way to do this optimization without glitches, but so far I have no clue about the feasibility.
+	// TODO: maybe there's some way to do this optimization without glitches, but so far I have no clue about the feasibility.
 	//
 	// Note: In Wasmtime or many other runtimes, moduleContextPtr is called "vmContext". Also note that `moduleContextPtr`
 	//  is wazero-specific since other runtimes can naturally use the OS-level signal to do this job thanks to the fact that
 	//  they can use native stack vs wazero cannot use Go-routine stack and have to use Go-runtime allocated []byte as a stack.
-	execCtxPtrValue := entryBlock.AddParam(builder, executionContextPtrTyp)
-	moduleCtxPtrValue := entryBlock.AddParam(builder, moduleContextPtrTyp)
-	builder.AnnotateValue(execCtxPtrValue, "exec_ctx")
-	builder.AnnotateValue(moduleCtxPtrValue, "module_ctx")
-	c.execCtxPtrValue, c.moduleCtxPtrValue = execCtxPtrValue, moduleCtxPtrValue
+	c.execCtxPtrValue = entryBlock.AddParam(builder, executionContextPtrTyp)
+	c.moduleCtxPtrValue = entryBlock.AddParam(builder, moduleContextPtrTyp)
+	builder.AnnotateValue(c.execCtxPtrValue, "exec_ctx")
+	builder.AnnotateValue(c.moduleCtxPtrValue, "module_ctx")
 
 	for i, typ := range c.wasmFunctionTyp.Params {
 		st := wasmToSSA(typ)

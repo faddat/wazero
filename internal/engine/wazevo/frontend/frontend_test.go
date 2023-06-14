@@ -30,6 +30,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 	i32i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}
 	i32_i32i32 := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
 	i32f32f64_v := wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
+	i64f32f64_i64f32f64 := wasm.FunctionType{Params: []wasm.ValueType{i64, f32, f64}, Results: []wasm.ValueType{i64, f32, f64}}
 
 	for _, tc := range []struct {
 		name string
@@ -76,16 +77,19 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:f32, v4:f64)
 `,
 		},
 		{
-			name: "add params return", m: singleFunctionModule(i32i32_i32, []byte{
+			name: "add/sub params return", m: singleFunctionModule(i32i32_i32, []byte{
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32Add,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Sub,
 				wasm.OpcodeEnd,
 			}, nil),
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	v4:i32 = Iadd v2, v3
-	Jump blk_ret, v4
+	v5:i32 = Isub v4, v2
+	Jump blk_ret, v5
 `,
 		},
 		{
@@ -101,15 +105,42 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 `,
 		},
 		{
-			name: "locals + params", m: singleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeEnd},
-				[]wasm.ValueType{i32, i64, f32, f64}),
+			name: "locals + params", m: singleFunctionModule(
+				i64f32f64_i64f32f64,
+				[]byte{
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI64Add,
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI64Sub,
+
+					wasm.OpcodeLocalGet, 1,
+					wasm.OpcodeLocalGet, 1,
+					wasm.OpcodeF32Add,
+					wasm.OpcodeLocalGet, 1,
+					wasm.OpcodeF32Sub,
+
+					wasm.OpcodeLocalGet, 2,
+					wasm.OpcodeLocalGet, 2,
+					wasm.OpcodeF64Add,
+					wasm.OpcodeLocalGet, 2,
+					wasm.OpcodeF64Sub,
+
+					wasm.OpcodeEnd,
+				}, []wasm.ValueType{i32, i64, f32, f64}),
 			exp: `
-blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:f32, v4:f64)
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)
 	v5:i32 = Iconst_32 0x0
 	v6:i64 = Iconst_64 0x0
 	v7:f32 = F32const 0.000000
 	v8:f64 = F64const 0.000000
-	Jump blk_ret
+	v9:i64 = Iadd v2, v2
+	v10:i64 = Isub v9, v2
+	v11:f32 = Fadd v3, v3
+	v12:f32 = Fsub v11, v3
+	v13:f64 = Fadd v4, v4
+	v14:f64 = Fsub v13, v4
+	Jump blk_ret, v10, v12, v14
 `,
 		},
 		{

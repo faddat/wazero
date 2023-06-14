@@ -320,8 +320,8 @@ const (
 	// `v = Iadd x, y`.
 	OpcodeIadd
 
-	// OpcodeIsub ...
-	// `v = isub x, y`.
+	// OpcodeIsub performs an integer subtraction.
+	// `v = Isub x, y`.
 	OpcodeIsub
 
 	// OpcodeIneg ...
@@ -556,12 +556,12 @@ const (
 	// `f = ffcmp x, y`.
 	OpcodeFfcmp
 
-	// OpcodeFadd ...
-	// `v = fadd x, y`.
+	// OpcodeFadd performs an floating point addition.
+	// `v = Fadd x, y`.
 	OpcodeFadd
 
-	// OpcodeFsub ...
-	// `v = fsub x, y`.
+	// OpcodeFsub performs an floating point subtraction.
+	// `v = Fsub x, y`.
 	OpcodeFsub
 
 	// OpcodeFmul ...
@@ -801,6 +801,9 @@ var instructionReturnTypes = [...]returnTypesFn{
 		return
 	},
 	OpcodeIadd:     returnTypesFnSingle,
+	OpcodeIsub:     returnTypesFnSingle,
+	OpcodeFadd:     returnTypesFnSingle,
+	OpcodeFsub:     returnTypesFnSingle,
 	OpcodeF32const: returnTypesFnF32,
 	OpcodeF64const: returnTypesFnF64,
 	OpcodeStore:    returnTypesFnNoReturns,
@@ -832,6 +835,27 @@ func (i *Instruction) AsIconst32(v uint32) {
 
 func (i *Instruction) AsIadd(x, y Value) {
 	i.opcode = OpcodeIadd
+	i.v = x
+	i.v2 = y
+	i.typ = x._Type()
+}
+
+func (i *Instruction) AsIsub(x, y Value) {
+	i.opcode = OpcodeIsub
+	i.v = x
+	i.v2 = y
+	i.typ = x._Type()
+}
+
+func (i *Instruction) AsFadd(x, y Value) {
+	i.opcode = OpcodeFadd
+	i.v = x
+	i.v2 = y
+	i.typ = x._Type()
+}
+
+func (i *Instruction) AsFsub(x, y Value) {
+	i.opcode = OpcodeFsub
 	i.v = x
 	i.v2 = y
 	i.typ = x._Type()
@@ -891,7 +915,7 @@ func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
 	case OpcodeTrap:
-	case OpcodeIadd:
+	case OpcodeIadd, OpcodeIsub, OpcodeFadd, OpcodeFsub:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.format(b), i.v2.format(b))
 	case OpcodeCall:
 		vs := make([]string, len(i.vs))
