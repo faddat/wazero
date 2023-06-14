@@ -117,6 +117,9 @@ type builder struct {
 	blkStack                       []*basicBlock
 	redundantParameterIndexToValue map[int]Value
 	redundantParameterIndexes      []int
+
+	// blockIterCur is used to implement basicBlockIterator.
+	blockIterCur int
 }
 
 // Reset implements Builder.Reset.
@@ -388,4 +391,26 @@ func (b *builder) Format() string {
 		}
 	}
 	return str.String()
+}
+
+// blockIteratorNext is used to traverse all the available blocks.
+func (b *builder) blockIteratorNext() *basicBlock {
+	index := b.blockIterCur
+	for {
+		if index == b.basicBlocksPool.allocated {
+			return nil
+		}
+		ret := b.basicBlocksPool.view(index)
+		index++
+		if !ret.invalid {
+			b.blockIterCur = index
+			return ret
+		}
+	}
+}
+
+// blockIteratorBegin begins the block traversal from the beginning.
+func (b *builder) blockIteratorBegin() *basicBlock {
+	b.blockIterCur = 0
+	return b.blockIteratorNext()
 }

@@ -37,8 +37,7 @@ func passDeadBlockElimination(b *builder) {
 		}
 	}
 
-	for i := 0; i < b.basicBlocksPool.allocated; i++ {
-		blk := b.basicBlocksPool.view(i)
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		if _, ok := b.blkVisited[blk]; !ok {
 			blk.invalid = true
 		}
@@ -47,14 +46,9 @@ func passDeadBlockElimination(b *builder) {
 
 // passRedundantPhiElimination eliminates the redundant PHIs (in our terminology, parameters of a block).
 func passRedundantPhiElimination(b *builder) {
-	// Intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
-	for blockIndex := 1; /* skip entry block! */ blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
-		blk := b.basicBlocksPool.view(blockIndex)
-		if blk.invalid {
-			// Already removed block.
-			continue
-		}
-
+	blk := b.blockIteratorBegin()
+	// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
+	for blk = b.blockIteratorNext(); /* skip entry block! */ blk != nil; blk = b.blockIteratorNext() {
 		paramNum := len(blk.params)
 
 		// We will store the unnecessary param's index into b.ints.
@@ -144,13 +138,7 @@ func passDeadCodeElimination(b *builder) {
 		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
 	}
 
-	for blockIndex := 0; blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
-		blk := b.basicBlocksPool.view(blockIndex)
-		if blk.invalid {
-			// Already removed block.
-			continue
-		}
-
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		// TODO!!
 	}
 }
@@ -159,13 +147,7 @@ func passDeadCodeElimination(b *builder) {
 // This is the last SSA-level optimization pass and after this, the SSA function is ready to be used by backends.
 func passInstructionGroupIDAssignment(b *builder) {
 	var gid InstructionGroupID
-	for blockIndex := 0; blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
-		blk := b.basicBlocksPool.view(blockIndex)
-		if blk.invalid {
-			// Already removed block.
-			continue
-		}
-
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		// Walk through the instructions in this block.
 		cur := blk.rootInstr
 		for ; cur != nil; cur = cur.next {
