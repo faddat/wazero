@@ -90,59 +90,59 @@ const (
 	OpcodeFuncAddr
 
 	// OpcodeSplat ...
-	// `a = splat x`.
+	// `v = splat x`.
 	OpcodeSplat
 
 	// OpcodeSwizzle ...
-	// `a = swizzle x, y`.
+	// `v = swizzle x, y`.
 	OpcodeSwizzle
 
 	// OpcodeInsertlane ...
-	// `a = insertlane x, y, Idx`. (TernaryImm8)
+	// `v = insertlane x, y, Idx`. (TernaryImm8)
 	OpcodeInsertlane
 
 	// OpcodeExtractlane ...
-	// `a = extractlane x, Idx`. (BinaryImm8)
+	// `v = extractlane x, Idx`. (BinaryImm8)
 	OpcodeExtractlane
 
 	// OpcodeSmin ...
-	// `a = smin x, y`.
+	// `v = smin x, y`.
 	OpcodeSmin
 
 	// OpcodeUmin ...
-	// `a = umin x, y`.
+	// `v = umin x, y`.
 	OpcodeUmin
 
 	// OpcodeSmax ...
-	// `a = smax x, y`.
+	// `v = smax x, y`.
 	OpcodeSmax
 
 	// OpcodeUmax ...
-	// `a = umax x, y`.
+	// `v = umax x, y`.
 	OpcodeUmax
 
 	// OpcodeAvgRound ...
-	// `a = avg_round x, y`.
+	// `v = avg_round x, y`.
 	OpcodeAvgRound
 
 	// OpcodeUaddSat ...
-	// `a = uadd_sat x, y`.
+	// `v = uadd_sat x, y`.
 	OpcodeUaddSat
 
 	// OpcodeSaddSat ...
-	// `a = sadd_sat x, y`.
+	// `v = sadd_sat x, y`.
 	OpcodeSaddSat
 
 	// OpcodeUsubSat ...
-	// `a = usub_sat x, y`.
+	// `v = usub_sat x, y`.
 	OpcodeUsubSat
 
 	// OpcodeSsubSat ...
-	// `a = ssub_sat x, y`.
+	// `v = ssub_sat x, y`.
 	OpcodeSsubSat
 
 	// OpcodeLoad ...
-	// `a = load MemFlags, p, Offset`.
+	// `v = load MemFlags, p, Offset`.
 	OpcodeLoad
 
 	// OpcodeStore ...
@@ -150,11 +150,11 @@ const (
 	OpcodeStore
 
 	// OpcodeUload8 ...
-	// `a = uload8 MemFlags, p, Offset`.
+	// `v = uload8 MemFlags, p, Offset`.
 	OpcodeUload8
 
 	// OpcodeSload8 ...
-	// `a = sload8 MemFlags, p, Offset`.
+	// `v = sload8 MemFlags, p, Offset`.
 	OpcodeSload8
 
 	// OpcodeIstore8 ...
@@ -162,11 +162,11 @@ const (
 	OpcodeIstore8
 
 	// OpcodeUload16 ...
-	// `a = uload16 MemFlags, p, Offset`.
+	// `v = uload16 MemFlags, p, Offset`.
 	OpcodeUload16
 
 	// OpcodeSload16 ...
-	// `a = sload16 MemFlags, p, Offset`.
+	// `v = sload16 MemFlags, p, Offset`.
 	OpcodeSload16
 
 	// OpcodeIstore16 ...
@@ -174,11 +174,11 @@ const (
 	OpcodeIstore16
 
 	// OpcodeUload32 ...
-	// `a = uload32 MemFlags, p, Offset`.
+	// `v = uload32 MemFlags, p, Offset`.
 	OpcodeUload32
 
 	// OpcodeSload32 ...
-	// `a = sload32 MemFlags, p, Offset`.
+	// `v = sload32 MemFlags, p, Offset`.
 	OpcodeSload32
 
 	// OpcodeIstore32 ...
@@ -186,35 +186,35 @@ const (
 	OpcodeIstore32
 
 	// OpcodeUload8x8 ...
-	// `a = uload8x8 MemFlags, p, Offset`.
+	// `v = uload8x8 MemFlags, p, Offset`.
 	OpcodeUload8x8
 
 	// OpcodeSload8x8 ...
-	// `a = sload8x8 MemFlags, p, Offset`.
+	// `v = sload8x8 MemFlags, p, Offset`.
 	OpcodeSload8x8
 
 	// OpcodeUload16x4 ...
-	// `a = uload16x4 MemFlags, p, Offset`.
+	// `v = uload16x4 MemFlags, p, Offset`.
 	OpcodeUload16x4
 
 	// OpcodeSload16x4 ...
-	// `a = sload16x4 MemFlags, p, Offset`.
+	// `v = sload16x4 MemFlags, p, Offset`.
 	OpcodeSload16x4
 
 	// OpcodeUload32x2 ...
-	// `a = uload32x2 MemFlags, p, Offset`.
+	// `v = uload32x2 MemFlags, p, Offset`.
 	OpcodeUload32x2
 
 	// OpcodeSload32x2 ...
-	// `a = sload32x2 MemFlags, p, Offset`.
+	// `v = sload32x2 MemFlags, p, Offset`.
 	OpcodeSload32x2
 
 	// OpcodeGlobalValue ...
-	// `a = global_value GV`.
+	// `v = global_value GV`.
 	OpcodeGlobalValue
 
 	// OpcodeSymbolValue ...
-	// `a = symbol_value GV`.
+	// `v = symbol_value GV`.
 	OpcodeSymbolValue
 
 	// OpcodeHeapAddr ...
@@ -222,7 +222,7 @@ const (
 	OpcodeHeapAddr
 
 	// OpcodeHeapLoad ...
-	// `a = heap_load heap_imm, index`.
+	// `v = heap_load heap_imm, index`.
 	OpcodeHeapLoad
 
 	// OpcodeHeapStore ...
@@ -241,23 +241,23 @@ const (
 	OpcodeIconst
 
 	// OpcodeF32const ...
-	// `a = f32const N`. (UnaryIeee32)
+	// `v = f32const N`. (UnaryIeee32)
 	OpcodeF32const
 
 	// OpcodeF64const ...
-	// `a = f64const N`. (UnaryIeee64)
+	// `v = f64const N`. (UnaryIeee64)
 	OpcodeF64const
 
 	// OpcodeVconst ...
-	// `a = vconst N`.
+	// `v = vconst N`.
 	OpcodeVconst
 
 	// OpcodeShuffle ...
-	// `a = shuffle a, b, mask`.
+	// `v = shuffle a, b, mask`.
 	OpcodeShuffle
 
 	// OpcodeNull ...
-	// `a = null`.
+	// `v = null`.
 	OpcodeNull
 
 	// OpcodeNop ...
@@ -265,15 +265,15 @@ const (
 	OpcodeNop
 
 	// OpcodeSelect ...
-	// `a = select c, x, y`.
+	// `v = select c, x, y`.
 	OpcodeSelect
 
 	// OpcodeSelectSpectreGuard ...
-	// `a = select_spectre_guard c, x, y`.
+	// `v = select_spectre_guard c, x, y`.
 	OpcodeSelectSpectreGuard
 
 	// OpcodeBitselect ...
-	// `a = bitselect c, x, y`.
+	// `v = bitselect c, x, y`.
 	OpcodeBitselect
 
 	// OpcodeVsplit ...
@@ -281,11 +281,11 @@ const (
 	OpcodeVsplit
 
 	// OpcodeVconcat ...
-	// `a = vconcat x, y`.
+	// `v = vconcat x, y`.
 	OpcodeVconcat
 
 	// OpcodeVselect ...
-	// `a = vselect c, x, y`.
+	// `v = vselect c, x, y`.
 	OpcodeVselect
 
 	// OpcodeVanyTrue ...
@@ -301,11 +301,11 @@ const (
 	OpcodeVhighBits
 
 	// OpcodeIcmp ...
-	// `a = icmp Cond, x, y`.
+	// `v = icmp Cond, x, y`.
 	OpcodeIcmp
 
 	// OpcodeIcmpImm ...
-	// `a = icmp_imm Cond, x, Y`.
+	// `v = icmp_imm Cond, x, Y`.
 	OpcodeIcmpImm
 
 	// OpcodeIfcmp ...
@@ -317,87 +317,87 @@ const (
 	OpcodeIfcmpImm
 
 	// OpcodeIadd performs an integer addition.
-	// `a = iadd x, y`.
+	// `v = Iadd x, y`.
 	OpcodeIadd
 
 	// OpcodeIsub ...
-	// `a = isub x, y`.
+	// `v = isub x, y`.
 	OpcodeIsub
 
 	// OpcodeIneg ...
-	// `a = ineg x`.
+	// `v = ineg x`.
 	OpcodeIneg
 
 	// OpcodeIabs ...
-	// `a = iabs x`.
+	// `v = iabs x`.
 	OpcodeIabs
 
 	// OpcodeImul ...
-	// `a = imul x, y`.
+	// `v = imul x, y`.
 	OpcodeImul
 
 	// OpcodeUmulhi ...
-	// `a = umulhi x, y`.
+	// `v = umulhi x, y`.
 	OpcodeUmulhi
 
 	// OpcodeSmulhi ...
-	// `a = smulhi x, y`.
+	// `v = smulhi x, y`.
 	OpcodeSmulhi
 
 	// OpcodeSqmulRoundSat ...
-	// `a = sqmul_round_sat x, y`.
+	// `v = sqmul_round_sat x, y`.
 	OpcodeSqmulRoundSat
 
 	// OpcodeUdiv ...
-	// `a = udiv x, y`.
+	// `v = udiv x, y`.
 	OpcodeUdiv
 
 	// OpcodeSdiv ...
-	// `a = sdiv x, y`.
+	// `v = sdiv x, y`.
 	OpcodeSdiv
 
 	// OpcodeUrem ...
-	// `a = urem x, y`.
+	// `v = urem x, y`.
 	OpcodeUrem
 
 	// OpcodeSrem ...
-	// `a = srem x, y`.
+	// `v = srem x, y`.
 	OpcodeSrem
 
 	// OpcodeIaddImm ...
-	// `a = iadd_imm x, Y`. (BinaryImm64)
+	// `v = iadd_imm x, Y`. (BinaryImm64)
 	OpcodeIaddImm
 
 	// OpcodeImulImm ...
-	// `a = imul_imm x, Y`. (BinaryImm64)
+	// `v = imul_imm x, Y`. (BinaryImm64)
 	OpcodeImulImm
 
 	// OpcodeUdivImm ...
-	// `a = udiv_imm x, Y`. (BinaryImm64)
+	// `v = udiv_imm x, Y`. (BinaryImm64)
 	OpcodeUdivImm
 
 	// OpcodeSdivImm ...
-	// `a = sdiv_imm x, Y`. (BinaryImm64)
+	// `v = sdiv_imm x, Y`. (BinaryImm64)
 	OpcodeSdivImm
 
 	// OpcodeUremImm ...
-	// `a = urem_imm x, Y`. (BinaryImm64)
+	// `v = urem_imm x, Y`. (BinaryImm64)
 	OpcodeUremImm
 
 	// OpcodeSremImm ...
-	// `a = srem_imm x, Y`. (BinaryImm64)
+	// `v = srem_imm x, Y`. (BinaryImm64)
 	OpcodeSremImm
 
 	// OpcodeIrsubImm ...
-	// `a = irsub_imm x, Y`. (BinaryImm64)
+	// `v = irsub_imm x, Y`. (BinaryImm64)
 	OpcodeIrsubImm
 
 	// OpcodeIaddCin ...
-	// `a = iadd_cin x, y, c_in`.
+	// `v = iadd_cin x, y, c_in`.
 	OpcodeIaddCin
 
 	// OpcodeIaddIfcin ...
-	// `a = iadd_ifcin x, y, c_in`.
+	// `v = iadd_ifcin x, y, c_in`.
 	OpcodeIaddIfcin
 
 	// OpcodeIaddCout ...
@@ -417,15 +417,15 @@ const (
 	OpcodeIaddIfcarry
 
 	// OpcodeUaddOverflowTrap ...
-	// `a = uadd_overflow_trap x, y, code`.
+	// `v = uadd_overflow_trap x, y, code`.
 	OpcodeUaddOverflowTrap
 
 	// OpcodeIsubBin ...
-	// `a = isub_bin x, y, b_in`.
+	// `v = isub_bin x, y, b_in`.
 	OpcodeIsubBin
 
 	// OpcodeIsubIfbin ...
-	// `a = isub_ifbin x, y, b_in`.
+	// `v = isub_ifbin x, y, b_in`.
 	OpcodeIsubIfbin
 
 	// OpcodeIsubBout ...
@@ -445,111 +445,111 @@ const (
 	OpcodeIsubIfborrow
 
 	// OpcodeBand ...
-	// `a = band x, y`.
+	// `v = band x, y`.
 	OpcodeBand
 
 	// OpcodeBor ...
-	// `a = bor x, y`.
+	// `v = bor x, y`.
 	OpcodeBor
 
 	// OpcodeBxor ...
-	// `a = bxor x, y`.
+	// `v = bxor x, y`.
 	OpcodeBxor
 
 	// OpcodeBnot ...
-	// `a = bnot x`.
+	// `v = bnot x`.
 	OpcodeBnot
 
 	// OpcodeBandNot ...
-	// `a = band_not x, y`.
+	// `v = band_not x, y`.
 	OpcodeBandNot
 
 	// OpcodeBorNot ...
-	// `a = bor_not x, y`.
+	// `v = bor_not x, y`.
 	OpcodeBorNot
 
 	// OpcodeBxorNot ...
-	// `a = bxor_not x, y`.
+	// `v = bxor_not x, y`.
 	OpcodeBxorNot
 
 	// OpcodeBandImm ...
-	// `a = band_imm x, Y`. (BinaryImm64)
+	// `v = band_imm x, Y`. (BinaryImm64)
 	OpcodeBandImm
 
 	// OpcodeBorImm ...
-	// `a = bor_imm x, Y`. (BinaryImm64)
+	// `v = bor_imm x, Y`. (BinaryImm64)
 	OpcodeBorImm
 
 	// OpcodeBxorImm ...
-	// `a = bxor_imm x, Y`. (BinaryImm64)
+	// `v = bxor_imm x, Y`. (BinaryImm64)
 	OpcodeBxorImm
 
 	// OpcodeRotl ...
-	// `a = rotl x, y`.
+	// `v = rotl x, y`.
 	OpcodeRotl
 
 	// OpcodeRotr ...
-	// `a = rotr x, y`.
+	// `v = rotr x, y`.
 	OpcodeRotr
 
 	// OpcodeRotlImm ...
-	// `a = rotl_imm x, Y`. (BinaryImm64)
+	// `v = rotl_imm x, Y`. (BinaryImm64)
 	OpcodeRotlImm
 
 	// OpcodeRotrImm ...
-	// `a = rotr_imm x, Y`. (BinaryImm64)
+	// `v = rotr_imm x, Y`. (BinaryImm64)
 	OpcodeRotrImm
 
 	// OpcodeIshl ...
-	// `a = ishl x, y`.
+	// `v = ishl x, y`.
 	OpcodeIshl
 
 	// OpcodeUshr ...
-	// `a = ushr x, y`.
+	// `v = ushr x, y`.
 	OpcodeUshr
 
 	// OpcodeSshr ...
-	// `a = sshr x, y`.
+	// `v = sshr x, y`.
 	OpcodeSshr
 
 	// OpcodeIshlImm ...
-	// `a = ishl_imm x, Y`. (BinaryImm64)
+	// `v = ishl_imm x, Y`. (BinaryImm64)
 	OpcodeIshlImm
 
 	// OpcodeUshrImm ...
-	// `a = ushr_imm x, Y`. (BinaryImm64)
+	// `v = ushr_imm x, Y`. (BinaryImm64)
 	OpcodeUshrImm
 
 	// OpcodeSshrImm ...
-	// `a = sshr_imm x, Y`. (BinaryImm64)
+	// `v = sshr_imm x, Y`. (BinaryImm64)
 	OpcodeSshrImm
 
 	// OpcodeBitrev ...
-	// `a = bitrev x`.
+	// `v = bitrev x`.
 	OpcodeBitrev
 
 	// OpcodeClz ...
-	// `a = clz x`.
+	// `v = clz x`.
 	OpcodeClz
 
 	// OpcodeCls ...
-	// `a = cls x`.
+	// `v = cls x`.
 	OpcodeCls
 
 	// OpcodeCtz ...
-	// `a = ctz x`.
+	// `v = ctz x`.
 	OpcodeCtz
 
 	// OpcodeBswap ...
-	// `a = bswap x`.
+	// `v = bswap x`.
 	OpcodeBswap
 
 	// OpcodePopcnt ...
-	// `a = popcnt x`.
+	// `v = popcnt x`.
 	OpcodePopcnt
 
 	// OpcodeFcmp ...
-	// `a = fcmp Cond, x, y`.
+	// `v = fcmp Cond, x, y`.
 	OpcodeFcmp
 
 	// OpcodeFfcmp ...
@@ -557,151 +557,151 @@ const (
 	OpcodeFfcmp
 
 	// OpcodeFadd ...
-	// `a = fadd x, y`.
+	// `v = fadd x, y`.
 	OpcodeFadd
 
 	// OpcodeFsub ...
-	// `a = fsub x, y`.
+	// `v = fsub x, y`.
 	OpcodeFsub
 
 	// OpcodeFmul ...
-	// `a = fmul x, y`.
+	// `v = fmul x, y`.
 	OpcodeFmul
 
 	// OpcodeFdiv ...
-	// `a = fdiv x, y`.
+	// `v = fdiv x, y`.
 	OpcodeFdiv
 
 	// OpcodeSqrt ...
-	// `a = sqrt x`.
+	// `v = sqrt x`.
 	OpcodeSqrt
 
 	// OpcodeFma ...
-	// `a = fma x, y, z`.
+	// `v = fma x, y, z`.
 	OpcodeFma
 
 	// OpcodeFneg ...
-	// `a = fneg x`.
+	// `v = fneg x`.
 	OpcodeFneg
 
 	// OpcodeFabs ...
-	// `a = fabs x`.
+	// `v = fabs x`.
 	OpcodeFabs
 
 	// OpcodeFcopysign ...
-	// `a = fcopysign x, y`.
+	// `v = fcopysign x, y`.
 	OpcodeFcopysign
 
 	// OpcodeFmin ...
-	// `a = fmin x, y`.
+	// `v = fmin x, y`.
 	OpcodeFmin
 
 	// OpcodeFminPseudo ...
-	// `a = fmin_pseudo x, y`.
+	// `v = fmin_pseudo x, y`.
 	OpcodeFminPseudo
 
 	// OpcodeFmax ...
-	// `a = fmax x, y`.
+	// `v = fmax x, y`.
 	OpcodeFmax
 
 	// OpcodeFmaxPseudo ...
-	// `a = fmax_pseudo x, y`.
+	// `v = fmax_pseudo x, y`.
 	OpcodeFmaxPseudo
 
 	// OpcodeCeil ...
-	// `a = ceil x`.
+	// `v = ceil x`.
 	OpcodeCeil
 
 	// OpcodeFloor ...
-	// `a = floor x`.
+	// `v = floor x`.
 	OpcodeFloor
 
 	// OpcodeTrunc ...
-	// `a = trunc x`.
+	// `v = trunc x`.
 	OpcodeTrunc
 
 	// OpcodeNearest ...
-	// `a = nearest x`.
+	// `v = nearest x`.
 	OpcodeNearest
 
 	// OpcodeIsNull ...
-	// `a = is_null x`.
+	// `v = is_null x`.
 	OpcodeIsNull
 
 	// OpcodeIsInvalid ...
-	// `a = is_invalid x`.
+	// `v = is_invalid x`.
 	OpcodeIsInvalid
 
 	// OpcodeBitcast ...
-	// `a = bitcast MemFlags, x`.
+	// `v = bitcast MemFlags, x`.
 	OpcodeBitcast
 
 	// OpcodeScalarToVector ...
-	// `a = scalar_to_vector s`.
+	// `v = scalar_to_vector s`.
 	OpcodeScalarToVector
 
 	// OpcodeBmask ...
-	// `a = bmask x`.
+	// `v = bmask x`.
 	OpcodeBmask
 
 	// OpcodeIreduce ...
-	// `a = ireduce x`.
+	// `v = ireduce x`.
 	OpcodeIreduce
-	// `a = snarrow x, y`.
+	// `v = snarrow x, y`.
 
 	// OpcodeSnarrow ...
 	OpcodeSnarrow
-	// `a = unarrow x, y`.
+	// `v = unarrow x, y`.
 
 	// OpcodeUnarrow ...
 	OpcodeUnarrow
-	// `a = uunarrow x, y`.
+	// `v = uunarrow x, y`.
 
 	// OpcodeUunarrow ...
 	OpcodeUunarrow
-	// `a = swiden_low x`.
+	// `v = swiden_low x`.
 
 	// OpcodeSwidenLow ...
 	OpcodeSwidenLow
-	// `a = swiden_high x`.
+	// `v = swiden_high x`.
 
 	// OpcodeSwidenHigh ...
 	OpcodeSwidenHigh
-	// `a = uwiden_low x`.
+	// `v = uwiden_low x`.
 
 	// OpcodeUwidenLow ...
 	OpcodeUwidenLow
-	// `a = uwiden_high x`.
+	// `v = uwiden_high x`.
 
 	// OpcodeUwidenHigh ...
 	OpcodeUwidenHigh
-	// `a = iadd_pairwise x, y`.
+	// `v = iadd_pairwise x, y`.
 
 	// OpcodeIaddPairwise ...
 	OpcodeIaddPairwise
 
 	// OpcodeWideningPairwiseDotProductS ...
-	// `a = widening_pairwise_dot_product_s x, y`.
+	// `v = widening_pairwise_dot_product_s x, y`.
 	OpcodeWideningPairwiseDotProductS
 
 	// OpcodeUextend ...
-	// `a = uextend x`.
+	// `v = uextend x`.
 	OpcodeUextend
 
 	// OpcodeSextend ...
-	// `a = sextend x`.
+	// `v = sextend x`.
 	OpcodeSextend
 
 	// OpcodeFpromote ...
-	// `a = fpromote x`.
+	// `v = fpromote x`.
 	OpcodeFpromote
 
 	// OpcodeFdemote ...
-	// `a = fdemote x`.
+	// `v = fdemote x`.
 	OpcodeFdemote
 
 	// OpcodeFvdemote ...
-	// `a = fvdemote x`.
+	// `v = fvdemote x`.
 	OpcodeFvdemote
 
 	// OpcodeFvpromoteLow ...
@@ -709,31 +709,31 @@ const (
 	OpcodeFvpromoteLow
 
 	// OpcodeFcvtToUint ...
-	// `a = fcvt_to_uint x`.
+	// `v = fcvt_to_uint x`.
 	OpcodeFcvtToUint
 
 	// OpcodeFcvtToSint ...
-	// `a = fcvt_to_sint x`.
+	// `v = fcvt_to_sint x`.
 	OpcodeFcvtToSint
 
 	// OpcodeFcvtToUintSat ...
-	// `a = fcvt_to_uint_sat x`.
+	// `v = fcvt_to_uint_sat x`.
 	OpcodeFcvtToUintSat
 
 	// OpcodeFcvtToSintSat ...
-	// `a = fcvt_to_sint_sat x`.
+	// `v = fcvt_to_sint_sat x`.
 	OpcodeFcvtToSintSat
 
 	// OpcodeFcvtFromUint ...
-	// `a = fcvt_from_uint x`.
+	// `v = fcvt_from_uint x`.
 	OpcodeFcvtFromUint
 
 	// OpcodeFcvtFromSint ...
-	// `a = fcvt_from_sint x`.
+	// `v = fcvt_from_sint x`.
 	OpcodeFcvtFromSint
 
 	// OpcodeFcvtLowFromSint ...
-	// `a = fcvt_low_from_sint x`.
+	// `v = fcvt_low_from_sint x`.
 	OpcodeFcvtLowFromSint
 
 	// OpcodeIsplit ...
@@ -741,19 +741,19 @@ const (
 	OpcodeIsplit
 
 	// OpcodeIconcat ...
-	// `a = iconcat lo, hi`.
+	// `v = iconcat lo, hi`.
 	OpcodeIconcat
 
 	// OpcodeAtomicRmw ...
-	// `a = atomic_rmw MemFlags, AtomicRmwOp, p, x`.
+	// `v = atomic_rmw MemFlags, AtomicRmwOp, p, x`.
 	OpcodeAtomicRmw
 
 	// OpcodeAtomicCas ...
-	// `a = atomic_cas MemFlags, p, e, x`.
+	// `v = atomic_cas MemFlags, p, e, x`.
 	OpcodeAtomicCas
 
 	// OpcodeAtomicLoad ...
-	// `a = atomic_load MemFlags, p`.
+	// `v = atomic_load MemFlags, p`.
 	OpcodeAtomicLoad
 
 	// OpcodeAtomicStore ...
@@ -765,7 +765,7 @@ const (
 	OpcodeFence
 
 	// OpcodeExtractVector ...
-	// `a = extract_vector x, y`. (BinaryImm8)
+	// `v = extract_vector x, y`. (BinaryImm8)
 	OpcodeExtractVector
 
 	OpcodeAlias
