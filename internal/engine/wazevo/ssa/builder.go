@@ -24,9 +24,6 @@ type Builder interface {
 	// AllocateBasicBlock creates a basic block in SSA function.
 	AllocateBasicBlock() BasicBlock
 
-	// Blocks return the valid BasicBlock(s).
-	Blocks() []BasicBlock
-
 	// CurrentBlock returns the currently handled BasicBlock which is set by the latest call to SetCurrentBlock.
 	CurrentBlock() BasicBlock
 
@@ -74,6 +71,18 @@ type Builder interface {
 
 	// Format returns the debugging string of the SSA function.
 	Format() string
+
+	// BlockIteratorBegin initializes the state to iterate over all the valid BasicBlock(s) compiled.
+	// Combined with BlockIteratorNext, we can use this like:
+	//
+	// 	for blk := builder.BlockIteratorBegin(); blk != nil; blk = builder.BlockIteratorNext() {
+	// 		// ...
+	//	}
+	BlockIteratorBegin() BasicBlock
+
+	// BlockIteratorNext advances the state for iteration initialized by BlockIteratorBegin.
+	// Returns nil if there's no unseen BasicBlock.
+	BlockIteratorNext() BasicBlock
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -219,19 +228,6 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 	}
 }
 
-// Blocks implements Builder.Blocks.
-func (b *builder) Blocks() []BasicBlock {
-	b.basicBlocksView = b.basicBlocksView[:0]
-	for i := 0; i < b.basicBlocksPool.allocated; i++ {
-		blk := b.basicBlocksPool.view(i)
-		if blk.ReturnBlock() || blk.invalid {
-			continue
-		}
-		b.basicBlocksView = append(b.basicBlocksView, blk)
-	}
-	return b.basicBlocksView
-}
-
 // DefineVariable implements Builder.DefineVariable.
 func (b *builder) DefineVariable(variable Variable, value Value, block BasicBlock) {
 	if b.variables[variable].invalid() {
@@ -372,7 +368,8 @@ func (b *builder) Format() string {
 		}
 	}
 
-	for _, blk := range b.Blocks() {
+	for blk := b.BlockIteratorBegin(); blk != nil; blk = b.BlockIteratorNext() {
+		fmt.Println(blk)
 		bb := blk.(*basicBlock)
 		str.WriteByte('\n')
 		str.WriteString(bb.FormatHeader(b))
@@ -393,7 +390,16 @@ func (b *builder) Format() string {
 	return str.String()
 }
 
-// blockIteratorNext is used to traverse all the available blocks.
+// BlockIteratorNext implements Builder.BlockIteratorNext.
+func (b *builder) BlockIteratorNext() BasicBlock {
+	if blk := b.blockIteratorNext(); blk == nil {
+		return nil // BasicBlock((*basicBlock)(nil)) != BasicBlock(nil)!
+	} else {
+		return blk
+	}
+}
+
+// BlockIteratorNext implements Builder.BlockIteratorNext.
 func (b *builder) blockIteratorNext() *basicBlock {
 	index := b.blockIterCur
 	for {
@@ -409,7 +415,12 @@ func (b *builder) blockIteratorNext() *basicBlock {
 	}
 }
 
-// blockIteratorBegin begins the block traversal from the beginning.
+// BlockIteratorBegin implements Builder.BlockIteratorBegin.
+func (b *builder) BlockIteratorBegin() BasicBlock {
+	return b.blockIteratorBegin()
+}
+
+// BlockIteratorBegin implements Builder.BlockIteratorBegin.
 func (b *builder) blockIteratorBegin() *basicBlock {
 	b.blockIterCur = 0
 	return b.blockIteratorNext()
