@@ -20,6 +20,8 @@ var defaultOptimizationPasses = []optimizationPass{
 	// TODO: Constant folding.
 	// TODO: Common subexpression elimination.
 	// TODO: Arithmetic simplifications.
+	// TODO: and more!
+	passDeadCodeElimination,
 }
 
 // passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
@@ -136,5 +138,32 @@ func passRedundantPhiElimination(b *builder) {
 			delete(b.redundantParameterIndexToValue, paramIndex)
 		}
 		b.redundantParameterIndexes = b.redundantParameterIndexes[:0]
+	}
+}
+
+// passDeadCodeElimination traverses all the instructions, and calculates the reference count of each Value,
+// and eliminates all the unnecessary instructions whose ref count is zero. The results are stored at builder.valueRefCounts.
+//
+// This also calculates the instructionGroupID of each SSA Instruction: divided by side effects and blocks.
+func passDeadCodeElimination(b *builder) {
+	if iid := int(b.nextValueID); iid >= len(b.valueRefCounts) {
+		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
+	}
+
+	var gid instructionGroupID = 0
+	for blockIndex := 0; blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
+		blk := b.basicBlocksPool.view(blockIndex)
+		if blk.invalid {
+			// Already removed block.
+			continue
+		}
+
+		// In order to calculate the exact refCount, we pre-oder traverse the instruction tree.
+		// TODO
+
+		root := blk.currentInstr
+
+		// instructionGroupID won't be shared by instructions in different blocks.
+		gid++
 	}
 }

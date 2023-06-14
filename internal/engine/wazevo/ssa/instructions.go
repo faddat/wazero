@@ -26,7 +26,21 @@ type Instruction struct {
 
 	rValue  Value
 	rValues []Value
+	gid     instructionGroupID
 }
+
+// instructionGroupID is assigned to each instruction and represents a group of instructions
+// where each instruction is interchangeable with others. instructionGroupID is determined by
+// the side effects of instructions and block: 1) If instructions are within the same block,
+// then they are assigned the same instructionGroupID, and vice versa. 2) if there's an instruction
+// with side effect between two instructions, then these two instructions will have different instructionGroupID.
+//
+// The notable application of this is used in lowering SSA-level instruction to a ISA specific instruction,
+// where we eagerly try to merge multiple instructions into single operation etc. Such merging cannot be done
+// if these instruction have different instructionGroupID since it will change the semantics of a program.
+//
+// See passDeadCodeElimination.
+type instructionGroupID uint32
 
 // Returns Value(s) produced by this instruction if any.
 // The `first` is the first return value, and `rest` is the rest of the values.
@@ -782,7 +796,25 @@ var (
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
 )
 
-var instructionReturnTypes = [...]returnTypesFn{
+// instructionSideEffects provides the info to determine if an instruction has side effects.
+// Instructions with side effects must not be eliminated regardless whether the result is used or not.
+var instructionSideEffects = [opcodeEnd]bool{
+	OpcodeJump:     true,
+	OpcodeIconst:   false,
+	OpcodeCall:     true,
+	OpcodeIadd:     false,
+	OpcodeIsub:     false,
+	OpcodeFadd:     false,
+	OpcodeFsub:     false,
+	OpcodeF32const: false,
+	OpcodeF64const: false,
+	OpcodeStore:    true,
+	OpcodeTrap:     true,
+	OpcodeReturn:   true,
+	OpcodeBrz:      true,
+}
+
+var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeJump:   returnTypesFnNoReturns,
 	OpcodeIconst: returnTypesFnSingle,
 	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
@@ -810,7 +842,6 @@ var instructionReturnTypes = [...]returnTypesFn{
 	OpcodeTrap:     returnTypesFnNoReturns,
 	OpcodeReturn:   returnTypesFnNoReturns,
 	OpcodeBrz:      returnTypesFnNoReturns,
-	opcodeEnd:      nil,
 }
 
 func (i *Instruction) AsStore(value, ptr Value, offset uint32) {

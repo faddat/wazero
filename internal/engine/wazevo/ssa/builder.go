@@ -106,6 +106,10 @@ type builder struct {
 
 	valueAnnotations map[valueID]string
 
+	// valueRefCounts is used to lower the SSA in backend, and will be calculated
+	// by the last SSA-level optimization pass.
+	valueRefCounts []int
+
 	// The followings are used for optimization passes.
 	blkVisited                     map[*basicBlock]struct{}
 	blkStack                       []*basicBlock
@@ -135,6 +139,7 @@ func (b *builder) Reset() {
 
 	for v := valueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
+		b.valueRefCounts[v] = 0
 	}
 	b.nextValueID = 0
 }
