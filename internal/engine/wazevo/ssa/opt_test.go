@@ -11,7 +11,7 @@ func TestBuilder_Optimize(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		// pass is the optimization pass to run.
-		pass optimizationPass
+		pass func(b *builder)
 		// setup creates the SSA function in the given *builder.
 		// TODO: when we have the text SSA IR parser, we can eliminate this `setup`,
 		// 	we could directly decode the *builder from the `before` string. I am still

@@ -118,7 +118,7 @@ type builder struct {
 	redundantParameterIndexToValue map[int]Value
 	redundantParameterIndexes      []int
 
-	// blockIterCur is used to implement basicBlockIterator.
+	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
 }
 

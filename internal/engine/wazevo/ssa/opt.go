@@ -16,10 +16,6 @@ func (b *builder) Optimize() {
 	passInstructionGroupIDAssignment(b)
 }
 
-// optimizationPass represents a pass which operates on and manipulates the SSA function
-// constructed in the given builder.
-type optimizationPass func(*builder)
-
 // passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
 func passDeadBlockElimination(b *builder) {
 	entryBlk := b.basicBlocksPool.view(0)
@@ -149,8 +145,7 @@ func passInstructionGroupIDAssignment(b *builder) {
 	var gid InstructionGroupID
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		// Walk through the instructions in this block.
-		cur := blk.rootInstr
-		for ; cur != nil; cur = cur.next {
+		for cur := blk.rootInstr; cur != nil; cur = cur.next {
 			if instructionSideEffects[cur.opcode] {
 				// Side effects create different instruction groups.
 				gid++
