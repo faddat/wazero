@@ -13,7 +13,7 @@ type optimizationPass func(*builder)
 
 // defaultOptimizationPasses consists of the optimization passes run by default.
 var defaultOptimizationPasses = []optimizationPass{
-	passDeadCodeElimination,
+	passDeadBlockElimination,
 	passRedundantPhiElimination,
 	// TODO: block coalescing.
 	// TODO: Copy-propagation.
@@ -22,8 +22,8 @@ var defaultOptimizationPasses = []optimizationPass{
 	// TODO: Arithmetic simplifications.
 }
 
-// passDeadCodeElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
-func passDeadCodeElimination(b *builder) {
+// passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
+func passDeadBlockElimination(b *builder) {
 	entryBlk := b.basicBlocksPool.view(0)
 	b.blkStack = append(b.blkStack, entryBlk)
 	for len(b.blkStack) > 0 {
