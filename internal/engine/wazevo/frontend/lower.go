@@ -136,7 +136,16 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(iconst)
 		value, _ := iconst.Returns()
 		state.push(value)
-
+	case wasm.OpcodeI32Add:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		iadd := builder.AllocateInstruction()
+		iadd.AsIadd(x, y)
+		builder.InsertInstruction(iadd)
+		value, _ := iadd.Returns()
+		state.push(value)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
 		if state.unreachable {
@@ -173,7 +182,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			followingBlock:               followingBlk,
 			blockType:                    bt,
 		})
-
 	case wasm.OpcodeLoop:
 		bt := c.readBlockType()
 

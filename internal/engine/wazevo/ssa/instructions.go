@@ -777,13 +777,14 @@ type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
 
 var (
 	returnTypesFnNoReturns returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeInvalid, nil }
+	returnTypesFnSingle                  = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil }
 	returnTypesFnF32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
 )
 
 var instructionReturnTypes = [...]returnTypesFn{
 	OpcodeJump:   returnTypesFnNoReturns,
-	OpcodeIconst: func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil },
+	OpcodeIconst: returnTypesFnSingle,
 	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.v)
 		sig, ok := b.signatures[sigID]
@@ -799,6 +800,7 @@ var instructionReturnTypes = [...]returnTypesFn{
 		}
 		return
 	},
+	OpcodeIadd:     returnTypesFnSingle,
 	OpcodeF32const: returnTypesFnF32,
 	OpcodeF64const: returnTypesFnF64,
 	OpcodeStore:    returnTypesFnNoReturns,
@@ -826,6 +828,13 @@ func (i *Instruction) AsIconst32(v uint32) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u64 = uint64(v)
+}
+
+func (i *Instruction) AsIadd(x, y Value) {
+	i.opcode = OpcodeIadd
+	i.v = x
+	i.v2 = y
+	i.typ = x._Type()
 }
 
 func (i *Instruction) AsF32const(f float32) {
@@ -882,6 +891,8 @@ func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
 	case OpcodeTrap:
+	case OpcodeIadd:
+		instSuffix = fmt.Sprintf(" %s, %s", i.v.format(b), i.v2.format(b))
 	case OpcodeCall:
 		vs := make([]string, len(i.vs))
 		for idx := range vs {

@@ -76,13 +76,16 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:f32, v4:f64)
 `,
 		},
 		{
-			name: "param -> return", m: singleFunctionModule(i32_i32, []byte{
+			name: "add params return", m: singleFunctionModule(i32i32_i32, []byte{
 				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Add,
 				wasm.OpcodeEnd,
 			}, nil),
 			exp: `
-blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
-	Jump blk_ret, v2
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	v4:i32 = Iadd v2, v3
+	Jump blk_ret, v4
 `,
 		},
 		{
@@ -110,7 +113,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:f32, v4:f64)
 `,
 		},
 		{
-			name: "locals + params return", m: singleFunctionModule(i32_i32i32, []byte{
+			name: "locals + params + add return", m: singleFunctionModule(i32_i32i32, []byte{
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeEnd,
