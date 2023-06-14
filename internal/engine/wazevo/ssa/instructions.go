@@ -29,6 +29,14 @@ type Instruction struct {
 	gid     instructionGroupID
 }
 
+func (i *Instruction) reset() {
+	*i = Instruction{}
+	i.v = valueInvalid
+	i.v2 = valueInvalid
+	i.rValue = valueInvalid
+	i.typ = typeInvalid
+}
+
 // instructionGroupID is assigned to each instruction and represents a group of instructions
 // where each instruction is interchangeable with others. instructionGroupID is determined by
 // the side effects of instructions and block: 1) If instructions are within the same block,
