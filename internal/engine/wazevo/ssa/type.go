@@ -3,15 +3,7 @@ package ssa
 type Type byte
 
 const (
-	TypeInvalid Type = 1 + iota
-
-	// TypeI8 represents an integer type with 8 bits.
-	// TODO: do we need this?
-	TypeI8
-
-	// TypeI16 represents an integer type with 16 bits.
-	// TODO: do we need this?
-	TypeI16
+	typeInvalid Type = 1 + iota
 
 	// TypeI32 represents an integer type with 32 bits.
 	TypeI32
@@ -31,12 +23,8 @@ const (
 // String implements fmt.Stringer.
 func (t Type) String() (ret string) {
 	switch t {
-	case TypeInvalid:
+	case typeInvalid:
 		return "invalid"
-	case TypeI8:
-		return "i8"
-	case TypeI16:
-		return "i16"
 	case TypeI32:
 		return "i32"
 	case TypeI64:
@@ -52,5 +40,5 @@ func (t Type) String() (ret string) {
 }
 
 func (t Type) invalid() bool {
-	return t == TypeInvalid
+	return t == typeInvalid
 }

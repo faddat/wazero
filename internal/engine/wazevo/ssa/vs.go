@@ -59,7 +59,7 @@ func (v *Value) _Type() Type {
 
 // id returns the valueID of this value.
 func (v *Value) id() valueID {
-	return valueID(*v & 0xffffffff)
+	return valueID(*v)
 }
 
 // setType sets a type of this Value.

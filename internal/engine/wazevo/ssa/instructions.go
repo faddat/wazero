@@ -776,7 +776,7 @@ const (
 type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
 
 var (
-	returnTypesFnNoReturns returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeInvalid, nil }
+	returnTypesFnNoReturns returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return typeInvalid, nil }
 	returnTypesFnSingle                  = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil }
 	returnTypesFnF32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }

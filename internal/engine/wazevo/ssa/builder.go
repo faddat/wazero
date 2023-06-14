@@ -130,7 +130,7 @@ func (b *builder) Reset() {
 	b.basicBlocksPool.reset()
 
 	for i := Variable(0); i < b.nextVariable; i++ {
-		b.variables[i] = TypeInvalid
+		b.variables[i] = typeInvalid
 	}
 
 	for v := valueID(0); v < b.nextValueID; v++ {
@@ -224,7 +224,7 @@ func (b *builder) Blocks() []BasicBlock {
 
 // DefineVariable implements Builder.DefineVariable.
 func (b *builder) DefineVariable(variable Variable, value Value, block BasicBlock) {
-	if b.variables[variable] == TypeInvalid {
+	if b.variables[variable].invalid() {
 		panic("BUG: trying to define variable " + variable.String() + " but is not declared yet")
 	}
 
@@ -342,7 +342,7 @@ func (b *builder) Seal(raw BasicBlock) {
 
 func (b *builder) definedVariableType(variable Variable) Type {
 	typ := b.variables[variable]
-	if typ == TypeInvalid {
+	if typ.invalid() {
 		panic(fmt.Sprintf("%s is not defined yet", variable))
 	}
 	return typ
