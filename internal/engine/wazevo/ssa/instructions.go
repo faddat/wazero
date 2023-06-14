@@ -26,7 +26,7 @@ type Instruction struct {
 
 	rValue  Value
 	rValues []Value
-	gid     instructionGroupID
+	gid     InstructionGroupID
 }
 
 func (i *Instruction) reset() {
@@ -37,18 +37,18 @@ func (i *Instruction) reset() {
 	i.typ = typeInvalid
 }
 
-// instructionGroupID is assigned to each instruction and represents a group of instructions
-// where each instruction is interchangeable with others. instructionGroupID is determined by
+// InstructionGroupID is assigned to each instruction and represents a group of instructions
+// where each instruction is interchangeable with others. InstructionGroupID is determined by
 // the side effects of instructions and block: 1) If instructions are within the same block,
-// then they are assigned the same instructionGroupID, and vice versa. 2) if there's an instruction
+// then they are assigned the same InstructionGroupID, and vice versa. 2) if there's an instruction
 // with side effect between two instructions, then these two instructions will have different instructionGroupID.
 //
 // The notable application of this is used in lowering SSA-level instruction to a ISA specific instruction,
 // where we eagerly try to merge multiple instructions into single operation etc. Such merging cannot be done
-// if these instruction have different instructionGroupID since it will change the semantics of a program.
+// if these instruction have different InstructionGroupID since it will change the semantics of a program.
 //
-// See passDeadCodeElimination.
-type instructionGroupID uint32
+// See passInstructionGroupIDAssignment.
+type InstructionGroupID uint32
 
 // Returns Value(s) produced by this instruction if any.
 // The `first` is the first return value, and `rest` is the rest of the values.

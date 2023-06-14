@@ -2,27 +2,23 @@ package ssa
 
 // Optimize implements Builder.Optimize.
 func (b *builder) Optimize() {
-	for _, pass := range defaultOptimizationPasses {
-		pass(b)
-	}
-}
-
-// optimizationPass represents a pass which operates on and manipulates the SSA function
-// constructed in the given builder.
-type optimizationPass func(*builder)
-
-// defaultOptimizationPasses consists of the optimization passes run by default.
-var defaultOptimizationPasses = []optimizationPass{
-	passDeadBlockElimination,
-	passRedundantPhiElimination,
+	passDeadBlockElimination(b)
+	passRedundantPhiElimination(b)
 	// TODO: block coalescing.
 	// TODO: Copy-propagation.
 	// TODO: Constant folding.
 	// TODO: Common subexpression elimination.
 	// TODO: Arithmetic simplifications.
 	// TODO: and more!
-	passDeadCodeElimination,
+	// This must be the second to the last as it gathers the value usage count info for backends to use.
+	passDeadCodeElimination(b)
+	// Finally we can assign instruction group ID.
+	passInstructionGroupIDAssignment(b)
 }
+
+// optimizationPass represents a pass which operates on and manipulates the SSA function
+// constructed in the given builder.
+type optimizationPass func(*builder)
 
 // passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
 func passDeadBlockElimination(b *builder) {
@@ -143,14 +139,11 @@ func passRedundantPhiElimination(b *builder) {
 
 // passDeadCodeElimination traverses all the instructions, and calculates the reference count of each Value,
 // and eliminates all the unnecessary instructions whose ref count is zero. The results are stored at builder.valueRefCounts.
-//
-// This also calculates the instructionGroupID of each SSA Instruction: divided by side effects and blocks.
 func passDeadCodeElimination(b *builder) {
 	if iid := int(b.nextValueID); iid >= len(b.valueRefCounts) {
 		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
 	}
 
-	var gid instructionGroupID = 0
 	for blockIndex := 0; blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
 		blk := b.basicBlocksPool.view(blockIndex)
 		if blk.invalid {
@@ -158,12 +151,32 @@ func passDeadCodeElimination(b *builder) {
 			continue
 		}
 
-		// In order to calculate the exact refCount, we pre-oder traverse the instruction tree.
-		// TODO
+		// TODO!!
+	}
+}
 
-		root := blk.currentInstr
+// passInstructionGroupIDAssignment assigns a InstructionGroupID to each Instruction.
+// This is the last SSA-level optimization pass and after this, the SSA function is ready to be used by backends.
+func passInstructionGroupIDAssignment(b *builder) {
+	var gid InstructionGroupID
+	for blockIndex := 0; blockIndex < b.basicBlocksPool.allocated; blockIndex++ {
+		blk := b.basicBlocksPool.view(blockIndex)
+		if blk.invalid {
+			// Already removed block.
+			continue
+		}
 
-		// instructionGroupID won't be shared by instructions in different blocks.
+		// Walk through the instructions in this block.
+		cur := blk.rootInstr
+		for ; cur != nil; cur = cur.next {
+			if instructionSideEffects[cur.opcode] {
+				// Side effects create different instruction groups.
+				gid++
+			}
+			cur.gid = gid
+		}
+
+		// Instructions in different blocks should have different group IDs.
 		gid++
 	}
 }

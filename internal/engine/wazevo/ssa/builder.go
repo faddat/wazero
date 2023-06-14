@@ -111,6 +111,8 @@ type builder struct {
 	valueRefCounts []int
 
 	// The followings are used for optimization passes.
+	instStack                      []*Instruction
+	instVisited                    map[*Instruction]struct{}
 	blkVisited                     map[*basicBlock]struct{}
 	blkStack                       []*basicBlock
 	redundantParameterIndexToValue map[int]Value

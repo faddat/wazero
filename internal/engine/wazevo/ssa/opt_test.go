@@ -7,11 +7,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func Test_defaultPasses(t *testing.T) {
-	// passDeadCodeElimination must be the last as it gathers the value usage count info for backends to use.
-	require.Equal(t, optimizationPass(passDeadCodeElimination), defaultOptimizationPasses[len(defaultOptimizationPasses)-1])
-}
-
 func TestBuilder_Optimize(t *testing.T) {
 	for _, tc := range []struct {
 		name string
