@@ -10,10 +10,8 @@ func (b *builder) Optimize() {
 	// TODO: Common subexpression elimination.
 	// TODO: Arithmetic simplifications.
 	// TODO: and more!
-	// This must be the second to the last as it gathers the value usage count info for backends to use.
+	// This is the last as it gathers the value usage count and instructionGroupID info for backends to use.
 	passDeadCodeElimination(b)
-	// Finally we can assign instruction group ID.
-	passInstructionGroupIDAssignment(b)
 }
 
 // passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
@@ -129,31 +127,108 @@ func passRedundantPhiElimination(b *builder) {
 
 // passDeadCodeElimination traverses all the instructions, and calculates the reference count of each Value,
 // and eliminates all the unnecessary instructions whose ref count is zero. The results are stored at builder.valueRefCounts.
+//
+// This also assigns a InstructionGroupID to each Instruction during the process.
+//
+// This is the last SSA-level optimization pass and after this, the SSA function is ready to be used by backends.
+//
+// TODO: the algorithm here might not be efficient. Get back to this later.
 func passDeadCodeElimination(b *builder) {
-	if iid := int(b.nextValueID); iid >= len(b.valueRefCounts) {
+	nvid := int(b.nextValueID)
+	if nvid >= len(b.valueRefCounts) {
 		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
 	}
-
-	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-		// TODO!!
+	if nvid >= len(b.valueIDToInstruction) {
+		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
 	}
-}
 
-// passInstructionGroupIDAssignment assigns a InstructionGroupID to each Instruction.
-// This is the last SSA-level optimization pass and after this, the SSA function is ready to be used by backends.
-func passInstructionGroupIDAssignment(b *builder) {
+	// First, we gather all the instructions with side effects.
+	liveInstructions := b.instStack[:0]
+	// During the process, we will assign InstructionGroupID to each instruction, which is not
+	// relevant to dead code elimination, but we need in the backend.
 	var gid InstructionGroupID
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-		// Walk through the instructions in this block.
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
-			if instructionSideEffects[cur.opcode] {
+			cur.gid = gid
+			if cur.HasSideEffects() {
+				liveInstructions = append(liveInstructions, cur)
 				// Side effects create different instruction groups.
 				gid++
 			}
-			cur.gid = gid
+
+			r1, rs := cur.Returns()
+			if r1.valid() {
+				b.valueIDToInstruction[r1.id()] = cur
+			}
+			for _, r := range rs {
+				b.valueIDToInstruction[r.id()] = cur
+			}
+		}
+	}
+
+	// Find all the instructions referenced by live instructions transitively.
+	for len(liveInstructions) > 0 {
+		tail := len(liveInstructions) - 1
+		live := liveInstructions[tail]
+		liveInstructions = liveInstructions[:tail]
+		if live.live {
+			// If it's already marked alive, this is referenced multiple times,
+			// so we can skip it.
+			continue
+		}
+		live.live = true
+
+		v1, v2, vs := live.args()
+		if v1.valid() {
+			producingInst := b.valueIDToInstruction[v1.id()]
+			if producingInst != nil {
+				liveInstructions = append(liveInstructions, producingInst)
+			}
 		}
 
-		// Instructions in different blocks should have different group IDs.
-		gid++
+		if v2.valid() {
+			producingInst := b.valueIDToInstruction[v2.id()]
+			if producingInst != nil {
+				liveInstructions = append(liveInstructions, producingInst)
+			}
+		}
+
+		for _, v := range vs {
+			producingInst := b.valueIDToInstruction[v.id()]
+			if producingInst != nil {
+				liveInstructions = append(liveInstructions, producingInst)
+			}
+		}
 	}
+
+	// Now that all the live instructions are flagged as live=true, we eliminate all dead instructions.
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for cur := blk.rootInstr; cur != nil; cur = cur.next {
+			if !cur.live {
+				// Remove the instruction from the list.
+				if prev := cur.prev; prev != nil {
+					prev.next = cur.next
+				}
+				if next := cur.next; next != nil {
+					next.prev = cur.prev
+				}
+				continue
+			}
+
+			// If the value alive, we can be sure that arguments are used definitely.
+			// Hences, we can increment the value reference counts.
+			v1, v2, vs := cur.args()
+			if v1.valid() {
+				b.valueRefCounts[v1.id()]++
+			}
+			if v2.valid() {
+				b.valueRefCounts[v2.id()]++
+			}
+			for _, v := range vs {
+				b.valueRefCounts[v.id()]++
+			}
+		}
+	}
+
+	b.instStack = liveInstructions // we reuse the stack for the next iteration.
 }

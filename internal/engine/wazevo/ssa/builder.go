@@ -123,6 +123,7 @@ type builder struct {
 	instStack                      []*Instruction
 	instVisited                    map[*Instruction]struct{}
 	blkVisited                     map[*basicBlock]struct{}
+	valueIDToInstruction           []*Instruction
 	blkStack                       []*basicBlock
 	redundantParameterIndexToValue map[int]Value
 	redundantParameterIndexes      []int
@@ -154,6 +155,7 @@ func (b *builder) Reset() {
 	for v := valueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
 		b.valueRefCounts[v] = 0
+		b.valueIDToInstruction[v] = nil
 	}
 	b.nextValueID = 0
 }
@@ -369,7 +371,6 @@ func (b *builder) Format() string {
 	}
 
 	for blk := b.BlockIteratorBegin(); blk != nil; blk = b.BlockIteratorNext() {
-		fmt.Println(blk)
 		bb := blk.(*basicBlock)
 		str.WriteByte('\n')
 		str.WriteString(bb.FormatHeader(b))
@@ -393,7 +394,7 @@ func (b *builder) Format() string {
 // BlockIteratorNext implements Builder.BlockIteratorNext.
 func (b *builder) BlockIteratorNext() BasicBlock {
 	if blk := b.blockIteratorNext(); blk == nil {
-		return nil // BasicBlock((*basicBlock)(nil)) != BasicBlock(nil)!
+		return nil // BasicBlock((*basicBlock)(nil)) != BasicBlock(nil)
 	} else {
 		return blk
 	}

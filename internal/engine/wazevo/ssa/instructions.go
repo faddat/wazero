@@ -27,6 +27,7 @@ type Instruction struct {
 	rValue  Value
 	rValues []Value
 	gid     InstructionGroupID
+	live    bool
 }
 
 func (i *Instruction) reset() {
@@ -38,22 +39,27 @@ func (i *Instruction) reset() {
 }
 
 // InstructionGroupID is assigned to each instruction and represents a group of instructions
-// where each instruction is interchangeable with others. InstructionGroupID is determined by
-// the side effects of instructions and block: 1) If instructions are within the same block,
-// then they are assigned the same InstructionGroupID, and vice versa. 2) if there's an instruction
-// with side effect between two instructions, then these two instructions will have different instructionGroupID.
+// where each instruction is interchangeable with others except for the last instruction
+// in the group which has side effects. In short, InstructionGroupID is determined by the side effects of instructions.
+// That means, if there's an instruction with side effect between two instructions, then these two instructions
+// will have different instructionGroupID. Note that each block always ends with branching, which is with side effects,
+// therefore, instructions in different blocks always have different InstructionGroupID(s).
 //
 // The notable application of this is used in lowering SSA-level instruction to a ISA specific instruction,
 // where we eagerly try to merge multiple instructions into single operation etc. Such merging cannot be done
 // if these instruction have different InstructionGroupID since it will change the semantics of a program.
 //
-// See passInstructionGroupIDAssignment.
+// See passDeadCodeElimination.
 type InstructionGroupID uint32
 
 // Returns Value(s) produced by this instruction if any.
 // The `first` is the first return value, and `rest` is the rest of the values.
 func (i *Instruction) Returns() (first Value, rest []Value) {
 	return i.rValue, i.rValues
+}
+
+func (i *Instruction) args() (v1, v2 Value, vs []Value) {
+	return i.v, i.v2, i.vs
 }
 
 // Next returns the next instruction laid out next to itself.
@@ -820,6 +826,11 @@ var instructionSideEffects = [opcodeEnd]bool{
 	OpcodeTrap:     true,
 	OpcodeReturn:   true,
 	OpcodeBrz:      true,
+}
+
+// HasSideEffects returns true if this instruction has side effects.
+func (i *Instruction) HasSideEffects() bool {
+	return instructionSideEffects[i.opcode]
 }
 
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{

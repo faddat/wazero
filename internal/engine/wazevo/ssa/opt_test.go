@@ -16,7 +16,9 @@ func TestBuilder_Optimize(t *testing.T) {
 		// TODO: when we have the text SSA IR parser, we can eliminate this `setup`,
 		// 	we could directly decode the *builder from the `before` string. I am still
 		//  constantly changing the format, so let's keep setup for now.
-		setup func(*builder)
+		// `verifier` is executed after executing pass, and can be used to
+		// do the additional verification of the state of SSA function in addition to `after` text result.
+		setup func(*builder) (verifier func(t *testing.T))
 		// before is the expected SSA function after `setup` is executed.
 		before,
 		// after is the expected output after optimization pass.
@@ -25,7 +27,7 @@ func TestBuilder_Optimize(t *testing.T) {
 		{
 			name: "dead block",
 			pass: passDeadBlockElimination,
-			setup: func(b *builder) {
+			setup: func(b *builder) func(*testing.T) {
 				entry := b.AllocateBasicBlock()
 				value := entry.AddParam(b, TypeI32)
 
@@ -71,6 +73,7 @@ func TestBuilder_Optimize(t *testing.T) {
 					jmp.AsJump(nil, middle1)
 					b.InsertInstruction(jmp)
 				}
+				return nil
 			},
 			before: `
 blk0: (v0:i32)
@@ -107,7 +110,7 @@ blk3: () <-- (blk1,blk2)
 		{
 			name: "redundant phis",
 			pass: passRedundantPhiElimination,
-			setup: func(b *builder) {
+			setup: func(b *builder) func(*testing.T) {
 				entry, loopHeader, end := b.AllocateBasicBlock(), b.AllocateBasicBlock(), b.AllocateBasicBlock()
 
 				loopHeader.AddParam(b, TypeI32)
@@ -154,6 +157,7 @@ blk3: () <-- (blk1,blk2)
 					ret.AsReturn(nil)
 					b.InsertInstruction(ret)
 				}
+				return nil
 			},
 			before: `
 blk0: ()
@@ -183,16 +187,107 @@ blk2: () <-- (blk1)
 	Return
 `,
 		},
+		{
+			name: "dead code",
+			pass: passDeadCodeElimination,
+			setup: func(b *builder) func(*testing.T) {
+				entry, end := b.AllocateBasicBlock(), b.AllocateBasicBlock()
+
+				b.SetCurrentBlock(entry)
+				iconstRefThriceInst := b.AllocateInstruction()
+				iconstRefThriceInst.AsIconst32(3)
+				b.InsertInstruction(iconstRefThriceInst)
+				refThriceVal, _ := iconstRefThriceInst.Returns()
+
+				// This has side effect.
+				store := b.AllocateInstruction()
+				store.AsStore(refThriceVal, refThriceVal, 0)
+				b.InsertInstruction(store)
+
+				iconstDeadInst := b.AllocateInstruction()
+				iconstDeadInst.AsIconst32(0)
+				b.InsertInstruction(iconstDeadInst)
+
+				jmp := b.AllocateInstruction()
+				jmp.AsJump(nil, end)
+				b.InsertInstruction(jmp)
+
+				b.SetCurrentBlock(end)
+				iconstRefOnceInst := b.AllocateInstruction()
+				iconstRefOnceInst.AsIconst32(1)
+				b.InsertInstruction(iconstRefOnceInst)
+				refOnceVal, _ := iconstRefOnceInst.Returns()
+				add := b.AllocateInstruction()
+				add.AsIadd(refOnceVal, refThriceVal)
+				b.InsertInstruction(add)
+
+				addRes, _ := add.Returns()
+
+				ret := b.AllocateInstruction()
+				ret.AsReturn([]Value{addRes})
+				b.InsertInstruction(ret)
+				return func(t *testing.T) {
+					// Group IDs.
+					const gid0, gid1, gid2 InstructionGroupID = 0, 1, 2
+					require.Equal(t, gid0, iconstRefThriceInst.gid)
+					require.Equal(t, gid0, store.gid)
+					require.Equal(t, gid1, iconstDeadInst.gid)
+					require.Equal(t, gid1, jmp.gid)
+					// Different blocks have different gids.
+					require.Equal(t, gid2, iconstRefOnceInst.gid)
+					require.Equal(t, gid2, add.gid)
+					require.Equal(t, gid2, ret.gid)
+
+					// Dead of alive...
+					require.False(t, iconstDeadInst.live)
+					require.True(t, iconstRefOnceInst.live)
+					require.True(t, iconstRefThriceInst.live)
+					require.True(t, add.live)
+					require.True(t, jmp.live)
+					require.True(t, ret.live)
+
+					require.Equal(t, 1, b.valueRefCounts[refOnceVal.id()])
+					require.Equal(t, 1, b.valueRefCounts[addRes.id()])
+					require.Equal(t, 3, b.valueRefCounts[refThriceVal.id()])
+				}
+			},
+			before: `
+blk0: ()
+	v0:i32 = Iconst_32 0x3
+	Store v0, v0, 0x0
+	v1:i32 = Iconst_32 0x0
+	Jump blk1
+
+blk1: () <-- (blk0)
+	v2:i32 = Iconst_32 0x1
+	v3:i32 = Iadd v2, v0
+	Return v3
+`,
+			after: `
+blk0: ()
+	v0:i32 = Iconst_32 0x3
+	Store v0, v0, 0x0
+	Jump blk1
+
+blk1: () <-- (blk0)
+	v2:i32 = Iconst_32 0x1
+	v3:i32 = Iadd v2, v0
+	Return v3
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewBuilder().(*builder)
-			tc.setup(b)
+			verifier := tc.setup(b)
 			fmt.Println(b.Format())
 			require.Equal(t, tc.before, b.Format())
 			tc.pass(b)
 			fmt.Println("--------")
 			fmt.Println(b.Format())
+			if verifier != nil {
+				verifier(t)
+			}
 			require.Equal(t, tc.after, b.Format())
 		})
 	}
