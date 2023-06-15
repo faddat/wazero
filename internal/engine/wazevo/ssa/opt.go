@@ -208,6 +208,8 @@ func passDeadCodeElimination(b *builder) {
 				// Remove the instruction from the list.
 				if prev := cur.prev; prev != nil {
 					prev.next = cur.next
+				} else {
+					blk.rootInstr = cur.next
 				}
 				if next := cur.next; next != nil {
 					next.prev = cur.prev

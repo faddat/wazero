@@ -103,6 +103,10 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v5:f64 = F64const 0.000000
 	Jump blk_ret
 `,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk_ret
+`,
 		},
 		{
 			name: "locals + params", m: singleFunctionModule(
@@ -134,6 +138,16 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)
 	v6:i64 = Iconst_64 0x0
 	v7:f32 = F32const 0.000000
 	v8:f64 = F64const 0.000000
+	v9:i64 = Iadd v2, v2
+	v10:i64 = Isub v9, v2
+	v11:f32 = Fadd v3, v3
+	v12:f32 = Fsub v11, v3
+	v13:f64 = Fadd v4, v4
+	v14:f64 = Fsub v13, v4
+	Jump blk_ret, v10, v12, v14
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)
 	v9:i64 = Iadd v2, v2
 	v10:i64 = Isub v9, v2
 	v11:f32 = Fadd v3, v3
@@ -252,6 +266,13 @@ blk1: () <-- (blk0,blk1)
 blk2: ()
 	Jump blk_ret
 `,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	Jump blk1
+`,
 		},
 		{
 			name: "loop - br_if", m: singleFunctionModule(vv, []byte{
@@ -273,6 +294,18 @@ blk1: () <-- (blk0,blk1)
 
 blk2: ()
 	Jump blk_ret
+
+blk3: () <-- (blk1)
+	Return
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	v2:i32 = Iconst_32 0x1
+	Brz v2, blk1
+	Jump blk3
 
 blk3: () <-- (blk1)
 	Return
@@ -301,6 +334,13 @@ blk1: () <-- (blk0,blk2)
 
 blk2: ()
 	Jump blk1
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Jump blk_ret
 `,
 		},
 		{
@@ -391,6 +431,22 @@ blk2: () <-- (blk0)
 blk3: () <-- (blk2)
 	Jump blk_ret, v2
 `,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x0
+	v4:i32 = Iconst_32 0x0
+	Brz v2, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Return v4
+
+blk2: () <-- (blk0)
+	Jump blk3
+
+blk3: () <-- (blk2)
+	Jump blk_ret, v2
+`,
 		},
 		{
 			name: "multi predecessors local ref",
@@ -413,6 +469,20 @@ blk3: () <-- (blk2)
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	v4:i32 = Iconst_32 0x0
+	Brz v2, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Jump blk3, v2
+
+blk2: () <-- (blk0)
+	Jump blk3, v3
+
+blk3: (v5:i32) <-- (blk1,blk2)
+	Jump blk_ret, v5
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	Brz v2, blk2
 	Jump blk1
 
@@ -482,6 +552,25 @@ blk3: () <-- (blk4)
 blk4: () <-- (blk1)
 	Jump blk3
 `,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	v3 = v2
+	Brz v3, blk1
+	Jump blk4
+
+blk2: () <-- (blk3)
+	v4:i32 = Iconst_32 0x0
+	Jump blk_ret, v4
+
+blk3: () <-- (blk4)
+	Jump blk2
+
+blk4: () <-- (blk1)
+	Jump blk3
+`,
 		},
 		{
 			name: "reference value from unsealed block - #3",
@@ -508,6 +597,21 @@ blk1: (v3:i32) <-- (blk0,blk3)
 
 blk2: ()
 	Jump blk_ret
+
+blk3: () <-- (blk4)
+	v4:i32 = Iconst_32 0x1
+	Jump blk1, v4
+
+blk4: () <-- (blk1)
+	Jump blk3
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Jump blk1, v2
+
+blk1: (v3:i32) <-- (blk0,blk3)
+	Brz v3, blk_ret
+	Jump blk4
 
 blk3: () <-- (blk4)
 	v4:i32 = Iconst_32 0x1
@@ -578,8 +682,10 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			require.Equal(t, tc.exp, actual)
 
 			b.Optimize()
-			if tc.expAfterOpt != "" {
-				require.Equal(t, tc.expAfterOpt, actual)
+			if expAfterOpt := tc.expAfterOpt; expAfterOpt != "" {
+				actualAfterOpt := fc.formatBuilder()
+				fmt.Println(actualAfterOpt)
+				require.Equal(t, expAfterOpt, actualAfterOpt)
 			}
 		})
 	}
