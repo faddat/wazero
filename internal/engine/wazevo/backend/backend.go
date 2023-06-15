@@ -63,6 +63,7 @@ func (c *Compiler) assignVirtualRegisters() {
 	}
 
 	// After assigned all values produced by instructions, we assign a virtual register to alias destination.
+	// TODO: maybe it's possible to do this in the above loop given that alias's block _maybe_ comes after the source block.
 	for blk := builder.BlockIteratorBegin(); blk != nil; blk = builder.BlockIteratorNext() {
 		for _, alias := range blk.Aliases() {
 			src := c.ssaValuesToVRegs[alias.Src.ID()]
