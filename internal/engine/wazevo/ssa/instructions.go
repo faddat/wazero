@@ -796,8 +796,6 @@ const (
 	// `v = extract_vector x, y`. (BinaryImm8)
 	OpcodeExtractVector
 
-	OpcodeAlias
-
 	opcodeEnd
 )
 

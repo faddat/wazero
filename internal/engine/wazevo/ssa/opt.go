@@ -103,7 +103,7 @@ func passRedundantPhiElimination(b *builder) {
 			phiValue := blk.params[redundantParamIndex].value
 			newValue := b.redundantParameterIndexToValue[redundantParamIndex]
 			// Create an alias in this block temporarily to
-			blk.alias(newValue, phiValue)
+			b.alias(phiValue, newValue)
 		}
 
 		// Finally, Remove the param from the blk.
@@ -166,6 +166,8 @@ func passDeadCodeElimination(b *builder) {
 		}
 	}
 
+	// TODO: take alias into account.
+
 	// Find all the instructions referenced by live instructions transitively.
 	for len(liveInstructions) > 0 {
 		tail := len(liveInstructions) - 1
@@ -177,6 +179,9 @@ func passDeadCodeElimination(b *builder) {
 			continue
 		}
 		live.live = true
+
+		// Before we walk, we need to resolve the alias first.
+		b.resolveArgumentAlias(live)
 
 		v1, v2, vs := live.args()
 		if v1.Valid() {
@@ -218,7 +223,7 @@ func passDeadCodeElimination(b *builder) {
 			}
 
 			// If the value alive, we can be sure that arguments are used definitely.
-			// Hences, we can increment the value reference counts.
+			// Hence, we can increment the value reference counts.
 			v1, v2, vs := cur.args()
 			if v1.Valid() {
 				b.valueRefCounts[v1.ID()]++

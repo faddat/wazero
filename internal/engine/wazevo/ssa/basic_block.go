@@ -39,9 +39,6 @@ type BasicBlock interface {
 
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
-
-	// Aliases returns the ValueAlias(es) of this block.
-	Aliases() []ValueAlias
 }
 
 type (
@@ -50,7 +47,6 @@ type (
 		id                      basicBlockID
 		rootInstr, currentInstr *Instruction
 		params                  []blockParam
-		aliases                 []ValueAlias
 		preds                   []basicBlockPredecessorInfo
 		success                 []*basicBlock
 		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
@@ -150,7 +146,6 @@ func (bb *basicBlock) reset() {
 	bb.rootInstr, bb.currentInstr = nil, nil
 	bb.preds = bb.preds[:0]
 	bb.success = bb.success[:0]
-	bb.aliases = bb.aliases[:0]
 	bb.invalid, bb.sealed = false, false
 	bb.singlePred = nil
 	// TODO: reuse the map!
@@ -200,15 +195,6 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	} else {
 		return fmt.Sprintf("blk%d: (%s)", bb.id, strings.Join(ps, ", "))
 	}
-}
-
-// Aliases implements BasicBlock.
-func (bb *basicBlock) Aliases() []ValueAlias {
-	return bb.aliases
-}
-
-func (bb *basicBlock) alias(src, dst Value) {
-	bb.aliases = append(bb.aliases, ValueAlias{Src: src, Dst: dst})
 }
 
 // blockParam implements Value and represents a parameter to a basicBlock.

@@ -2,9 +2,10 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"sort"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // Builder is used to builds SSA consisting of Basic Blocks per function.
@@ -88,6 +89,7 @@ func NewBuilder() Builder {
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]struct{}),
+		valueIDAliases:                 make(map[ValueID]Value),
 		redundantParameterIndexToValue: make(map[int]Value),
 	}
 }
@@ -108,6 +110,7 @@ type builder struct {
 	// nextVariable is used by builder.AllocateVariable.
 	nextVariable Variable
 
+	valueIDAliases   map[ValueID]Value
 	valueAnnotations map[ValueID]string
 
 	// valueRefCounts is used to lower the SSA in backend, and will be calculated
@@ -149,6 +152,7 @@ func (b *builder) Reset() {
 
 	for v := ValueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
+		delete(b.valueIDAliases, v)
 		b.valueRefCounts[v] = 0
 		b.valueIDToInstruction[v] = nil
 	}
@@ -371,12 +375,6 @@ func (b *builder) Format() string {
 		str.WriteString(bb.FormatHeader(b))
 		str.WriteByte('\n')
 
-		for i := range bb.aliases {
-			str.WriteByte('\t')
-			str.WriteString(bb.aliases[i].format(b))
-			str.WriteByte('\n')
-		}
-
 		for cur := bb.Root(); cur != nil; cur = cur.Next() {
 			str.WriteByte('\t')
 			str.WriteString(cur.Format(b))
@@ -425,4 +423,22 @@ func (b *builder) blockIteratorBegin() *basicBlock {
 // ValueRefCountMap implements Builder.ValueRefCountMap.
 func (b *builder) ValueRefCountMap() []int {
 	return b.valueRefCounts
+}
+
+func (b *builder) alias(dst, src Value) {
+	b.valueIDAliases[dst.ID()] = src
+}
+
+func (b *builder) resolveArgumentAlias(instr *Instruction) {
+	if src, ok := b.valueIDAliases[instr.v.ID()]; ok {
+		instr.v = src
+	}
+	if src, ok := b.valueIDAliases[instr.v2.ID()]; ok {
+		instr.v2 = src
+	}
+	for i, v := range instr.vs {
+		if src, ok := b.valueIDAliases[v.ID()]; ok {
+			instr.vs[i] = src
+		}
+	}
 }

@@ -557,8 +557,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk1
 
 blk1: () <-- (blk0,blk1)
-	v3 = v2
-	Brz v3, blk1
+	Brz v2, blk1
 	Jump blk4
 
 blk2: () <-- (blk3)

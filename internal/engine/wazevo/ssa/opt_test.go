@@ -178,7 +178,6 @@ blk0: ()
 	Jump blk1, v1
 
 blk1: (v0:i32) <-- (blk0,blk1)
-	v2 = v1
 	v3:i32 = Iconst_32 0xff
 	Brz v2, blk1, v3
 	Jump blk2
@@ -208,17 +207,21 @@ blk2: () <-- (blk1)
 				iconstDeadInst.AsIconst32(0)
 				b.InsertInstruction(iconstDeadInst)
 
+				iconstRefOnceInst := b.AllocateInstruction()
+				iconstRefOnceInst.AsIconst32(1)
+				b.InsertInstruction(iconstRefOnceInst)
+				refOnceVal, _ := iconstRefOnceInst.Returns()
+
 				jmp := b.AllocateInstruction()
 				jmp.AsJump(nil, end)
 				b.InsertInstruction(jmp)
 
 				b.SetCurrentBlock(end)
-				iconstRefOnceInst := b.AllocateInstruction()
-				iconstRefOnceInst.AsIconst32(1)
-				b.InsertInstruction(iconstRefOnceInst)
-				refOnceVal, _ := iconstRefOnceInst.Returns()
+				aliasedRefOnceVal := b.allocateValue(refOnceVal._Type())
+				b.alias(aliasedRefOnceVal, refOnceVal)
+
 				add := b.AllocateInstruction()
-				add.AsIadd(refOnceVal, refThriceVal)
+				add.AsIadd(aliasedRefOnceVal, refThriceVal)
 				b.InsertInstruction(add)
 
 				addRes, _ := add.Returns()
@@ -232,9 +235,9 @@ blk2: () <-- (blk1)
 					require.Equal(t, gid0, iconstRefThriceInst.gid)
 					require.Equal(t, gid0, store.gid)
 					require.Equal(t, gid1, iconstDeadInst.gid)
+					require.Equal(t, gid1, iconstRefOnceInst.gid)
 					require.Equal(t, gid1, jmp.gid)
 					// Different blocks have different gids.
-					require.Equal(t, gid2, iconstRefOnceInst.gid)
 					require.Equal(t, gid2, add.gid)
 					require.Equal(t, gid2, ret.gid)
 
@@ -256,23 +259,23 @@ blk0: ()
 	v0:i32 = Iconst_32 0x3
 	Store v0, v0, 0x0
 	v1:i32 = Iconst_32 0x0
+	v2:i32 = Iconst_32 0x1
 	Jump blk1
 
 blk1: () <-- (blk0)
-	v2:i32 = Iconst_32 0x1
-	v3:i32 = Iadd v2, v0
-	Return v3
+	v4:i32 = Iadd v3, v0
+	Return v4
 `,
 			after: `
 blk0: ()
 	v0:i32 = Iconst_32 0x3
 	Store v0, v0, 0x0
+	v2:i32 = Iconst_32 0x1
 	Jump blk1
 
 blk1: () <-- (blk0)
-	v2:i32 = Iconst_32 0x1
-	v3:i32 = Iadd v2, v0
-	Return v3
+	v4:i32 = Iadd v2, v0
+	Return v4
 `,
 		},
 	} {
