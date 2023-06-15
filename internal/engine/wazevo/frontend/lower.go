@@ -387,7 +387,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		currentBlk := builder.CurrentBlock()
 		v := state.pop()
 
 		targetFrame := state.ctrlPeekAt(int(labelIndex))
