@@ -73,6 +73,10 @@ type Builder interface {
 	// BlockIteratorNext advances the state for iteration initialized by BlockIteratorBegin.
 	// Returns nil if there's no unseen BasicBlock.
 	BlockIteratorNext() BasicBlock
+
+	// ValueRefCountMap returns the map of ValueID to its reference count.
+	// The returned slice must not be modified.
+	ValueRefCountMap() []int
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -80,7 +84,7 @@ func NewBuilder() Builder {
 	return &builder{
 		instructionsPool:               newPool[Instruction](),
 		basicBlocksPool:                newPool[basicBlock](),
-		valueAnnotations:               make(map[valueID]string),
+		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]struct{}),
 		redundantParameterIndexToValue: make(map[int]Value),
@@ -99,11 +103,11 @@ type builder struct {
 	// variables track the types for Variable with the index regarded Variable.
 	variables []Type
 	// nextValueID is used by builder.AllocateValue.
-	nextValueID valueID
+	nextValueID ValueID
 	// nextVariable is used by builder.AllocateVariable.
 	nextVariable Variable
 
-	valueAnnotations map[valueID]string
+	valueAnnotations map[ValueID]string
 
 	// valueRefCounts is used to lower the SSA in backend, and will be calculated
 	// by the last SSA-level optimization pass.
@@ -142,7 +146,7 @@ func (b *builder) Reset() {
 		b.variables[i] = typeInvalid
 	}
 
-	for v := valueID(0); v < b.nextValueID; v++ {
+	for v := ValueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
 		b.valueRefCounts[v] = 0
 		b.valueIDToInstruction[v] = nil
@@ -152,7 +156,7 @@ func (b *builder) Reset() {
 
 // AnnotateValue implements Builder.AnnotateValue.
 func (b *builder) AnnotateValue(value Value, a string) {
-	b.valueAnnotations[value.id()] = a
+	b.valueAnnotations[value.ID()] = a
 }
 
 // AllocateInstruction implements Builder.AllocateInstruction.
@@ -415,4 +419,9 @@ func (b *builder) BlockIteratorBegin() BasicBlock {
 func (b *builder) blockIteratorBegin() *basicBlock {
 	b.blockIterCur = 0
 	return b.blockIteratorNext()
+}
+
+// ValueRefCountMap implements Builder.ValueRefCountMap.
+func (b *builder) ValueRefCountMap() []int {
+	return b.valueRefCounts
 }

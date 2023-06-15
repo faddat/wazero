@@ -23,33 +23,33 @@ func (v Variable) String() string {
 // Higher 32-bit is used to store Type for this value.
 type Value uint64
 
-// valueID is the lower 32bit of Value, which is the pure identifier of Value without type info.
-type valueID uint32
+// ValueID is the lower 32bit of Value, which is the pure identifier of Value without type info.
+type ValueID uint32
 
 const (
-	valueIDInvalid valueID = math.MaxUint32
+	valueIDInvalid ValueID = math.MaxUint32
 	valueInvalid   Value   = Value(valueIDInvalid)
 )
 
 // Format creates a debug string for this Value using the data stored in Builder.
 func (v *Value) format(b Builder) string {
-	if annotation, ok := b.(*builder).valueAnnotations[v.id()]; ok {
+	if annotation, ok := b.(*builder).valueAnnotations[v.ID()]; ok {
 		return annotation
 	}
-	return fmt.Sprintf("v%d", v.id())
+	return fmt.Sprintf("v%d", v.ID())
 }
 
 func (v *Value) formatWithType(b Builder) string {
-	if annotation, ok := b.(*builder).valueAnnotations[v.id()]; ok {
+	if annotation, ok := b.(*builder).valueAnnotations[v.ID()]; ok {
 		return annotation + ":" + v._Type().String()
 	} else {
-		return fmt.Sprintf("v%d:%s", v.id(), v._Type())
+		return fmt.Sprintf("v%d:%s", v.ID(), v._Type())
 	}
 }
 
 // valid returns true if this value is valid.
 func (v *Value) valid() bool {
-	return v.id() != valueIDInvalid
+	return v.ID() != valueIDInvalid
 }
 
 // _Type returns the Type of this value.
@@ -57,9 +57,9 @@ func (v *Value) _Type() Type {
 	return Type(*v >> 32)
 }
 
-// id returns the valueID of this value.
-func (v *Value) id() valueID {
-	return valueID(*v)
+// ID returns the valueID of this value.
+func (v *Value) ID() ValueID {
+	return ValueID(*v)
 }
 
 // setType sets a type of this Value.

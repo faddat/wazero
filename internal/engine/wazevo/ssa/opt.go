@@ -158,10 +158,10 @@ func passDeadCodeElimination(b *builder) {
 
 			r1, rs := cur.Returns()
 			if r1.valid() {
-				b.valueIDToInstruction[r1.id()] = cur
+				b.valueIDToInstruction[r1.ID()] = cur
 			}
 			for _, r := range rs {
-				b.valueIDToInstruction[r.id()] = cur
+				b.valueIDToInstruction[r.ID()] = cur
 			}
 		}
 	}
@@ -180,21 +180,21 @@ func passDeadCodeElimination(b *builder) {
 
 		v1, v2, vs := live.args()
 		if v1.valid() {
-			producingInst := b.valueIDToInstruction[v1.id()]
+			producingInst := b.valueIDToInstruction[v1.ID()]
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		if v2.valid() {
-			producingInst := b.valueIDToInstruction[v2.id()]
+			producingInst := b.valueIDToInstruction[v2.ID()]
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		for _, v := range vs {
-			producingInst := b.valueIDToInstruction[v.id()]
+			producingInst := b.valueIDToInstruction[v.ID()]
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
@@ -221,13 +221,13 @@ func passDeadCodeElimination(b *builder) {
 			// Hences, we can increment the value reference counts.
 			v1, v2, vs := cur.args()
 			if v1.valid() {
-				b.valueRefCounts[v1.id()]++
+				b.valueRefCounts[v1.ID()]++
 			}
 			if v2.valid() {
-				b.valueRefCounts[v2.id()]++
+				b.valueRefCounts[v2.ID()]++
 			}
 			for _, v := range vs {
-				b.valueRefCounts[v.id()]++
+				b.valueRefCounts[v.ID()]++
 			}
 		}
 	}

@@ -260,7 +260,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		v := state.pop()
 		thenBlk, elseBlk, followingBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
 
-		// We do not make the Wasm-level block parameters as SSA-level block params,
+		// We do not make the Wasm-level block parameters as SSA-level block params for if-else blocks
 		// since they won't be PHI and the definition is unique.
 
 		// On the other hand, the following block after if-else-end will likely have

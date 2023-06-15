@@ -238,7 +238,7 @@ blk2: () <-- (blk1)
 					require.Equal(t, gid2, add.gid)
 					require.Equal(t, gid2, ret.gid)
 
-					// Dead of alive...
+					// Dead or Alive...
 					require.False(t, iconstDeadInst.live)
 					require.True(t, iconstRefOnceInst.live)
 					require.True(t, iconstRefThriceInst.live)
@@ -246,9 +246,9 @@ blk2: () <-- (blk1)
 					require.True(t, jmp.live)
 					require.True(t, ret.live)
 
-					require.Equal(t, 1, b.valueRefCounts[refOnceVal.id()])
-					require.Equal(t, 1, b.valueRefCounts[addRes.id()])
-					require.Equal(t, 3, b.valueRefCounts[refThriceVal.id()])
+					require.Equal(t, 1, b.valueRefCounts[refOnceVal.ID()])
+					require.Equal(t, 1, b.valueRefCounts[addRes.ID()])
+					require.Equal(t, 3, b.valueRefCounts[refThriceVal.ID()])
 				}
 			},
 			before: `
