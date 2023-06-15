@@ -1018,7 +1018,7 @@ func (i *Instruction) Format(b Builder) string {
 	instr := i.opcode.String() + instSuffix
 
 	var rvs []string
-	if rv := i.rValue; rv.valid() {
+	if rv := i.rValue; rv.Valid() {
 		rvs = append(rvs, rv.formatWithType(b))
 	}
 

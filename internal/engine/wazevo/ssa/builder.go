@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"sort"
 	"strings"
 )
@@ -82,8 +83,8 @@ type Builder interface {
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool:               newPool[Instruction](),
-		basicBlocksPool:                newPool[basicBlock](),
+		instructionsPool:               wazevoapi.NewPool[Instruction](),
+		basicBlocksPool:                wazevoapi.NewPool[basicBlock](),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]struct{}),
@@ -93,8 +94,8 @@ func NewBuilder() Builder {
 
 // builder implements Builder interface.
 type builder struct {
-	basicBlocksPool  pool[basicBlock]
-	instructionsPool pool[Instruction]
+	basicBlocksPool  wazevoapi.Pool[basicBlock]
+	instructionsPool wazevoapi.Pool[Instruction]
 	signatures       map[SignatureID]*Signature
 
 	basicBlocksView []BasicBlock
@@ -128,19 +129,19 @@ type builder struct {
 
 // Reset implements Builder.Reset.
 func (b *builder) Reset() {
-	b.instructionsPool.reset()
+	b.instructionsPool.Reset()
 	for _, sig := range b.signatures {
 		sig.used = false
 	}
 
 	b.blkStack = b.blkStack[:0]
 
-	for i := 0; i < b.basicBlocksPool.allocated; i++ {
-		blk := b.basicBlocksPool.view(i)
+	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
+		blk := b.basicBlocksPool.View(i)
 		blk.reset()
 		delete(b.blkVisited, blk)
 	}
-	b.basicBlocksPool.reset()
+	b.basicBlocksPool.Reset()
 
 	for i := Variable(0); i < b.nextVariable; i++ {
 		b.variables[i] = typeInvalid
@@ -161,7 +162,7 @@ func (b *builder) AnnotateValue(value Value, a string) {
 
 // AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
-	instr := b.instructionsPool.allocate()
+	instr := b.instructionsPool.Allocate()
 	instr.reset()
 	return instr
 }
@@ -187,8 +188,8 @@ func (b *builder) UsedSignatures() (ret []*Signature) {
 
 // AllocateBasicBlock implements Builder.AllocateBasicBlock.
 func (b *builder) AllocateBasicBlock() BasicBlock {
-	id := basicBlockID(b.basicBlocksPool.allocated)
-	blk := b.basicBlocksPool.allocate()
+	id := basicBlockID(b.basicBlocksPool.Allocated())
+	blk := b.basicBlocksPool.Allocate()
 	blk.id = id
 	blk.lastDefinitions = make(map[Variable]Value)
 	blk.unknownValues = make(map[Variable]Value)
@@ -398,10 +399,10 @@ func (b *builder) BlockIteratorNext() BasicBlock {
 func (b *builder) blockIteratorNext() *basicBlock {
 	index := b.blockIterCur
 	for {
-		if index == b.basicBlocksPool.allocated {
+		if index == b.basicBlocksPool.Allocated() {
 			return nil
 		}
-		ret := b.basicBlocksPool.view(index)
+		ret := b.basicBlocksPool.View(index)
 		index++
 		if !ret.invalid {
 			b.blockIterCur = index

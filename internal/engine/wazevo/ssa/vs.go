@@ -47,8 +47,8 @@ func (v *Value) formatWithType(b Builder) string {
 	}
 }
 
-// valid returns true if this value is valid.
-func (v *Value) valid() bool {
+// Valid returns true if this value is valid.
+func (v *Value) Valid() bool {
 	return v.ID() != valueIDInvalid
 }
 
@@ -67,12 +67,12 @@ func (v *Value) setType(typ Type) {
 	*v |= Value(typ) << 32
 }
 
-// valueAlias holds the information to alias the source Value to the destination Value.
+// ValueAlias holds the information to alias the source Value to the destination Value.
 // Aliases are needed during the optimizations, where we remove/modify the BasicBlock and Instruction(s).
-type valueAlias struct {
-	src, dst Value
+type ValueAlias struct {
+	Src, Dst Value
 }
 
-func (va valueAlias) format(b Builder) string {
-	return fmt.Sprintf("%s = %s", va.dst.format(b), va.src.format(b))
+func (va ValueAlias) format(b Builder) string {
+	return fmt.Sprintf("%s = %s", va.Dst.format(b), va.Src.format(b))
 }

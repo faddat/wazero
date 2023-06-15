@@ -16,7 +16,7 @@ func (b *builder) Optimize() {
 
 // passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
 func passDeadBlockElimination(b *builder) {
-	entryBlk := b.basicBlocksPool.view(0)
+	entryBlk := b.basicBlocksPool.View(0)
 	b.blkStack = append(b.blkStack, entryBlk)
 	for len(b.blkStack) > 0 {
 		reachableBlk := b.blkStack[len(b.blkStack)-1]
@@ -58,7 +58,7 @@ func passRedundantPhiElimination(b *builder) {
 					continue
 				}
 
-				if !nonSelfReferencingValue.valid() {
+				if !nonSelfReferencingValue.Valid() {
 					nonSelfReferencingValue = pred
 					continue
 				}
@@ -69,7 +69,7 @@ func passRedundantPhiElimination(b *builder) {
 				}
 			}
 
-			if !nonSelfReferencingValue.valid() {
+			if !nonSelfReferencingValue.Valid() {
 				// This shouldn't happen, and must be a bug in builder.go.
 				panic("BUG: params added but only self-referencing")
 			}
@@ -157,7 +157,7 @@ func passDeadCodeElimination(b *builder) {
 			}
 
 			r1, rs := cur.Returns()
-			if r1.valid() {
+			if r1.Valid() {
 				b.valueIDToInstruction[r1.ID()] = cur
 			}
 			for _, r := range rs {
@@ -179,14 +179,14 @@ func passDeadCodeElimination(b *builder) {
 		live.live = true
 
 		v1, v2, vs := live.args()
-		if v1.valid() {
+		if v1.Valid() {
 			producingInst := b.valueIDToInstruction[v1.ID()]
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
-		if v2.valid() {
+		if v2.Valid() {
 			producingInst := b.valueIDToInstruction[v2.ID()]
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
@@ -220,10 +220,10 @@ func passDeadCodeElimination(b *builder) {
 			// If the value alive, we can be sure that arguments are used definitely.
 			// Hences, we can increment the value reference counts.
 			v1, v2, vs := cur.args()
-			if v1.valid() {
+			if v1.Valid() {
 				b.valueRefCounts[v1.ID()]++
 			}
-			if v2.valid() {
+			if v2.Valid() {
 				b.valueRefCounts[v2.ID()]++
 			}
 			for _, v := range vs {

@@ -1,19 +1,28 @@
-package ssa
+package wazevoapi
 
 const poolPageSize = 128
 
-type pool[T any] struct {
+// Pool is a pool of T that can be allocated and reset.
+// This is useful to avoid unnecessary allocations.
+type Pool[T any] struct {
 	pages            []*[poolPageSize]T
 	allocated, index int
 }
 
-func newPool[T any]() pool[T] {
-	var ret pool[T]
-	ret.reset()
+// NewPool returns a new Pool.
+func NewPool[T any]() Pool[T] {
+	var ret Pool[T]
+	ret.Reset()
 	return ret
 }
 
-func (p *pool[T]) allocate() *T {
+// Allocated returns the number of allocated T currently in the pool.
+func (p *Pool[T]) Allocated() int {
+	return p.allocated
+}
+
+// Allocate allocates a new T from the pool.
+func (p *Pool[T]) Allocate() *T {
 	if p.index == poolPageSize {
 		if len(p.pages) == cap(p.pages) {
 			p.pages = append(p.pages, new([poolPageSize]T))
@@ -32,12 +41,14 @@ func (p *pool[T]) allocate() *T {
 	return ret
 }
 
-func (p *pool[T]) view(i int) *T {
+// View returns the i-th T from the pool.
+func (p *Pool[T]) View(i int) *T {
 	page, index := i/poolPageSize, i%poolPageSize
 	return &p.pages[page][index]
 }
 
-func (p *pool[T]) reset() {
+// Reset resets the pool.
+func (p *Pool[T]) Reset() {
 	for _, ns := range p.pages {
 		pages := ns[:]
 		for i := range pages {

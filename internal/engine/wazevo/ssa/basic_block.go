@@ -39,6 +39,9 @@ type BasicBlock interface {
 
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
+
+	// Aliases returns the ValueAlias(es) of this block.
+	Aliases() []ValueAlias
 }
 
 type (
@@ -47,7 +50,7 @@ type (
 		id                      basicBlockID
 		rootInstr, currentInstr *Instruction
 		params                  []blockParam
-		aliases                 []valueAlias
+		aliases                 []ValueAlias
 		preds                   []basicBlockPredecessorInfo
 		success                 []*basicBlock
 		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
@@ -199,8 +202,13 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	}
 }
 
+// Aliases implements BasicBlock.
+func (bb *basicBlock) Aliases() []ValueAlias {
+	return bb.aliases
+}
+
 func (bb *basicBlock) alias(src, dst Value) {
-	bb.aliases = append(bb.aliases, valueAlias{src: src, dst: dst})
+	bb.aliases = append(bb.aliases, ValueAlias{Src: src, Dst: dst})
 }
 
 // blockParam implements Value and represents a parameter to a basicBlock.
