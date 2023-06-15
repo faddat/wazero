@@ -87,8 +87,7 @@ func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []was
 const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
 
 // LowerToSSA lowers the current function to SSA function which will be held by ssaBuilder.
-// After calling this, the caller will be able to access the SSA info in ssa.SSABuilder pased
-// when calling NewFrontendCompiler and can share them with the backend.
+// After calling this, the caller will be able to access the SSA info in *Compiler.ssaBuilder.
 //
 // Note that this only does the naive lowering, and do not do any optimization, instead the caller is expected to do so.
 func (c *Compiler) LowerToSSA() error {
@@ -135,10 +134,12 @@ func (c *Compiler) LowerToSSA() error {
 	return nil
 }
 
+// localVariable returns the SSA variable for the given Wasm local index.
 func (c *Compiler) localVariable(index wasm.Index) ssa.Variable {
 	return c.wasmLocalToVariable[index]
 }
 
+// declareWasmLocals declares the SSA variables for the Wasm locals.
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	localCount := wasm.Index(len(c.wasmFunctionTyp.Params))
 	for i, typ := range c.wasmFunctionLocalTypes {
@@ -166,6 +167,7 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	}
 }
 
+// wasmToSSA converts wasm.ValueType to ssa.Type.
 func wasmToSSA(vt wasm.ValueType) ssa.Type {
 	switch vt {
 	case wasm.ValueTypeI32:
@@ -181,6 +183,7 @@ func wasmToSSA(vt wasm.ValueType) ssa.Type {
 	}
 }
 
+// addBlockParamsFromWasmTypes adds the block parameters to the given block.
 func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.BasicBlock) {
 	for _, typ := range tps {
 		st := wasmToSSA(typ)
@@ -194,6 +197,7 @@ func (c *Compiler) formatBuilder() string {
 	return c.ssaBuilder.Format()
 }
 
+// getOrCreateTrapBlock returns the trap block for the given trap code.
 func (c *Compiler) getOrCreateTrapBlock(code wazevoapi.TrapCode) ssa.BasicBlock {
 	blk := c.trapBlocks[code]
 	if blk == nil {
@@ -203,6 +207,7 @@ func (c *Compiler) getOrCreateTrapBlock(code wazevoapi.TrapCode) ssa.BasicBlock 
 	return blk
 }
 
+// emitTrapBlocks emits the trap blocks.
 func (c *Compiler) emitTrapBlocks() {
 	builder := c.ssaBuilder
 	for trapCode := wazevoapi.TrapCode(0); trapCode < wazevoapi.TrapCodeCount; trapCode++ {

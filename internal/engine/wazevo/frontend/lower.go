@@ -11,7 +11,9 @@ import (
 )
 
 type (
+	// loweringState is used to keep the state of lowering.
 	loweringState struct {
+		// values holds the values on the Wasm stack.
 		values           []ssa.Value
 		controlFrames    []controlFrame
 		unreachable      bool
@@ -43,10 +45,12 @@ const (
 	controlFrameKindBlock
 )
 
+// isLoop returns true if this is a loop frame.
 func (ctrl *controlFrame) isLoop() bool {
 	return ctrl.kind == controlFrameKindLoop
 }
 
+// reset resets the state of loweringState for reuse.
 func (l *loweringState) reset() {
 	l.values = l.values[:0]
 	l.controlFrames = l.controlFrames[:0]
@@ -100,6 +104,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
+// lowerBody lowers the body of the Wasm function to the SSA form.
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	c.ssaBuilder.Seal(entryBlk)
 
@@ -305,7 +310,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			// If this Then block is currently reachable, we have to insert the branching to the following BB.
 			followingBlk := ifctrl.followingBlock // == the BB after if-then-else.
 			args := c.loweringState.nPeekDup(len(ifctrl.blockType.Results))
-			c.insertJumpToBlock(args, builder.CurrentBlock(), followingBlk)
+			c.insertJumpToBlock(args, followingBlk)
 		} else {
 			state.unreachable = false
 		}
@@ -328,7 +333,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
 
 			// Insert the unconditional branch to the target.
-			c.insertJumpToBlock(args, builder.CurrentBlock(), followingBlk)
+			c.insertJumpToBlock(args, followingBlk)
 		} else { // unreachable.
 			if state.unreachableDepth > 0 {
 				state.unreachableDepth--
@@ -349,7 +354,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			// If this is the end of Then block, we have to emit the empty Else block.
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
-			c.insertJumpToBlock(nil, elseBlk, followingBlk)
+			c.insertJumpToBlock(nil, followingBlk)
 		}
 
 		builder.Seal(ctrl.followingBlock)
@@ -372,7 +377,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
 		}
 		args := c.loweringState.nPeekDup(argNum)
-		c.insertJumpToBlock(args, builder.CurrentBlock(), targetBlk)
+		c.insertJumpToBlock(args, targetBlk)
 
 		state.unreachable = true
 
@@ -402,7 +407,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Insert the unconditional jump to the Else block which corresponds to after br_if.
 		elseBlk := builder.AllocateBasicBlock()
-		c.insertJumpToBlock(args, currentBlk, elseBlk)
+		c.insertJumpToBlock(args, elseBlk)
 
 		// Now start translating the instructions after br_if.
 		builder.SetCurrentBlock(elseBlk)
@@ -417,8 +422,10 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.unreachable = true
 
 	case wasm.OpcodeUnreachable:
+		// TODO: in order to assign the correct source address, we need to have
+		// 	a dedicated block before jumping to `trapBlk` which is shared across functions.
 		trapBlk := c.getOrCreateTrapBlock(wazevoapi.TrapCodeUnreachable)
-		c.insertJumpToBlock(nil, builder.CurrentBlock(), trapBlk)
+		c.insertJumpToBlock(nil, trapBlk)
 		state.unreachable = true
 
 	case wasm.OpcodeCall:
@@ -464,6 +471,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	}
 }
 
+// storeCallerModuleContext stores the current module's moduleContextPtr into execContext.callerModuleContextPtr.
 func (c *Compiler) storeCallerModuleContext() {
 	builder := c.ssaBuilder
 	execCtx := c.execCtxPtrValue
@@ -490,6 +498,7 @@ func (c *Compiler) readI32s() int32 {
 	return v
 }
 
+// readBlockType reads the block type from the current position of the bytecode reader.
 func (c *Compiler) readBlockType() *wasm.FunctionType {
 	state := &c.loweringState
 
@@ -503,7 +512,8 @@ func (c *Compiler) readBlockType() *wasm.FunctionType {
 	return bt
 }
 
-func (c *Compiler) insertJumpToBlock(args []ssa.Value, currentBlk, targetBlk ssa.BasicBlock) {
+// insertJumpToBlock inserts a jump instruction to the given block in the current block.
+func (c *Compiler) insertJumpToBlock(args []ssa.Value, targetBlk ssa.BasicBlock) {
 	builder := c.ssaBuilder
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
@@ -524,6 +534,7 @@ func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
 	}
 }
 
+// cloneValuesList clones the given values list.
 func cloneValuesList(in []ssa.Value) (ret []ssa.Value) {
 	ret = make([]ssa.Value, len(in))
 	for i := range ret {
@@ -532,6 +543,7 @@ func cloneValuesList(in []ssa.Value) (ret []ssa.Value) {
 	return
 }
 
+// results returns the number of results of the current function.
 func (c *Compiler) results() int {
 	return len(c.wasmFunctionTyp.Results)
 }
