@@ -429,6 +429,7 @@ func (b *builder) alias(dst, src Value) {
 	b.valueIDAliases[dst.ID()] = src
 }
 
+// resolveArgumentAlias resolves the alias of the arguments of the given instruction.
 func (b *builder) resolveArgumentAlias(instr *Instruction) {
 	if src, ok := b.valueIDAliases[instr.v.ID()]; ok {
 		instr.v = src

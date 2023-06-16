@@ -166,8 +166,6 @@ func passDeadCodeElimination(b *builder) {
 		}
 	}
 
-	// TODO: take alias into account.
-
 	// Find all the instructions referenced by live instructions transitively.
 	for len(liveInstructions) > 0 {
 		tail := len(liveInstructions) - 1
