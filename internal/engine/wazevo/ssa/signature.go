@@ -7,7 +7,9 @@ import (
 
 // Signature is a function prototype.
 type Signature struct {
-	ID              SignatureID
+	// ID is a unique identifier for this signature used to lookup.
+	ID SignatureID
+	// Params and Results are the types of the parameters and results of the function.
 	Params, Results []Type
 
 	// used is true if this is used by the currently-compiled function.

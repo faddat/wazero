@@ -125,12 +125,11 @@ func passRedundantPhiElimination(b *builder) {
 	}
 }
 
-// passDeadCodeElimination traverses all the instructions, and calculates the reference count of each Value,
-// and eliminates all the unnecessary instructions whose ref count is zero. The results are stored at builder.valueRefCounts.
-//
-// This also assigns a InstructionGroupID to each Instruction during the process.
-//
-// This is the last SSA-level optimization pass and after this, the SSA function is ready to be used by backends.
+// passDeadCodeElimination traverses all the instructions, and calculates the reference count of each Value, and
+// eliminates all the unnecessary instructions whose ref count is zero.
+// The results are stored at builder.valueRefCounts. This also assigns a InstructionGroupID to each Instruction
+// during the process. This is the last SSA-level optimization pass and after this,
+// the SSA function is ready to be used by backends.
 //
 // TODO: the algorithm here might not be efficient. Get back to this later.
 func passDeadCodeElimination(b *builder) {

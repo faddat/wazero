@@ -323,7 +323,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 		pred := &blk.preds[i]
 		// Find the definition in the predecessor recursively.
 		value := b.findValue(typ, variable, pred.blk)
-		pred.branch.addArgument(value)
+		pred.branch.addArgumentBranchInst(value)
 	}
 	return paramValue
 }
@@ -342,7 +342,7 @@ func (b *builder) Seal(raw BasicBlock) {
 		for i := range blk.preds {
 			pred := &blk.preds[i]
 			predValue := b.findValue(typ, variable, pred.blk)
-			pred.branch.addArgument(predValue)
+			pred.branch.addArgumentBranchInst(predValue)
 		}
 	}
 }

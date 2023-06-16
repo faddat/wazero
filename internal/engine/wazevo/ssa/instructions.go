@@ -30,6 +30,7 @@ type Instruction struct {
 	live    bool
 }
 
+// reset resets this instruction to the initial state.
 func (i *Instruction) reset() {
 	*i = Instruction{}
 	i.v = valueInvalid
@@ -796,9 +797,11 @@ const (
 	// `v = extract_vector x, y`. (BinaryImm8)
 	OpcodeExtractVector
 
+	// opcodeEnd marks the end of the opcode list.
 	opcodeEnd
 )
 
+// opcodeInfo provides the info to determine the type of an instruction.
 type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
 
 var (
@@ -831,6 +834,7 @@ func (i *Instruction) HasSideEffects() bool {
 	return instructionSideEffects[i.opcode]
 }
 
+// instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeJump:   returnTypesFnNoReturns,
 	OpcodeIconst: returnTypesFnSingle,
@@ -861,6 +865,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeBrz:      returnTypesFnNoReturns,
 }
 
+// AsStore initializes this instruction as a store instruction with OpcodeStore.
 func (i *Instruction) AsStore(value, ptr Value, offset uint32) {
 	i.opcode = OpcodeStore
 	i.typ = TypeI64
@@ -869,18 +874,21 @@ func (i *Instruction) AsStore(value, ptr Value, offset uint32) {
 	i.u64 = uint64(offset)
 }
 
+// AsIconst64 initializes this instruction as a 64-bit integer constant instruction with OpcodeIconst.
 func (i *Instruction) AsIconst64(v uint64) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
 	i.u64 = v
 }
 
+// AsIconst32 initializes this instruction as a 32-bit integer constant instruction with OpcodeIconst.
 func (i *Instruction) AsIconst32(v uint32) {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u64 = uint64(v)
 }
 
+// AsIadd initializes this instruction as an integer addition instruction with OpcodeIadd.
 func (i *Instruction) AsIadd(x, y Value) {
 	i.opcode = OpcodeIadd
 	i.v = x
@@ -888,6 +896,7 @@ func (i *Instruction) AsIadd(x, y Value) {
 	i.typ = x._Type()
 }
 
+// AsIsub initializes this instruction as an integer subtraction instruction with OpcodeIsub.
 func (i *Instruction) AsIsub(x, y Value) {
 	i.opcode = OpcodeIsub
 	i.v = x
@@ -895,6 +904,7 @@ func (i *Instruction) AsIsub(x, y Value) {
 	i.typ = x._Type()
 }
 
+// AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
 func (i *Instruction) AsFadd(x, y Value) {
 	i.opcode = OpcodeFadd
 	i.v = x
@@ -902,6 +912,7 @@ func (i *Instruction) AsFadd(x, y Value) {
 	i.typ = x._Type()
 }
 
+// AsFsub initializes this instruction as a floating-point subtraction instruction with OpcodeFsub.
 func (i *Instruction) AsFsub(x, y Value) {
 	i.opcode = OpcodeFsub
 	i.v = x
@@ -909,33 +920,39 @@ func (i *Instruction) AsFsub(x, y Value) {
 	i.typ = x._Type()
 }
 
+// AsF32const initializes this instruction as a 32-bit floating-point constant instruction with OpcodeF32const.
 func (i *Instruction) AsF32const(f float32) {
 	i.opcode = OpcodeF32const
 	i.typ = TypeF64
 	i.u64 = uint64(math.Float32bits(f))
 }
 
+// AsF64const initializes this instruction as a 64-bit floating-point constant instruction with OpcodeF64const.
 func (i *Instruction) AsF64const(f float64) {
 	i.opcode = OpcodeF64const
 	i.typ = TypeF64
 	i.u64 = math.Float64bits(f)
 }
 
+// AsReturn initializes this instruction as a return instruction with OpcodeReturn.
 func (i *Instruction) AsReturn(vs []Value) {
 	i.opcode = OpcodeReturn
 	i.vs = vs
 }
 
+// AsTrap initializes this instruction as a trap instruction with OpcodeTrap.
 func (i *Instruction) AsTrap() {
 	i.opcode = OpcodeTrap
 }
 
+// AsJump initializes this instruction as a jump instruction with OpcodeJump.
 func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.opcode = OpcodeJump
 	i.vs = vs
 	i.blk = target
 }
 
+// AsBrz initializes this instruction as a branch-if-zero instruction with OpcodeBrz.
 func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 	i.opcode = OpcodeBrz
 	i.v = v
@@ -943,6 +960,7 @@ func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 	i.blk = target
 }
 
+// AsBrnz initializes this instruction as a branch-if-not-zero instruction with OpcodeBrnz.
 func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
 	i.opcode = OpcodeBrnz
 	i.v = v
@@ -950,6 +968,7 @@ func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
 	i.blk = target
 }
 
+// AsCall initializes this instruction as a call instruction with OpcodeCall.
 func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
 	i.opcode = OpcodeCall
 	i.typ = TypeF64
@@ -959,6 +978,8 @@ func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
 	sig.used = true
 }
 
+// Format returns a string representation of this instruction with the given builder.
+// For debugging purposes only.
 func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
@@ -1031,7 +1052,8 @@ func (i *Instruction) Format(b Builder) string {
 	}
 }
 
-func (i *Instruction) addArgument(v Value) {
+// addArgumentBranchInst adds an argument to this instruction.
+func (i *Instruction) addArgumentBranchInst(v Value) {
 	switch i.opcode {
 	case OpcodeJump, OpcodeBrz, OpcodeBrnz:
 		i.vs = append(i.vs, v)

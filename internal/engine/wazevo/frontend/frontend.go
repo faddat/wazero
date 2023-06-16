@@ -17,9 +17,6 @@ type Compiler struct {
 	offsets wazevoapi.OffsetData
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
-	// trapBlocks maps wazevoapi.TrapCode to the corresponding BasicBlock which
-	// exits the execution with the code.
-	trapBlocks [wazevoapi.TrapCodeCount]ssa.BasicBlock
 	signatures map[*wasm.FunctionType]*ssa.Signature
 
 	// Followings are reset by per function.
@@ -27,13 +24,16 @@ type Compiler struct {
 	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
 	// to the corresponding ssa.Variable.
 	wasmLocalToVariable    map[wasm.Index]ssa.Variable
-	loweringState          loweringState
 	wasmLocalFunctionIndex wasm.Index
 	wasmFunctionTyp        *wasm.FunctionType
 	wasmFunctionLocalTypes []wasm.ValueType
 	wasmFunctionBody       []byte
 	// br is reused during lowering.
 	br *bytes.Reader
+	// trapBlocks maps wazevoapi.TrapCode to the corresponding BasicBlock which
+	// exits the execution with the code.
+	trapBlocks    [wazevoapi.TrapCodeCount]ssa.BasicBlock
+	loweringState loweringState
 
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
 }
