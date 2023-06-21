@@ -1,8 +1,8 @@
 package ssa
 
-// RunPasses implements Builder.Optimize.
+// RunPasses implements Builder.RunPasses.
 //
-// The order here matters: some pass depends on the others.
+// The order here matters; some pass depends on the previous ones.
 //
 // Note that passes suffixed with "Opt" are the optimization passes, meaning that they edit the instructions and blocks
 // while the other passes are not, like passBlockFrequency does not edit them, but only calculates the additional information.

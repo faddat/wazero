@@ -148,6 +148,7 @@ func (b *builder) Reset() {
 
 	b.blkStack = b.blkStack[:0]
 	b.blkStack2 = b.blkStack2[:0]
+	b.dominators = b.dominators[:0]
 
 	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
 		blk := b.basicBlocksPool.View(i)
@@ -475,6 +476,9 @@ func (b *builder) entryBlk() *basicBlock {
 // isDominatedBy returns true if the given block `n` is dominated by the given block `d`.
 // Before calling this, the builder must pass by passCalculateImmediateDominators.
 func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
+	if len(b.dominators) == 0 {
+		panic("BUG: passCalculateImmediateDominators must be called before calling isDominatedBy")
+	}
 	ent := b.entryBlk()
 	doms := b.dominators
 	for n != d && n != ent { // 1 is assumed to be the root of the dominator tree

@@ -63,6 +63,7 @@ func passCalculateImmediateDominators(b *builder) {
 	}
 
 	// Reuse the dominators slice if possible from the previous computation of function.
+	b.dominators = b.dominators[:cap(b.dominators)]
 	if len(b.dominators) < b.basicBlocksPool.Allocated() {
 		b.dominators = append(b.dominators, make([]*basicBlock, b.basicBlocksPool.Allocated())...)
 	}
