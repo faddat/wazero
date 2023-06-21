@@ -1,7 +1,8 @@
 package ssa
 
 // passCalculateImmediateDominators calculates immediate dominators for each basic block.
-// The result is stored in b.dominators.
+// The result is stored in b.dominators. This make it possible for the following passes to
+// use builder.isDominatedBy to check if a block is dominated by another block.
 //
 // At the last of pass, this function also does the loop detection and sets the basicBlock.loop flag.
 func passCalculateImmediateDominators(b *builder) {
@@ -54,8 +55,7 @@ func passCalculateImmediateDominators(b *builder) {
 	// At this point, reversePostOrder has postorder actually, so we reverse it.
 	for i := len(reversePostOrder)/2 - 1; i >= 0; i-- {
 		j := len(reversePostOrder) - 1 - i
-		reversePostOrder[i], reversePostOrder[j] =
-			reversePostOrder[j], reversePostOrder[i]
+		reversePostOrder[i], reversePostOrder[j] = reversePostOrder[j], reversePostOrder[i]
 	}
 
 	for i, blk := range reversePostOrder {

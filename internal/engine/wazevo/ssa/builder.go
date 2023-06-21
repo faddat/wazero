@@ -473,6 +473,7 @@ func (b *builder) entryBlk() *basicBlock {
 }
 
 // isDominatedBy returns true if the given block `n` is dominated by the given block `d`.
+// Before calling this, the builder must pass by passCalculateImmediateDominators.
 func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 	ent := b.entryBlk()
 	doms := b.dominators
