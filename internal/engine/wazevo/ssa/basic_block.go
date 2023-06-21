@@ -61,14 +61,18 @@ type (
 		// sealed is true if this is sealed (all the predecessors are known).
 		sealed bool
 		// loopHeader is true if this block is a loop header:
+		//
 		// > A loop header (sometimes called the entry point of the loop) is a dominator that is the target
 		// > of a loop-forming back edge. The loop header dominates all blocks in the loop body.
 		// > A block may be a loop header for more than one loop. A loop may have multiple entry points,
 		// > in which case it has no "loop header".
 		//
-		// This is set during the passLoopDetection pass.
+		// See https://en.wikipedia.org/wiki/Control-flow_graph for more details.
+		//
+		// This is modified during the subPassLoopDetection pass.
 		loopHeader bool
 	}
+	// basicBlockID is the unique ID of a basicBlock.
 	basicBlockID uint32
 
 	// blockParam implements Value and represents a parameter to a basicBlock.
@@ -76,7 +80,8 @@ type (
 		// value is the Value that corresponds to the parameter in this block,
 		// and can be considered as an output of PHI instruction in traditional SSA.
 		value Value
-		typ   Type
+		// typ is the type of the parameter.
+		typ Type
 	}
 )
 
@@ -95,6 +100,8 @@ func (bb *basicBlock) Name() string {
 	}
 }
 
+// basicBlockPredecessorInfo is the information of a predecessor of a basicBlock.
+// predecessor is determined by a pair of block and the branch instruction used to jump to the successor.
 type basicBlockPredecessorInfo struct {
 	blk    *basicBlock
 	branch *Instruction
@@ -158,6 +165,7 @@ func (bb *basicBlock) Root() *Instruction {
 	return bb.rootInstr
 }
 
+// reset resets the basicBlock to its initial state so that it can be reused for another function.
 func (bb *basicBlock) reset() {
 	bb.params = bb.params[:0]
 	bb.rootInstr, bb.currentInstr = nil, nil
@@ -170,6 +178,7 @@ func (bb *basicBlock) reset() {
 	bb.lastDefinitions = make(map[Variable]Value)
 }
 
+// addPred adds a predecessor to this block specified by the branch instruction.
 func (bb *basicBlock) addPred(blk BasicBlock, branch *Instruction) {
 	if blk.ReturnBlock() {
 		// Return Block does not need to know the predecessors.
@@ -214,6 +223,7 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	}
 }
 
+// String implements fmt.Stringer for debugging purpose only.
 func (bb *basicBlock) String() string {
 	return strconv.Itoa(int(bb.id))
 }

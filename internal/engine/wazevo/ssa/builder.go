@@ -190,6 +190,7 @@ func (b *builder) DeclareSignature(s *Signature) {
 	s.used = false
 }
 
+// UsedSignatures implements Builder.UsedSignatures.
 func (b *builder) UsedSignatures() (ret []*Signature) {
 	for _, sig := range b.signatures {
 		if sig.used {
@@ -278,6 +279,7 @@ func (b *builder) DeclareVariable(typ Type) Variable {
 	return v
 }
 
+// allocateVariable allocates a new variable.
 func (b *builder) allocateVariable() (ret Variable) {
 	ret = b.nextVariable
 	b.nextVariable++
@@ -360,6 +362,7 @@ func (b *builder) Seal(raw BasicBlock) {
 	}
 }
 
+// definedVariableType returns the type of the given variable. If the variable is not defined yet, it panics.
 func (b *builder) definedVariableType(variable Variable) Type {
 	typ := b.variables[variable]
 	if typ.invalid() {
