@@ -36,6 +36,9 @@ func passCalculateImmediateDominators(b *builder) {
 			exploreStack = append(exploreStack, blk)
 			// And push the successors to the stack if necessary.
 			for _, succ := range blk.success {
+				if succ.ReturnBlock() || succ.invalid {
+					continue
+				}
 				if b.blkVisited[succ] == visitStateUnseen {
 					b.blkVisited[succ] = visitStateSeen
 					exploreStack = append(exploreStack, succ)
@@ -138,6 +141,9 @@ func subPassLoopDetection(b *builder) {
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for i := range blk.preds {
 			pred := blk.preds[i].blk
+			if pred.invalid {
+				continue
+			}
 			if b.isDominatedBy(pred, blk) {
 				blk.loopHeader = true
 			}
