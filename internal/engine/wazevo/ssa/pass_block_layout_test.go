@@ -86,6 +86,34 @@ func Test_passBlockFrequency(t *testing.T) {
 				3: 3,
 			},
 		},
+		{
+			name: "loop",
+			//                0
+			//               / \
+			//         ---> 1   4
+			//         |    |   |
+			//         3 -- 2   |
+			//         |        |
+			//          \       /
+			//           \    /
+			//             v v
+			//              5
+			edges: edgesCase{
+				0: {1, 4},
+				1: {2},
+				2: {3},
+				3: {1, 5},
+				4: {5},
+			},
+			setup: func(b *builder) {
+				b0, _, _, b3, b4, b5 :=
+					b.basicBlocksPool.View(0), b.basicBlocksPool.View(1),
+					b.basicBlocksPool.View(2), b.basicBlocksPool.View(3),
+					b.basicBlocksPool.View(4), b.basicBlocksPool.View(5)
+				insertJump(b, b0, b4) // b4 as a fallthrough edge.
+				insertJump(b, b3, b5) // b5 as a fallthrough edge.
+			},
+		},
 	} {
 
 		tc := tc

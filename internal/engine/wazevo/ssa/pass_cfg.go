@@ -100,7 +100,9 @@ func calculateDominators(reversePostOrderedBlks []*basicBlock, blockIDToReverseP
 	}
 	doms[entry.id] = entry
 
-	for changed := true; changed; changed = false {
+	changed := true
+	for changed {
+		changed = false
 		for _, blk := range reversePostOrderedBlks {
 			var u *basicBlock
 			for i := range blk.preds {

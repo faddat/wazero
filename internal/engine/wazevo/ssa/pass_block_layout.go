@@ -1,5 +1,7 @@
 package ssa
 
+import "fmt"
+
 // passBlockFrequency calculates the block frequency of each block.
 // This is similar to what BlockFrequencyInfo pass does in LLVM:
 // https://llvm.org/doxygen/classllvm_1_1BlockFrequencyInfoImpl.html#details
@@ -66,8 +68,14 @@ func passBlockFrequency(b *builder) {
 	b.blockFrequencies[0] = initialBlockFrequencyForEntry
 
 	// Propagate frequencies until it converges from the entry block.
-	for changed := true; changed; changed = false {
+	changed := true
+	for changed {
+		changed = false
 		b.blockIteratorBegin() // Skip entry block.
+		fmt.Println("---- next iteration ----")
+		fmt.Println(b.edgeWeights)
+		fmt.Println(b.blockFrequencies)
+		fmt.Println("-----")
 
 		for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
 			// TODO: handle overflow below.
