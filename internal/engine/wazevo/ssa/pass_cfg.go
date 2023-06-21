@@ -94,14 +94,14 @@ func passCalculateImmediateDominators(b *builder) {
 //
 // The result slice `doms` must be pre-allocated with the size larger than the size of dfsBlocks.
 func calculateDominators(reversePostOrderedBlks []*basicBlock, blockIDToReversePostOrder []int, doms []*basicBlock) {
-	entry := reversePostOrderedBlks[0]
+	entry, reversePostOrderedBlks := reversePostOrderedBlks[0], reversePostOrderedBlks[1: /* skips entry point */]
 	for _, blk := range reversePostOrderedBlks {
 		doms[blk.id] = nil
 	}
 	doms[entry.id] = entry
 
 	for changed := true; changed; changed = false {
-		for _, blk := range reversePostOrderedBlks[1: /* skips entry point */] {
+		for _, blk := range reversePostOrderedBlks {
 			var u *basicBlock
 			for i := range blk.preds {
 				pred := blk.preds[i].blk
