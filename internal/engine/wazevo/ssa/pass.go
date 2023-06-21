@@ -54,6 +54,8 @@ func passDeadBlockEliminationOpt(b *builder) {
 
 // passRedundantPhiEliminationOpt eliminates the redundant PHIs (in our terminology, parameters of a block).
 func passRedundantPhiEliminationOpt(b *builder) {
+	redundantParameterIndexes := b.ints[:0] // reuse the slice from previous iterations.
+
 	_ = b.blockIteratorBegin() // skip entry block!
 	// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
 	for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
@@ -89,7 +91,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 
 			if redundant {
 				b.redundantParameterIndexToValue[paramIndex] = nonSelfReferencingValue
-				b.redundantParameterIndexes = append(b.redundantParameterIndexes, paramIndex)
+				redundantParameterIndexes = append(redundantParameterIndexes, paramIndex)
 			}
 		}
 
@@ -112,7 +114,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 		}
 
 		// Still need to have the definition of the value of the PHI (previously as the parameter).
-		for _, redundantParamIndex := range b.redundantParameterIndexes {
+		for _, redundantParamIndex := range redundantParameterIndexes {
 			phiValue := blk.params[redundantParamIndex].value
 			onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
 			// Create an alias in this block from the only phi argument to the phi value.
@@ -131,11 +133,14 @@ func passRedundantPhiEliminationOpt(b *builder) {
 		blk.params = blk.params[:cur]
 
 		// Clears the map for the next iteration.
-		for _, paramIndex := range b.redundantParameterIndexes {
+		for _, paramIndex := range redundantParameterIndexes {
 			delete(b.redundantParameterIndexToValue, paramIndex)
 		}
-		b.redundantParameterIndexes = b.redundantParameterIndexes[:0]
+		redundantParameterIndexes = redundantParameterIndexes[:0]
 	}
+
+	// Reuse the slice for the future passes.
+	b.ints = redundantParameterIndexes
 }
 
 // passDeadCodeEliminationOpt traverses all the instructions, and calculates the reference count of each Value, and
@@ -250,34 +255,10 @@ func passDeadCodeEliminationOpt(b *builder) {
 	b.instStack = liveInstructions // we reuse the stack for the next iteration.
 }
 
-// passBlockFrequency calculates the block frequency of each block.
-// This is similar to what BlockFrequencyInfo pass does in LLVM:
-// https://llvm.org/doxygen/classllvm_1_1BlockFrequencyInfoImpl.html#details
-//
-// The calculated info will be necessary for backend to determine the order of basic block layout
-// which is similar to MachineBlockPlacement pass in LLVM: https://llvm.org/doxygen/MachineBlockPlacement_8cpp_source.html
-//
-// TODO: currently the algorithm is very simple and naive. We need to improve this later.
-// e.g. we could add more heuristics, or use the profile data if available.
-// e.g. Ball-Larus algorithm: https://www.cs.cornell.edu/courses/cs6120/2019fa/blog/efficient-path-prof/
-func passBlockFrequency(b *builder) {
-	// type edge [2]basicBlockID
-
-	//edgeWeights := make(map[edge]int)
-	//for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-	//}
-}
-
-// passLayoutBlocks determines the order of basic blocks by using the block frequency info calculated by passBlockFrequency.
-//
-// TODO: The current algorithm is just a simple greedy algorithm. While it is a good starting point,
-// but there are many ways to improve this. E.g. Pettis-Hansen algorithm could be used as in LLVM.
-func passLayoutBlocks(b *builder) {
-}
-
 // clearBlkVisited clears the b.blkVisited map so that we can reuse it for multiple places.
 func (b *builder) clearBlkVisited() {
-	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
+		blk := b.basicBlocksPool.View(i)
 		delete(b.blkVisited, blk)
 	}
 }

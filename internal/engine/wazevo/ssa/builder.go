@@ -132,8 +132,8 @@ type builder struct {
 	valueIDToInstruction           []*Instruction
 	blkStack                       []*basicBlock
 	blkStack2                      []*basicBlock
+	ints                           []int
 	redundantParameterIndexToValue map[int]Value
-	redundantParameterIndexes      []int
 
 	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
@@ -146,6 +146,7 @@ func (b *builder) Reset() {
 		sig.used = false
 	}
 
+	b.ints = b.ints[:0]
 	b.blkStack = b.blkStack[:0]
 	b.blkStack2 = b.blkStack2[:0]
 	b.dominators = b.dominators[:0]
@@ -449,6 +450,8 @@ func (b *builder) ValueRefCountMap() []int {
 	return b.valueRefCounts
 }
 
+// alias records the alias of the given values. The alias(es) will be
+// eliminated in the optimization pass via resolveArgumentAlias.
 func (b *builder) alias(dst, src Value) {
 	b.valueIDAliases[dst.ID()] = src
 }
