@@ -195,8 +195,9 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 			},
 		},
 		{
-			// Loop with multiple entries  are not loops in the strict sense.
+			// Loop with multiple entries are not loops in the strict sense.
 			// See the comment on basicBlock.loopHeader.
+			// Note that WebAssembly program won't produce such CFGs. TODO: proof!
 			name: "nested loops with multiple entries",
 			//     0
 			//    / \
