@@ -62,6 +62,7 @@ func passCalculateImmediateDominators(b *builder) {
 	blockIDToReversePostOrder := b.ints // Reuse b.ints from the previous iteration.
 	blockIDToReversePostOrder = blockIDToReversePostOrder[:cap(blockIDToReversePostOrder)]
 	if len(blockIDToReversePostOrder) < b.basicBlocksPool.Allocated() {
+		// Generously reserve space in the slice because the slice will be reused future allocation.
 		blockIDToReversePostOrder = append(blockIDToReversePostOrder, make([]int, b.basicBlocksPool.Allocated())...)
 	}
 	for i, blk := range reversePostOrder {
@@ -71,6 +72,7 @@ func passCalculateImmediateDominators(b *builder) {
 	// Reuse the dominators slice if possible from the previous computation of function.
 	b.dominators = b.dominators[:cap(b.dominators)]
 	if len(b.dominators) < b.basicBlocksPool.Allocated() {
+		// Generously reserve space in the slice because the slice will be reused future allocation.
 		b.dominators = append(b.dominators, make([]*basicBlock, b.basicBlocksPool.Allocated())...)
 	}
 	calculateDominators(reversePostOrder, blockIDToReversePostOrder, b.dominators)
