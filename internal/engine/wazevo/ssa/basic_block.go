@@ -236,3 +236,13 @@ func (bb *basicBlock) String() string {
 func newBlockEdge(src, dst *basicBlock) blockEdge {
 	return blockEdge(uint64(src.id)<<32 | uint64(dst.id))
 }
+
+// String implements fmt.Stringer for debugging purpose only.
+func (e blockEdge) String() string {
+	src := uint64(e) >> 32
+	dst := uint32(e)
+	if dst == basicBlockIDReturnBlock {
+		return fmt.Sprintf("blk%d->ret", src)
+	}
+	return fmt.Sprintf("blk%d->blk%d", src, dst)
+}

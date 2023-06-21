@@ -17,8 +17,7 @@ func passBlockFrequency(b *builder) {
 		switch len(ss) {
 		case 0:
 		case 1:
-			// The sole successor should be higher weights.
-			b.assignEdgeWeight(blk, ss[0], 10)
+			b.assignEdgeWeight(blk, ss[0], 1)
 		case 2:
 			thenBlk, elseBlk := ss[0], ss[1]
 			thenIsLoop := thenBlk.loopHeader && b.isDominatedBy(blk, thenBlk)
@@ -28,12 +27,12 @@ func passBlockFrequency(b *builder) {
 			if thenIsLoop {
 				// When both are loop back-edges, we assign higher weight to thenBlk
 				// because it is more likely to be a hot path (I guess....).
-				b.assignEdgeWeight(blk, thenBlk, 10)
+				b.assignEdgeWeight(blk, thenBlk, 2)
 				b.assignEdgeWeight(blk, elseBlk, 1)
 				break // break switch!
 			} else if elseIsLoop {
 				b.assignEdgeWeight(blk, thenBlk, 1)
-				b.assignEdgeWeight(blk, elseBlk, 10)
+				b.assignEdgeWeight(blk, elseBlk, 2)
 				break // break switch!
 			}
 
@@ -44,11 +43,11 @@ func passBlockFrequency(b *builder) {
 
 			// Assign higher weight to the fallthrough edge which is the target of the last branching instruction.
 			if blk.currentInstr.blk.(*basicBlock) == thenBlk {
-				b.assignEdgeWeight(blk, thenBlk, 10)
+				b.assignEdgeWeight(blk, thenBlk, 2)
 				b.assignEdgeWeight(blk, elseBlk, 1)
 			} else {
 				b.assignEdgeWeight(blk, thenBlk, 1)
-				b.assignEdgeWeight(blk, elseBlk, 10)
+				b.assignEdgeWeight(blk, elseBlk, 2)
 			}
 		default:
 			panic("TODO: blocks with more than 2 successors are not supported yet i.e. OpCodeBrTable instruction")
@@ -68,16 +67,21 @@ func passBlockFrequency(b *builder) {
 
 	// Propagate frequencies until it converges from the entry block.
 	for changed := true; changed; changed = false {
-		for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-			var newFreq int
+		b.blockIteratorBegin() // Skip entry block.
+
+		for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
+			// TODO: handle overflow below.
+			var newFreq int64
 			for i := range blk.preds {
 				pred := blk.preds[i].blk
 				newFreq += b.blockFrequencies[pred.id] * b.edgeWeight(pred, blk)
 			}
 
-			if b.blockFrequencies[blk.id] != newFreq {
-				b.blockFrequencies[blk.id] = newFreq
+			id := blk.id
+			if b.blockFrequencies[id] != newFreq {
+				b.blockFrequencies[id] = newFreq
 				changed = true
+				// TODO: should I break inner loop? which is faster?
 			}
 		}
 	}

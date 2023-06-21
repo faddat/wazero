@@ -95,7 +95,7 @@ func NewBuilder() Builder {
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]int),
 		valueIDAliases:                 make(map[ValueID]Value),
-		edgeWeights:                    make(map[blockEdge]int),
+		edgeWeights:                    make(map[blockEdge]int64),
 		redundantParameterIndexToValue: make(map[int]Value),
 	}
 }
@@ -129,10 +129,10 @@ type builder struct {
 
 	// blockFrequencies are the calculated frequencies of each BasicBlock.
 	// The index is blockID of the BasicBlock. See passBlockFrequency for more details.
-	blockFrequencies []int
+	blockFrequencies []int64
 
 	// edgeWeights stores the weight of each edge.
-	edgeWeights map[blockEdge]int
+	edgeWeights map[blockEdge]int64
 
 	// The followings are used for optimization passes.
 	instStack                      []*Instruction
@@ -506,13 +506,13 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 }
 
 // assignEdgeWeight assigns the weight of the given edge from `src` to `to`.
-func (b *builder) assignEdgeWeight(src, to *basicBlock, weight int) {
+func (b *builder) assignEdgeWeight(src, to *basicBlock, weight int64) {
 	edge := newBlockEdge(src, to)
 	b.edgeWeights[edge] = weight
 }
 
 // edgeWeight returns the weight of the given edge from `src` to `to`.
-func (b *builder) edgeWeight(src, to *basicBlock) int {
+func (b *builder) edgeWeight(src, to *basicBlock) int64 {
 	edge := newBlockEdge(src, to)
 	return b.edgeWeights[edge]
 }
