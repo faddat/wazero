@@ -226,6 +226,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		loopHeader, afterLoopBlock := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+		loopHeader.MarkAsLoopHeader()
 		c.addBlockParamsFromWasmTypes(bt.Params, loopHeader)
 		c.addBlockParamsFromWasmTypes(bt.Results, afterLoopBlock)
 

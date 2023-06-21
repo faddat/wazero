@@ -7,7 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestBuilder_Optimize(t *testing.T) {
+func TestBuilder_passes(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		// pass is the optimization pass to run.
@@ -26,7 +26,7 @@ func TestBuilder_Optimize(t *testing.T) {
 	}{
 		{
 			name: "dead block",
-			pass: passDeadBlockElimination,
+			pass: passDeadBlockEliminationOpt,
 			setup: func(b *builder) func(*testing.T) {
 				entry := b.AllocateBasicBlock()
 				value := entry.AddParam(b, TypeI32)
@@ -109,7 +109,7 @@ blk3: () <-- (blk1,blk2)
 		},
 		{
 			name: "redundant phis",
-			pass: passRedundantPhiElimination,
+			pass: passRedundantPhiEliminationOpt,
 			setup: func(b *builder) func(*testing.T) {
 				entry, loopHeader, end := b.AllocateBasicBlock(), b.AllocateBasicBlock(), b.AllocateBasicBlock()
 
@@ -188,7 +188,7 @@ blk2: () <-- (blk1)
 		},
 		{
 			name: "dead code",
-			pass: passDeadCodeElimination,
+			pass: passDeadCodeEliminationOpt,
 			setup: func(b *builder) func(*testing.T) {
 				entry, end := b.AllocateBasicBlock(), b.AllocateBasicBlock()
 

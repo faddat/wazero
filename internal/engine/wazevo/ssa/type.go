@@ -36,7 +36,6 @@ func (t Type) String() (ret string) {
 	default:
 		panic(int(t))
 	}
-	return
 }
 
 func (t Type) invalid() bool {

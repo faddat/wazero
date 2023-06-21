@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -39,6 +40,12 @@ type BasicBlock interface {
 
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
+
+	// LoopHeader returns true if this block is a loop header.
+	LoopHeader() bool
+
+	// MarkAsLoopHeader marks this block as a loop header.
+	MarkAsLoopHeader()
 }
 
 type (
@@ -53,14 +60,25 @@ type (
 		singlePred *basicBlock
 		// lastDefinitions maps Variable to its last definition in this block.
 		lastDefinitions map[Variable]Value
-		// sealed is true if this is sealed (all the predecessors are known).
-		sealed bool
 		// unknownsValues are used in builder.findValue. The usage is well-described in the paper.
 		unknownValues map[Variable]Value
 		// invalid is true if this block is made invalid during optimizations.
 		invalid bool
+		// sealed is true if this is sealed (all the predecessors are known).
+		sealed bool
+		// loopHeader is true if this block is a loop header. This is used by optimization and can be set true
+		// by the frontend.
+		loopHeader bool
 	}
 	basicBlockID uint32
+
+	// blockParam implements Value and represents a parameter to a basicBlock.
+	blockParam struct {
+		// value is the Value that corresponds to the parameter in this block,
+		// and can be considered as an output of PHI instruction in traditional SSA.
+		value Value
+		typ   Type
+	}
 )
 
 const basicBlockIDReturnBlock = 0xffffffff
@@ -197,10 +215,16 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	}
 }
 
-// blockParam implements Value and represents a parameter to a basicBlock.
-type blockParam struct {
-	// value is the Value that corresponds to the parameter in this block,
-	// and can be considered as an output of PHI instruction in traditional SSA.
-	value Value
-	typ   Type
+// LoopHeader implements BasicBlock.LoopHeader.
+func (bb *basicBlock) LoopHeader() bool {
+	return bb.loopHeader
+}
+
+// MarkAsLoopHeader implements BasicBlock.MarkAsLoopHeader.
+func (bb *basicBlock) MarkAsLoopHeader() {
+	bb.loopHeader = true
+}
+
+func (bb *basicBlock) String() string {
+	return strconv.Itoa(int(bb.id))
 }

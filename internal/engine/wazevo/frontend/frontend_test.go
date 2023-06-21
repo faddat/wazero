@@ -680,7 +680,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			fmt.Println(actual)
 			require.Equal(t, tc.exp, actual)
 
-			b.Optimize()
+			b.RunPasses()
 			if expAfterOpt := tc.expAfterOpt; expAfterOpt != "" {
 				actualAfterOpt := fc.formatBuilder()
 				fmt.Println(actualAfterOpt)

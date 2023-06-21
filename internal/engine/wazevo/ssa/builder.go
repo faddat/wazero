@@ -58,8 +58,8 @@ type Builder interface {
 	// UsedSignatures returns the slice of Signatures which are used/referenced by the currently-compiled function.
 	UsedSignatures() []*Signature
 
-	// Optimize runs various optimization passes on the constructed SSA function.
-	Optimize()
+	// RunPasses runs various optimization passes on the constructed SSA function.
+	RunPasses()
 
 	// Format returns the debugging string of the SSA function.
 	Format() string
@@ -70,6 +70,11 @@ type Builder interface {
 	// 	for blk := builder.BlockIteratorBegin(); blk != nil; blk = builder.BlockIteratorNext() {
 	// 		// ...
 	//	}
+	//
+	// The significance of the order of the returned BasicBlock(s) depends on the phase.
+	// After block layout pass completes, the returned blocks are ordered in the optimized form.
+	// Before that, the returned blocks are ordered in the order of AllocateBasicBlock being called,
+	// which is obviously not significant.
 	BlockIteratorBegin() BasicBlock
 
 	// BlockIteratorNext advances the state for iteration initialized by BlockIteratorBegin.
@@ -88,7 +93,7 @@ func NewBuilder() Builder {
 		basicBlocksPool:                wazevoapi.NewPool[basicBlock](),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
-		blkVisited:                     make(map[*basicBlock]struct{}),
+		blkVisited:                     make(map[*basicBlock]int),
 		valueIDAliases:                 make(map[ValueID]Value),
 		redundantParameterIndexToValue: make(map[int]Value),
 	}
@@ -100,8 +105,8 @@ type builder struct {
 	instructionsPool wazevoapi.Pool[Instruction]
 	signatures       map[SignatureID]*Signature
 
-	basicBlocksView []BasicBlock
-	currentBB       *basicBlock
+	orderedBasicBlocks []*basicBlock
+	currentBB          *basicBlock
 
 	// variables track the types for Variable with the index regarded Variable.
 	variables []Type
@@ -117,12 +122,16 @@ type builder struct {
 	// by the last SSA-level optimization pass.
 	valueRefCounts []int
 
+	// dominators stores the immediate dominator of each BasicBlock.
+	// The index is blockID of the BasicBlock.
+	dominators []*basicBlock
+
 	// The followings are used for optimization passes.
 	instStack                      []*Instruction
-	instVisited                    map[*Instruction]struct{}
-	blkVisited                     map[*basicBlock]struct{}
+	blkVisited                     map[*basicBlock]int
 	valueIDToInstruction           []*Instruction
 	blkStack                       []*basicBlock
+	blkStack2                      []*basicBlock
 	redundantParameterIndexToValue map[int]Value
 	redundantParameterIndexes      []int
 
@@ -138,6 +147,7 @@ func (b *builder) Reset() {
 	}
 
 	b.blkStack = b.blkStack[:0]
+	b.blkStack2 = b.blkStack2[:0]
 
 	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
 		blk := b.basicBlocksPool.View(i)
@@ -157,6 +167,7 @@ func (b *builder) Reset() {
 		b.valueIDToInstruction[v] = nil
 	}
 	b.nextValueID = 0
+	b.orderedBasicBlocks = b.orderedBasicBlocks[:0]
 }
 
 // AnnotateValue implements Builder.AnnotateValue.
@@ -396,6 +407,18 @@ func (b *builder) BlockIteratorNext() BasicBlock {
 // BlockIteratorNext implements Builder.BlockIteratorNext.
 func (b *builder) blockIteratorNext() *basicBlock {
 	index := b.blockIterCur
+
+	// orderedBasicBlocks can be non-empty after orderedBasicBlocks is done.
+	// That case, we know the exact order of basic blocks, so we can just iterate over it.
+	if l := len(b.orderedBasicBlocks); l > 0 {
+		if index == l {
+			return nil
+		}
+		ret := b.orderedBasicBlocks[index]
+		b.blockIterCur = index + 1
+		return ret
+	}
+
 	for {
 		if index == b.basicBlocksPool.Allocated() {
 			return nil
@@ -442,4 +465,9 @@ func (b *builder) resolveArgumentAlias(instr *Instruction) {
 			instr.vs[i] = src
 		}
 	}
+}
+
+// entryBlk returns the entry block of the function.
+func (b *builder) entryBlk() *basicBlock {
+	return b.basicBlocksPool.View(0)
 }

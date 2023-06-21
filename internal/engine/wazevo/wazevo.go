@@ -88,7 +88,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		}
 
 		// Run SSA-level optimization passes.
-		ssaBuilder.Optimize()
+		ssaBuilder.RunPasses()
 
 		// Now our ssaBuilder contains the necessary information to further lower them to
 		// machine code.

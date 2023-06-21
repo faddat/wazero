@@ -1,27 +1,40 @@
 package ssa
 
-// Optimize implements Builder.Optimize.
-func (b *builder) Optimize() {
-	passDeadBlockElimination(b)
-	passRedundantPhiElimination(b)
-	// TODO: block coalescing.
-	// TODO: Copy-propagation.
-	// TODO: Constant folding.
-	// TODO: Common subexpression elimination.
-	// TODO: Arithmetic simplifications.
-	// TODO: and more!
-	// This is the last as it gathers the value usage count and instructionGroupID info for backends to use.
-	passDeadCodeElimination(b)
+// RunPasses implements Builder.Optimize.
+//
+// The order here matters: some pass depends on the others.
+//
+// Note that passes suffixed with "Opt" are the optimization passes, meaning that they edit the instructions and blocks
+// while the other passes are not like passLayoutBlocks does not edit them, but only calculates the additional information.
+func (b *builder) RunPasses() {
+	passDeadBlockEliminationOpt(b)
+	passRedundantPhiEliminationOpt(b)
+	// The result of passCalculateDominatorTree will be used by various passes below.
+	passCalculateDominatorTree(b)
+
+	// TODO: implement more optimization passes like:
+	// 	block coalescing.
+	// 	Copy-propagation.
+	// 	Constant folding.
+	// 	Common subexpression elimination.
+	// 	Arithmetic simplifications.
+	// 	and more!
+
+	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
+	passDeadCodeEliminationOpt(b)
+	passBlockFrequency(b)
+	// passLayoutBlocks depends on passLayoutBlocks.
+	passLayoutBlocks(b)
 }
 
-// passDeadBlockElimination searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
-func passDeadBlockElimination(b *builder) {
-	entryBlk := b.basicBlocksPool.View(0)
+// passDeadBlockEliminationOpt searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
+func passDeadBlockEliminationOpt(b *builder) {
+	entryBlk := b.entryBlk()
 	b.blkStack = append(b.blkStack, entryBlk)
 	for len(b.blkStack) > 0 {
 		reachableBlk := b.blkStack[len(b.blkStack)-1]
 		b.blkStack = b.blkStack[:len(b.blkStack)-1]
-		b.blkVisited[reachableBlk] = struct{}{}
+		b.blkVisited[reachableBlk] = 0 // the value won't be used in this pass.
 
 		for _, successor := range reachableBlk.success {
 			if _, ok := b.blkVisited[successor]; ok {
@@ -38,14 +51,13 @@ func passDeadBlockElimination(b *builder) {
 	}
 }
 
-// passRedundantPhiElimination eliminates the redundant PHIs (in our terminology, parameters of a block).
-func passRedundantPhiElimination(b *builder) {
-	blk := b.blockIteratorBegin()
+// passRedundantPhiEliminationOpt eliminates the redundant PHIs (in our terminology, parameters of a block).
+func passRedundantPhiEliminationOpt(b *builder) {
+	_ = b.blockIteratorBegin() // skip entry block!
 	// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
-	for blk = b.blockIteratorNext(); /* skip entry block! */ blk != nil; blk = b.blockIteratorNext() {
+	for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
 		paramNum := len(blk.params)
 
-		// We will store the unnecessary param's index into b.ints.
 		for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
 			phiValue := blk.params[paramIndex].value
 			redundant := true
@@ -101,9 +113,9 @@ func passRedundantPhiElimination(b *builder) {
 		// Still need to have the definition of the value of the PHI (previously as the parameter).
 		for _, redundantParamIndex := range b.redundantParameterIndexes {
 			phiValue := blk.params[redundantParamIndex].value
-			newValue := b.redundantParameterIndexToValue[redundantParamIndex]
-			// Create an alias in this block temporarily to
-			b.alias(phiValue, newValue)
+			onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
+			// Create an alias in this block from the only phi argument to the phi value.
+			b.alias(phiValue, onlyValue)
 		}
 
 		// Finally, Remove the param from the blk.
@@ -125,14 +137,14 @@ func passRedundantPhiElimination(b *builder) {
 	}
 }
 
-// passDeadCodeElimination traverses all the instructions, and calculates the reference count of each Value, and
+// passDeadCodeEliminationOpt traverses all the instructions, and calculates the reference count of each Value, and
 // eliminates all the unnecessary instructions whose ref count is zero.
 // The results are stored at builder.valueRefCounts. This also assigns a InstructionGroupID to each Instruction
 // during the process. This is the last SSA-level optimization pass and after this,
 // the SSA function is ready to be used by backends.
 //
 // TODO: the algorithm here might not be efficient. Get back to this later.
-func passDeadCodeElimination(b *builder) {
+func passDeadCodeEliminationOpt(b *builder) {
 	nvid := int(b.nextValueID)
 	if nvid >= len(b.valueRefCounts) {
 		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
@@ -235,4 +247,36 @@ func passDeadCodeElimination(b *builder) {
 	}
 
 	b.instStack = liveInstructions // we reuse the stack for the next iteration.
+}
+
+// passBlockFrequency calculates the block frequency of each block.
+// This is similar to what BlockFrequencyInfo pass does in LLVM:
+// https://llvm.org/doxygen/classllvm_1_1BlockFrequencyInfoImpl.html#details
+//
+// The calculated info will be necessary for backend to determine the order of basic block layout
+// which is similar to MachineBlockPlacement pass in LLVM: https://llvm.org/doxygen/MachineBlockPlacement_8cpp_source.html
+//
+// TODO: currently the algorithm is very simple and naive. We need to improve this later.
+// e.g. we could add more heuristics, or use the profile data if available.
+// e.g. Ball-Larus algorithm: https://www.cs.cornell.edu/courses/cs6120/2019fa/blog/efficient-path-prof/
+func passBlockFrequency(b *builder) {
+	// type edge [2]basicBlockID
+
+	//edgeWeights := make(map[edge]int)
+	//for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+	//}
+}
+
+// passLayoutBlocks determines the order of basic blocks by using the block frequency info calculated by passBlockFrequency.
+//
+// TODO: The current algorithm is just a simple greedy algorithm. While it is a good starting point,
+// but there are many ways to improve this. E.g. Pettis-Hansen algorithm could be used as in LLVM.
+func passLayoutBlocks(b *builder) {
+}
+
+// clearBlkVisited clears the b.blkVisited map so that we can reuse it for multiple places.
+func (b *builder) clearBlkVisited() {
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		delete(b.blkVisited, blk)
+	}
 }
