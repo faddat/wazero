@@ -40,12 +40,6 @@ type BasicBlock interface {
 
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
-
-	// LoopHeader returns true if this block is a loop header.
-	LoopHeader() bool
-
-	// MarkAsLoopHeader marks this block as a loop header.
-	MarkAsLoopHeader()
 }
 
 type (
@@ -66,8 +60,13 @@ type (
 		invalid bool
 		// sealed is true if this is sealed (all the predecessors are known).
 		sealed bool
-		// loopHeader is true if this block is a loop header. This is used by optimization and can be set true
-		// by the frontend.
+		// loopHeader is true if this block is a loop header:
+		// > A loop header (sometimes called the entry point of the loop) is a dominator that is the target
+		// > of a loop-forming back edge. The loop header dominates all blocks in the loop body.
+		// > A block may be a loop header for more than one loop. A loop may have multiple entry points,
+		// > in which case it has no "loop header".
+		//
+		// This is set during the passLoopDetection pass.
 		loopHeader bool
 	}
 	basicBlockID uint32
@@ -213,16 +212,6 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	} else {
 		return fmt.Sprintf("blk%d: (%s)", bb.id, strings.Join(ps, ", "))
 	}
-}
-
-// LoopHeader implements BasicBlock.LoopHeader.
-func (bb *basicBlock) LoopHeader() bool {
-	return bb.loopHeader
-}
-
-// MarkAsLoopHeader implements BasicBlock.MarkAsLoopHeader.
-func (bb *basicBlock) MarkAsLoopHeader() {
-	bb.loopHeader = true
 }
 
 func (bb *basicBlock) String() string {

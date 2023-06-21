@@ -9,8 +9,9 @@ package ssa
 func (b *builder) RunPasses() {
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
-	// The result of passCalculateDominatorTree will be used by various passes below.
-	passCalculateDominatorTree(b)
+	passLoopDetection(b)
+	// The result of passCalculateImmediateDominators will be used by various passes below.
+	passCalculateImmediateDominators(b)
 
 	// TODO: implement more optimization passes like:
 	// 	block coalescing.
@@ -30,6 +31,7 @@ func (b *builder) RunPasses() {
 // passDeadBlockEliminationOpt searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
 func passDeadBlockEliminationOpt(b *builder) {
 	entryBlk := b.entryBlk()
+	b.clearBlkVisited()
 	b.blkStack = append(b.blkStack, entryBlk)
 	for len(b.blkStack) > 0 {
 		reachableBlk := b.blkStack[len(b.blkStack)-1]

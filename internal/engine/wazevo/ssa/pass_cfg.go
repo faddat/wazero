@@ -1,8 +1,10 @@
 package ssa
 
-// passCalculateDominatorTree calculates the dominator tree of the function.
+// passCalculateImmediateDominators calculates immediate dominators for each basic block.
 // The result is stored in b.dominators.
-func passCalculateDominatorTree(b *builder) {
+//
+// At the last of pass, this function also does the loop detection and sets the basicBlock.loop flag.
+func passCalculateImmediateDominators(b *builder) {
 	reversePostOrder := b.blkStack[:0]
 	exploreStack := b.blkStack2[:0]
 	b.clearBlkVisited()
@@ -26,7 +28,8 @@ func passCalculateDominatorTree(b *builder) {
 		exploreStack = exploreStack[:tail]
 		switch b.blkVisited[blk] {
 		case visitStateUnseen:
-			panic("BUG in DFS")
+			// This is likely a bug in the frontend.
+			panic("BUG: unsupported CFG")
 		case visitStateSeen:
 			// This is the first time to pop this block, and we have to see the successors first.
 			// So push this block again to the stack.
@@ -65,6 +68,9 @@ func passCalculateDominatorTree(b *builder) {
 	// Reuse the slices for the future use.
 	b.blkStack = reversePostOrder
 	b.blkStack2 = exploreStack
+
+	// Ready to detect loops!
+	subPassLoopDetection(b)
 }
 
 // calculateDominators calculates the immediate dominator of each node in the CFG, and store the result in `doms`.
@@ -123,4 +129,18 @@ func intersect(doms []*basicBlock, reversePostOrder map[*basicBlock]int, blk1 *b
 		}
 	}
 	return finger1
+}
+
+// subPassLoopDetection detects loops in the function using the immediate dominators.
+//
+// This is run at the last of passCalculateImmediateDominators.
+func subPassLoopDetection(b *builder) {
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for i := range blk.preds {
+			pred := blk.preds[i].blk
+			if b.isDominatedBy(pred, blk) {
+				blk.loopHeader = true
+			}
+		}
+	}
 }

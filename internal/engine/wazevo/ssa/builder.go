@@ -471,3 +471,13 @@ func (b *builder) resolveArgumentAlias(instr *Instruction) {
 func (b *builder) entryBlk() *basicBlock {
 	return b.basicBlocksPool.View(0)
 }
+
+// isDominatedBy returns true if the given block `n` is dominated by the given block `d`.
+func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
+	ent := b.entryBlk()
+	doms := b.dominators
+	for n != d && n != ent { // 1 is assumed to be the root of the dominator tree
+		n = doms[n.id]
+	}
+	return n == d
+}
