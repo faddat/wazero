@@ -9,7 +9,6 @@ package ssa
 func (b *builder) RunPasses() {
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
-	passLoopDetection(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
 	passCalculateImmediateDominators(b)
 
