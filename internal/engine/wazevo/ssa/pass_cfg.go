@@ -6,8 +6,8 @@ package ssa
 //
 // At the last of pass, this function also does the loop detection and sets the basicBlock.loop flag.
 func passCalculateImmediateDominators(b *builder) {
-	reversePostOrder := b.blkStack[:0]
-	exploreStack := b.blkStack2[:0]
+	reversePostOrder := b.reversePostOrderedBasicBlocks[:0]
+	exploreStack := b.blkStack[:0]
 	b.clearBlkVisited()
 
 	entryBlk := b.entryBlk()
@@ -78,9 +78,11 @@ func passCalculateImmediateDominators(b *builder) {
 	calculateDominators(reversePostOrder, blockIDToReversePostOrder, b.dominators)
 
 	// Reuse the slices for the future use.
-	b.blkStack = reversePostOrder
-	b.blkStack2 = exploreStack
+	b.blkStack = exploreStack
 	b.ints = blockIDToReversePostOrder
+
+	// For the following passes.
+	b.reversePostOrderedBasicBlocks = reversePostOrder
 
 	// Ready to detect loops!
 	subPassLoopDetection(b)

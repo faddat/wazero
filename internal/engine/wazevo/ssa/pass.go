@@ -5,12 +5,16 @@ package ssa
 // The order here matters; some pass depends on the previous ones.
 //
 // Note that passes suffixed with "Opt" are the optimization passes, meaning that they edit the instructions and blocks
-// while the other passes are not, like passBlockFrequency does not edit them, but only calculates the additional information.
+// while the other passes are not, like passEstimateBranchProbabilities does not edit them, but only calculates the additional information.
 func (b *builder) RunPasses() {
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
 	passCalculateImmediateDominators(b)
+
+	// TODO: implement either conversion of irreducible CFG into reducible one, or irreducible CFG detection where we panic.
+	// 	WebAssembly program shouldn't result in irreducible CFG, but we should handle it properly in just in case.
+	// 	See FixIrreducible pass in LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
 
 	// TODO: implement more optimization passes like:
 	// 	block coalescing.
@@ -22,9 +26,6 @@ func (b *builder) RunPasses() {
 
 	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
 	passDeadCodeEliminationOpt(b)
-	passBlockFrequency(b)
-	// passLayoutBlocks depends on passLayoutBlocks.
-	passLayoutBlocks(b)
 }
 
 // passDeadBlockEliminationOpt searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.

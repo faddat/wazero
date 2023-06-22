@@ -71,15 +71,20 @@ type Builder interface {
 	// 		// ...
 	//	}
 	//
-	// The significance of the order of the returned BasicBlock(s) depends on the phase.
-	// After block layout pass completes, the returned blocks are ordered in the optimized form.
-	// Before that, the returned blocks are ordered in the order of AllocateBasicBlock being called,
-	// which is obviously not significant.
+	// The returned blocks are ordered in the order of AllocateBasicBlock being called.
 	BlockIteratorBegin() BasicBlock
 
 	// BlockIteratorNext advances the state for iteration initialized by BlockIteratorBegin.
 	// Returns nil if there's no unseen BasicBlock.
 	BlockIteratorNext() BasicBlock
+
+	// BlockIteratorReversePostOrderBegin is almost the same as BlockIteratorBegin except it returns the BasicBlock in the reverse post-order.
+	// This is available after passCalculateImmediateDominators is run.
+	BlockIteratorReversePostOrderBegin() BasicBlock
+
+	// BlockIteratorReversePostOrderNext is almost the same as BlockIteratorPostOrderNext except it returns the BasicBlock in the reverse post-order.
+	// This is available after passCalculateImmediateDominators is run.
+	BlockIteratorReversePostOrderNext() BasicBlock
 
 	// ValueRefCountMap returns the map of ValueID to its reference count.
 	// The returned slice must not be modified.
@@ -95,7 +100,6 @@ func NewBuilder() Builder {
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]int),
 		valueIDAliases:                 make(map[ValueID]Value),
-		edgeWeights:                    make(map[blockEdge]int64),
 		redundantParameterIndexToValue: make(map[int]Value),
 	}
 }
@@ -106,8 +110,9 @@ type builder struct {
 	instructionsPool wazevoapi.Pool[Instruction]
 	signatures       map[SignatureID]*Signature
 
-	orderedBasicBlocks []*basicBlock
-	currentBB          *basicBlock
+	// reversePostOrderedBasicBlocks are the BasicBlock(s) ordered in the reverse post-order after passCalculateImmediateDominators.
+	reversePostOrderedBasicBlocks []*basicBlock
+	currentBB                     *basicBlock
 
 	// variables track the types for Variable with the index regarded Variable.
 	variables []Type
@@ -126,13 +131,6 @@ type builder struct {
 	// dominators stores the immediate dominator of each BasicBlock.
 	// The index is blockID of the BasicBlock.
 	dominators []*basicBlock
-
-	// blockFrequencies are the calculated frequencies of each BasicBlock.
-	// The index is blockID of the BasicBlock. See passBlockFrequency for more details.
-	blockFrequencies []int64
-
-	// edgeWeights stores the weight of each edge.
-	edgeWeights map[blockEdge]int64
 
 	// The followings are used for optimization passes.
 	instStack                      []*Instruction
@@ -177,11 +175,7 @@ func (b *builder) Reset() {
 		b.valueIDToInstruction[v] = nil
 	}
 	b.nextValueID = 0
-	b.orderedBasicBlocks = b.orderedBasicBlocks[:0]
-
-	for edge := range b.edgeWeights {
-		b.edgeWeights[edge] = -1
-	}
+	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
 }
 
 // AnnotateValue implements Builder.AnnotateValue.
@@ -424,18 +418,6 @@ func (b *builder) BlockIteratorNext() BasicBlock {
 // BlockIteratorNext implements Builder.BlockIteratorNext.
 func (b *builder) blockIteratorNext() *basicBlock {
 	index := b.blockIterCur
-
-	// orderedBasicBlocks can be non-empty after orderedBasicBlocks is done.
-	// That case, we know the exact order of basic blocks, so we can just iterate over it.
-	if l := len(b.orderedBasicBlocks); l > 0 {
-		if index == l {
-			return nil
-		}
-		ret := b.orderedBasicBlocks[index]
-		b.blockIterCur = index + 1
-		return ret
-	}
-
 	for {
 		if index == b.basicBlocksPool.Allocated() {
 			return nil
@@ -458,6 +440,35 @@ func (b *builder) BlockIteratorBegin() BasicBlock {
 func (b *builder) blockIteratorBegin() *basicBlock {
 	b.blockIterCur = 0
 	return b.blockIteratorNext()
+}
+
+// BlockIteratorReversePostOrderBegin implements Builder.BlockIteratorReversePostOrderBegin.
+func (b *builder) BlockIteratorReversePostOrderBegin() BasicBlock {
+	return b.blockIteratorReversePostOrderBegin()
+}
+
+// BlockIteratorBegin implements Builder.BlockIteratorBegin.
+func (b *builder) blockIteratorReversePostOrderBegin() *basicBlock {
+	b.blockIterCur = 0
+	return b.blockIteratorNext()
+}
+
+// BlockIteratorReversePostOrderNext implements Builder.BlockIteratorReversePostOrderNext.
+func (b *builder) BlockIteratorReversePostOrderNext() BasicBlock {
+	if blk := b.blockIteratorNext(); blk == nil {
+		return nil // BasicBlock((*basicBlock)(nil)) != BasicBlock(nil)
+	} else {
+		return blk
+	}
+}
+
+// BlockIteratorNext implements Builder.BlockIteratorNext.
+func (b *builder) blockIteratorReversePostOrderNext() *basicBlock {
+	if b.blockIterCur >= len(b.reversePostOrderedBasicBlocks) {
+		return nil
+	} else {
+		return b.reversePostOrderedBasicBlocks[b.blockIterCur]
+	}
 }
 
 // ValueRefCountMap implements Builder.ValueRefCountMap.
@@ -503,16 +514,4 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 		n = doms[n.id]
 	}
 	return n == d
-}
-
-// assignEdgeWeight assigns the weight of the given edge from `src` to `to`.
-func (b *builder) assignEdgeWeight(src, to *basicBlock, weight int64) {
-	edge := newBlockEdge(src, to)
-	b.edgeWeights[edge] = weight
-}
-
-// edgeWeight returns the weight of the given edge from `src` to `to`.
-func (b *builder) edgeWeight(src, to *basicBlock) int64 {
-	edge := newBlockEdge(src, to)
-	return b.edgeWeights[edge]
 }

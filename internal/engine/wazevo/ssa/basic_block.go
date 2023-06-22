@@ -75,10 +75,6 @@ type (
 	// basicBlockID is the unique ID of a basicBlock.
 	basicBlockID uint32
 
-	// blockEdge is an edge in the control flow graph. This is a pair of two basicBlockIDs.
-	// Higher 32 bits is the source block ID, and lower 32 bits is the destination block ID.
-	blockEdge uint64
-
 	// blockParam implements Value and represents a parameter to a basicBlock.
 	blockParam struct {
 		// value is the Value that corresponds to the parameter in this block,
@@ -230,19 +226,4 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 // String implements fmt.Stringer for debugging purpose only.
 func (bb *basicBlock) String() string {
 	return strconv.Itoa(int(bb.id))
-}
-
-// newBlockEdge creates a new blockEdge from src to dst.
-func newBlockEdge(src, dst *basicBlock) blockEdge {
-	return blockEdge(uint64(src.id)<<32 | uint64(dst.id))
-}
-
-// String implements fmt.Stringer for debugging purpose only.
-func (e blockEdge) String() string {
-	src := uint64(e) >> 32
-	dst := uint32(e)
-	if dst == basicBlockIDReturnBlock {
-		return fmt.Sprintf("blk%d->ret", src)
-	}
-	return fmt.Sprintf("blk%d->blk%d", src, dst)
 }
