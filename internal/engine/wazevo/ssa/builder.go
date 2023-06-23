@@ -684,12 +684,11 @@ func maybeInvertBranch(now *basicBlock, nextInRPO *basicBlock) bool {
 func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredecessorInfo) *basicBlock {
 	// In the following, we convert the following CFG:
 	//
-	// original:
 	//     pred --(originalBranch)--> succ
 	//
 	// to the following CFG:
 	//
-	//     pred -(newBranch)-> trampoline -(originalBranch)-> succ
+	//     pred --(newBranch)--> trampoline --(originalBranch)-> succ
 	//
 	// where trampoline is a new basic block which is created to split the critical edge.
 
