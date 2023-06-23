@@ -26,6 +26,7 @@ func (b *builder) RunPasses() {
 
 	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
 	passDeadCodeEliminationOpt(b)
+	b.donePasses = true
 }
 
 // passDeadBlockEliminationOpt searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
@@ -38,11 +39,11 @@ func passDeadBlockEliminationOpt(b *builder) {
 		b.blkStack = b.blkStack[:len(b.blkStack)-1]
 		b.blkVisited[reachableBlk] = 0 // the value won't be used in this pass.
 
-		for _, successor := range reachableBlk.success {
-			if _, ok := b.blkVisited[successor]; ok {
+		for _, succ := range reachableBlk.success {
+			if _, ok := b.blkVisited[succ]; ok {
 				continue
 			}
-			b.blkStack = append(b.blkStack, successor)
+			b.blkStack = append(b.blkStack, succ)
 		}
 	}
 

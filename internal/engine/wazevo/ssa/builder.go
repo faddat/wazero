@@ -58,7 +58,7 @@ type Builder interface {
 	// UsedSignatures returns the slice of Signatures which are used/referenced by the currently-compiled function.
 	UsedSignatures() []*Signature
 
-	// RunPasses runs various optimization passes on the constructed SSA function.
+	// RunPasses runs various passes on the constructed SSA function.
 	RunPasses()
 
 	// Format returns the debugging string of the SSA function.
@@ -89,6 +89,11 @@ type Builder interface {
 	// ValueRefCountMap returns the map of ValueID to its reference count.
 	// The returned slice must not be modified.
 	ValueRefCountMap() []int
+
+	// LayoutBlocks layouts the BasicBlock(s) so that backend can easily generate the code.
+	// During its process, it splits the critical edges in the function.
+	// This must be called after RunPasses. Otherwise, it panics.
+	LayoutBlocks()
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -143,11 +148,15 @@ type builder struct {
 
 	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
+
+	// donePasses is true if RunPasses is called.
+	donePasses bool
 }
 
 // Reset implements Builder.Reset.
 func (b *builder) Reset() {
 	b.instructionsPool.Reset()
+	b.donePasses = false
 	for _, sig := range b.signatures {
 		sig.used = false
 	}
@@ -212,6 +221,11 @@ func (b *builder) UsedSignatures() (ret []*Signature) {
 
 // AllocateBasicBlock implements Builder.AllocateBasicBlock.
 func (b *builder) AllocateBasicBlock() BasicBlock {
+	return b.allocateBasicBlock()
+}
+
+// allocateBasicBlock allocates a new basicBlock.
+func (b *builder) allocateBasicBlock() *basicBlock {
 	id := basicBlockID(b.basicBlocksPool.Allocated())
 	blk := b.basicBlocksPool.Allocate()
 	blk.id = id
@@ -510,8 +524,215 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 	}
 	ent := b.entryBlk()
 	doms := b.dominators
-	for n != d && n != ent { // 1 is assumed to be the root of the dominator tree
+	for n != d && n != ent {
 		n = doms[n.id]
 	}
 	return n == d
+}
+
+// LayoutBlocks implements Builder.LayoutBlocks. This re-organizes builder.reversePostOrderedBasicBlocks.
+//
+// TODO: there are tons of room for improvement here. e.g. LLVM has BlockPlacementPass using BlockFrequencyInfo,
+// BranchProbabilityInfo, and LoopInfo to do a much better job. Also, if we have the profiling instrumentation
+// like ball-larus algorithm, then we could do profile-guided optimization. Basically all of them are trying
+// to maximize the fall-through opportunities which is most efficient.
+//
+// Here, fallthrough happens when a block ends with jump instruction whose target is the right next block in the
+// builder.reversePostOrderedBasicBlocks.
+//
+// Currently, we just place blocks using the DFS reverse post-order of the dominator tree with the heuristics:
+//  1. a split edge trampoline towards loop headers will be placed as a fallthrough.
+//  2. we invert the brz to brnz if it makes the fallthrough more likely.
+//
+// This heuristic is done in maybeInvertBranch function.
+func (b *builder) LayoutBlocks() {
+	if !b.donePasses {
+		panic("SplitCriticalEdges must be called after all passes are done")
+	}
+
+	// We might end up splitting critical edges which adds more basic blocks,
+	// so we store the currently existing basic blocks in nonSplitBlocks temporarily.
+	// That way we can iterate over the original basic blocks while appending new ones into reversePostOrderedBasicBlocks.
+	nonSplitBlocks := b.blkStack[:0]
+	for i, blk := range b.reversePostOrderedBasicBlocks {
+		nonSplitBlocks = append(nonSplitBlocks, blk)
+		if i != len(b.reversePostOrderedBasicBlocks)-1 {
+			_ = maybeInvertBranch(blk, b.reversePostOrderedBasicBlocks[i+1])
+		}
+	}
+
+	b.clearBlkVisited()
+	inserted := b.blkVisited
+
+	// Reset the order slice since we update on the fly by splitting critical edges.
+	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
+	for _, blk := range nonSplitBlocks {
+		for i := range blk.preds {
+			pred := blk.preds[i].blk
+			if _, ok := inserted[pred]; ok {
+				continue
+			} else if pred.reversePostOrder < blk.reversePostOrder {
+				// This means the edge is critical, and this pred is the trampoline and yet to be inserted.
+				// Split edge trampolines must come before the destination in reverse post-order.
+				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, pred)
+				b.blkVisited[blk] = 0 // mark as inserted, the value is not used.
+			}
+		}
+
+		// Now that we've already added all the potential trampoline blocks incoming to this block,
+		// we can add this block itself.
+		b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, blk)
+		b.blkVisited[blk] = 0 // mark as inserted, the value is not used.
+
+		if len(blk.success) < 2 {
+			// There won't be critical edge originating from this block.
+			continue
+		}
+
+		for sidx, succ := range blk.success {
+			if len(succ.preds) < 2 {
+				// If there's no multiple incoming edges to this successor, (pred, succ) is not critical.
+				continue
+			}
+
+			// Otherwise, we are sure this is a critical edge. To modify the CFG, we need to find the predecessor info
+			// from the successor.
+			var predInfo *basicBlockPredecessorInfo
+			for i := range succ.preds { // This linear search should not be a problem since the number of predecessors should almost always small.
+				pred := &succ.preds[i]
+				if pred.blk == blk {
+					predInfo = pred
+					break
+				}
+			}
+
+			if predInfo == nil {
+				// This must be a bug in somewhere around branch manipulation.
+				panic("BUG: predecessor info not found while the successor exists in successors list")
+			}
+
+			trampoline := b.splitCriticalEdge(blk, predInfo)
+			// Update the successors slice because the target is no longer the original `succ`.
+			blk.success[sidx] = trampoline
+
+			// This can be lowered as fallthrough at the end of the block, so we append the block to reversePostOrder now.
+			if branch := blk.currentInstr; branch.opcode != OpcodeBrTable && branch.blk == trampoline {
+				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
+				inserted[trampoline] = 0 // mark as inserted, the value is not used.
+			}
+		}
+	}
+}
+
+// maybeInvertBranch inverts the branch instruction if it makes the fallthrough more likely with simple heuristics.
+//
+// Returns true if the branch is inverted for testing purpose.
+func maybeInvertBranch(now *basicBlock, nextInRPO *basicBlock) bool {
+	tailBranch := now.currentInstr
+	if tailBranch.opcode == OpcodeBrTable {
+		return false
+	}
+
+	condBranch := tailBranch.prev
+	if condBranch == nil || (condBranch.opcode != OpcodeBrnz && condBranch.opcode != OpcodeBrz) {
+		return false
+	}
+
+	// So this block has two branches (a conditional branch followed by an unconditional branch) at the end.
+	// We can invert the condition of the branch if it makes the fallthrough more likely.
+
+	if target := tailBranch.blk.(*basicBlock); target.loopHeader {
+		// First, if the tail's target is loopHeader, we don't need to do anything here,
+		// because the edge is highly likely (probably 100% for reducible CFGs once dead blocks are removed?) to be critical edge.
+		// That means, we will split the edge in the end of LayoutBlocks function, and insert the trampoline block
+		// right after this block, which will be fallthrough in any way.
+		return false
+	} else if target == nextInRPO {
+		// Also, if the tail's target is the next block in the reverse post-order, we don't need to do anything here,
+		// because if this is not critical edge, we would end up placing these two blocks adjacent to each other.
+		// Even if it is the critical edge, we place the trampoline block right after this block, which will be fallthrough in any way.
+		return false
+	}
+
+	// Intentionally have two blocks, so we can clarify the meaning of each
+	if target := condBranch.blk.(*basicBlock); target.loopHeader {
+		// On the other hand, if the condBranch's target is loopHeader, we invert the condition of the branch
+		// so that we could get the fallthrough to the trampoline block.
+		condBranch.InvertConditionalBrx()
+		condBranch.blk = tailBranch.blk
+		tailBranch.blk = target
+	} else if target == nextInRPO {
+		// If the condBranch's target is the next block in the reverse post-order, we invert the condition of the branch
+		// so that we could get the fallthrough to the block.
+		condBranch.InvertConditionalBrx()
+		condBranch.blk = tailBranch.blk
+		tailBranch.blk = target
+	}
+	return true
+}
+
+// splitCriticalEdge splits the critical edge between the given predecessor (`pred`) and successor (owning `predInfo`).
+//
+// pred is the source of the critical edge, predInfo is the predecessor info in the successor's preds[] slice which represents the critical edge.
+//
+// Why splitting critical edges is important? See following links:
+//
+//   - https://en.wikipedia.org/wiki/Control-flow_graph
+//   - https://nickdesaulniers.github.io/blog/2023/01/27/critical-edge-splitting/
+//
+// The returned basic block is the trampoline block which is inserted to split the critical edge.
+func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredecessorInfo) *basicBlock {
+	// In the following, we convert the following CFG:
+	//
+	// original:
+	//     pred --(originalBranch)--> succ
+	//
+	// to the following CFG:
+	//
+	//     pred -(newBranch)-> trampoline -(originalBranch)-> succ
+	//
+	// where trampoline is a new basic block which is created to split the critical edge.
+
+	trampoline := b.allocateBasicBlock()
+	originalBranch := predInfo.branch
+
+	// Replace originalBranch with the newBranch.
+	newBranch := b.AllocateInstruction()
+	newBranch.opcode = originalBranch.opcode
+	newBranch.blk = trampoline
+	if newBranch.opcode == OpcodeBrTable {
+		panic("BUG: critical edge shouldn't be originated from br_table")
+	}
+	swapInstruction(pred, originalBranch, newBranch)
+
+	// Replace the original branch with the new branch.
+	trampoline.rootInstr = originalBranch
+	trampoline.currentInstr = originalBranch
+	trampoline.success = append(trampoline.success, pred) // Do not use []*basicBlock{pred} because we might have already allocated the slice.
+	trampoline.preds = append(trampoline.preds,           // same trick as ^.
+		basicBlockPredecessorInfo{blk: pred, branch: newBranch})
+
+	// Update the original branch to point to the trampoline.
+	predInfo.blk = trampoline
+
+	// Assign the same order as the original block so that this will be placed before the actual destination.
+	trampoline.reversePostOrder = pred.reversePostOrder
+	return trampoline
+}
+
+// swapInstruction replaces `old` in the block `blk` with `newi`.
+func swapInstruction(blk *basicBlock, old, newi *Instruction) {
+	if blk.rootInstr == old {
+		blk.rootInstr = newi
+		next := old.next
+		newi.next = next
+		next.prev = newi
+	} else {
+		prev := old.prev
+		prev.next, newi.prev = newi, prev
+		if next := old.next; next != nil {
+			newi.next, next.prev = next, newi
+		}
+	}
+	old.prev, old.next = nil, nil
 }

@@ -58,15 +58,8 @@ func passCalculateImmediateDominators(b *builder) {
 		reversePostOrder[i], reversePostOrder[j] = reversePostOrder[j], reversePostOrder[i]
 	}
 
-	// Store the blockID->reversePostOrder mapping in blockIDToReversePostOrder slice.
-	blockIDToReversePostOrder := b.ints // Reuse b.ints from the previous iteration.
-	blockIDToReversePostOrder = blockIDToReversePostOrder[:cap(blockIDToReversePostOrder)]
-	if len(blockIDToReversePostOrder) < b.basicBlocksPool.Allocated() {
-		// Generously reserve space in the slice because the slice will be reused future allocation.
-		blockIDToReversePostOrder = append(blockIDToReversePostOrder, make([]int, b.basicBlocksPool.Allocated())...)
-	}
 	for i, blk := range reversePostOrder {
-		blockIDToReversePostOrder[blk.id] = i
+		blk.reversePostOrder = i
 	}
 
 	// Reuse the dominators slice if possible from the previous computation of function.
@@ -75,11 +68,10 @@ func passCalculateImmediateDominators(b *builder) {
 		// Generously reserve space in the slice because the slice will be reused future allocation.
 		b.dominators = append(b.dominators, make([]*basicBlock, b.basicBlocksPool.Allocated())...)
 	}
-	calculateDominators(reversePostOrder, blockIDToReversePostOrder, b.dominators)
+	calculateDominators(reversePostOrder, b.dominators)
 
 	// Reuse the slices for the future use.
 	b.blkStack = exploreStack
-	b.ints = blockIDToReversePostOrder
 
 	// For the following passes.
 	b.reversePostOrderedBasicBlocks = reversePostOrder
@@ -95,7 +87,7 @@ func passCalculateImmediateDominators(b *builder) {
 // The following code almost matches the pseudocode in the paper with one exception (see the code comment below).
 //
 // The result slice `doms` must be pre-allocated with the size larger than the size of dfsBlocks.
-func calculateDominators(reversePostOrderedBlks []*basicBlock, blockIDToReversePostOrder []int, doms []*basicBlock) {
+func calculateDominators(reversePostOrderedBlks []*basicBlock, doms []*basicBlock) {
 	entry, reversePostOrderedBlks := reversePostOrderedBlks[0], reversePostOrderedBlks[1: /* skips entry point */]
 	for _, blk := range reversePostOrderedBlks {
 		doms[blk.id] = nil
@@ -119,7 +111,7 @@ func calculateDominators(reversePostOrderedBlks []*basicBlock, blockIDToReverseP
 					u = pred
 					continue
 				} else {
-					u = intersect(doms, blockIDToReversePostOrder, u, pred)
+					u = intersect(doms, u, pred)
 				}
 			}
 			if doms[blk.id] != u {
@@ -133,15 +125,15 @@ func calculateDominators(reversePostOrderedBlks []*basicBlock, blockIDToReverseP
 // intersect returns the common dominator of blk1 and blk2.
 //
 // This is the `intersect` function in the paper.
-func intersect(doms []*basicBlock, reversePostOrder []int, blk1 *basicBlock, blk2 *basicBlock) *basicBlock {
+func intersect(doms []*basicBlock, blk1 *basicBlock, blk2 *basicBlock) *basicBlock {
 	finger1, finger2 := blk1, blk2
 	for finger1 != finger2 {
 		// Move the 'finger1' upwards to its immediate dominator.
-		for reversePostOrder[finger1.id] > reversePostOrder[finger2.id] {
+		for finger1.reversePostOrder > finger2.reversePostOrder {
 			finger1 = doms[finger1.id]
 		}
 		// Move the 'finger2' upwards to its immediate dominator.
-		for reversePostOrder[finger2.id] > reversePostOrder[finger1.id] {
+		for finger2.reversePostOrder > finger1.reversePostOrder {
 			finger2 = doms[finger2.id]
 		}
 	}

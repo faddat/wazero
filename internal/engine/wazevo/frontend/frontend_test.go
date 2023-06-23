@@ -686,6 +686,9 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 				fmt.Println(actualAfterOpt)
 				require.Equal(t, expAfterOpt, actualAfterOpt)
 			}
+
+			// Dry-run without checking the results of LayoutBlocks function.
+			b.LayoutBlocks()
 		})
 	}
 }

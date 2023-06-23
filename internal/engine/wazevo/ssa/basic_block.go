@@ -71,6 +71,10 @@ type (
 		//
 		// This is modified during the subPassLoopDetection pass.
 		loopHeader bool
+
+		// reversePostOrder is used to sort all the blocks in the function in reverse post order.
+		// This is used in SplitCriticalEdges.
+		reversePostOrder int
 	}
 	// basicBlockID is the unique ID of a basicBlock.
 	basicBlockID uint32

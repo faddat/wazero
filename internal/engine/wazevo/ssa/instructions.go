@@ -952,6 +952,18 @@ func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.blk = target
 }
 
+// InvertConditionalBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
+func (i *Instruction) InvertConditionalBrx() {
+	switch i.opcode {
+	case OpcodeBrz:
+		i.opcode = OpcodeBrnz
+	case OpcodeBrnz:
+		i.opcode = OpcodeBrz
+	default:
+		panic("BUG")
+	}
+}
+
 // AsBrz initializes this instruction as a branch-if-zero instruction with OpcodeBrz.
 func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 	i.opcode = OpcodeBrz
