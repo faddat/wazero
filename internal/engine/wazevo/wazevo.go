@@ -90,6 +90,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		// Run SSA-level optimization passes.
 		ssaBuilder.RunPasses()
 
+		// Finalize the layout of SSA blocks which might use the optimization results.
+		ssaBuilder.LayoutBlocks()
+
 		// Now our ssaBuilder contains the necessary information to further lower them to
 		// machine code.
 		body, err := be.Generate()
