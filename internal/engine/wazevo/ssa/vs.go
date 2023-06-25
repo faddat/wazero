@@ -66,13 +66,3 @@ func (v *Value) ID() ValueID {
 func (v *Value) setType(typ Type) {
 	*v |= Value(typ) << 32
 }
-
-// ValueAlias holds the information to alias the source Value to the destination Value.
-// Aliases are needed during the optimizations, where we remove/modify the BasicBlock and Instruction(s).
-type ValueAlias struct {
-	Src, Dst Value
-}
-
-func (va ValueAlias) format(b Builder) string {
-	return fmt.Sprintf("%s = %s", va.Dst.format(b), va.Src.format(b))
-}

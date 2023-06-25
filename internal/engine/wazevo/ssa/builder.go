@@ -469,7 +469,7 @@ func (b *builder) blockIteratorReversePostOrderBegin() *basicBlock {
 
 // BlockIteratorReversePostOrderNext implements Builder.BlockIteratorReversePostOrderNext.
 func (b *builder) BlockIteratorReversePostOrderNext() BasicBlock {
-	if blk := b.blockIteratorNext(); blk == nil {
+	if blk := b.blockIteratorReversePostOrderNext(); blk == nil {
 		return nil // BasicBlock((*basicBlock)(nil)) != BasicBlock(nil)
 	} else {
 		return blk
@@ -615,8 +615,8 @@ func (b *builder) LayoutBlocks() {
 			// Update the successors slice because the target is no longer the original `succ`.
 			blk.success[sidx] = trampoline
 
-			// This can be lowered as fallthrough at the end of the block, so we append the block to reversePostOrder now.
 			if branch := blk.currentInstr; branch.opcode != OpcodeBrTable && branch.blk == trampoline {
+				// This can be lowered as fallthrough at the end of the block, so we append the block to reversePostOrder now.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				inserted[trampoline] = 0 // mark as inserted, the value is not used.
 			}
@@ -708,8 +708,9 @@ func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredec
 	trampoline.rootInstr = originalBranch
 	trampoline.currentInstr = originalBranch
 	trampoline.success = append(trampoline.success, pred) // Do not use []*basicBlock{pred} because we might have already allocated the slice.
-	trampoline.preds = append(trampoline.preds,           // same trick as ^.
+	trampoline.preds = append(trampoline.preds,           // same as ^.
 		basicBlockPredecessorInfo{blk: pred, branch: newBranch})
+	b.Seal(trampoline)
 
 	// Update the original branch to point to the trampoline.
 	predInfo.blk = trampoline
@@ -719,18 +720,18 @@ func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredec
 	return trampoline
 }
 
-// swapInstruction replaces `old` in the block `blk` with `newi`.
-func swapInstruction(blk *basicBlock, old, newi *Instruction) {
+// swapInstruction replaces `old` in the block `blk` with `New`.
+func swapInstruction(blk *basicBlock, old, New *Instruction) {
 	if blk.rootInstr == old {
-		blk.rootInstr = newi
+		blk.rootInstr = New
 		next := old.next
-		newi.next = next
-		next.prev = newi
+		New.next = next
+		next.prev = New
 	} else {
 		prev := old.prev
-		prev.next, newi.prev = newi, prev
+		prev.next, New.prev = New, prev
 		if next := old.next; next != nil {
-			newi.next, next.prev = next, newi
+			New.next, next.prev = next, New
 		}
 	}
 	old.prev, old.next = nil, nil
