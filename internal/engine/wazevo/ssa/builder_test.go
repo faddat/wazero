@@ -312,13 +312,12 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			// |         ^
 			// v         |
 			// 2 ---------
-			setup: func(b *builder) func(t *testing.T) {
+			setup: func(b *builder) {
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertBrz(b, b0, b2)
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b3)
 				insertJump(b, b2, b3)
-				return nil
 			},
 			exp: []basicBlockID{0, 2, 1, 3},
 		},
