@@ -78,14 +78,6 @@ type Builder interface {
 	// Returns nil if there's no unseen BasicBlock.
 	BlockIteratorNext() BasicBlock
 
-	// BlockIteratorReversePostOrderBegin is almost the same as BlockIteratorBegin except it returns the BasicBlock in the reverse post-order.
-	// This is available after passCalculateImmediateDominators is run.
-	BlockIteratorReversePostOrderBegin() BasicBlock
-
-	// BlockIteratorReversePostOrderNext is almost the same as BlockIteratorPostOrderNext except it returns the BasicBlock in the reverse post-order.
-	// This is available after passCalculateImmediateDominators is run.
-	BlockIteratorReversePostOrderNext() BasicBlock
-
 	// ValueRefCountMap returns the map of ValueID to its reference count.
 	// The returned slice must not be modified.
 	ValueRefCountMap() []int
@@ -93,7 +85,17 @@ type Builder interface {
 	// LayoutBlocks layouts the BasicBlock(s) so that backend can easily generate the code.
 	// During its process, it splits the critical edges in the function.
 	// This must be called after RunPasses. Otherwise, it panics.
+	//
+	// The resulting order is available via BlockIteratorReversePostOrderBegin and BlockIteratorReversePostOrderNext.
 	LayoutBlocks()
+
+	// BlockIteratorReversePostOrderBegin is almost the same as BlockIteratorBegin except it returns the BasicBlock in the reverse post-order.
+	// This is available after RunPasses is run.
+	BlockIteratorReversePostOrderBegin() BasicBlock
+
+	// BlockIteratorReversePostOrderNext is almost the same as BlockIteratorPostOrderNext except it returns the BasicBlock in the reverse post-order.
+	// This is available after RunPasses is run.
+	BlockIteratorReversePostOrderNext() BasicBlock
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -481,7 +483,9 @@ func (b *builder) blockIteratorReversePostOrderNext() *basicBlock {
 	if b.blockIterCur >= len(b.reversePostOrderedBasicBlocks) {
 		return nil
 	} else {
-		return b.reversePostOrderedBasicBlocks[b.blockIterCur]
+		ret := b.reversePostOrderedBasicBlocks[b.blockIterCur]
+		b.blockIterCur++
+		return ret
 	}
 }
 
@@ -566,6 +570,7 @@ func (b *builder) LayoutBlocks() {
 
 	// Reset the order slice since we update on the fly by splitting critical edges.
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
+	uninsertedTrampolines := b.blkStack2[:0]
 	for _, blk := range nonSplitBlocks {
 		for i := range blk.preds {
 			pred := blk.preds[i].blk
@@ -611,29 +616,47 @@ func (b *builder) LayoutBlocks() {
 				panic("BUG: predecessor info not found while the successor exists in successors list")
 			}
 
-			trampoline := b.splitCriticalEdge(blk, predInfo)
+			trampoline := b.splitCriticalEdge(blk, succ, predInfo)
 			// Update the successors slice because the target is no longer the original `succ`.
 			blk.success[sidx] = trampoline
 
-			if branch := blk.currentInstr; branch.opcode != OpcodeBrTable && branch.blk == trampoline {
-				// This can be lowered as fallthrough at the end of the block, so we append the block to reversePostOrder now.
+			fallthroughBranch := blk.currentInstr
+			if fallthroughBranch.opcode != OpcodeBrTable && fallthroughBranch.blk == trampoline {
+				// This can be lowered as fallthrough at the end of the block.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				inserted[trampoline] = 0 // mark as inserted, the value is not used.
+			} else {
+				uninsertedTrampolines = append(uninsertedTrampolines, trampoline)
 			}
 		}
+
+		for _, trampoline := range uninsertedTrampolines {
+			if trampoline.success[0].reversePostOrder < trampoline.reversePostOrder {
+				// This means the critical edge was backward, so in any way insert after the current block.
+				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
+				inserted[trampoline] = 0 // mark as inserted, the value is not used.
+			} else {
+				// If the target is forward, we can wait to insert until the target is inserted.
+			}
+		}
+		uninsertedTrampolines = uninsertedTrampolines[:0] // Reuse the stack for the next block.
 	}
+
+	// Reuse the stack for the next iteration.
+	b.blkStack2 = uninsertedTrampolines[:0]
 }
 
 // maybeInvertBranch inverts the branch instruction if it makes the fallthrough more likely with simple heuristics.
+// nextInRPO is the next block in the reverse post-order.
 //
 // Returns true if the branch is inverted for testing purpose.
 func maybeInvertBranch(now *basicBlock, nextInRPO *basicBlock) bool {
-	tailBranch := now.currentInstr
-	if tailBranch.opcode == OpcodeBrTable {
+	fallthourghBranch := now.currentInstr
+	if fallthourghBranch.opcode == OpcodeBrTable {
 		return false
 	}
 
-	condBranch := tailBranch.prev
+	condBranch := fallthourghBranch.prev
 	if condBranch == nil || (condBranch.opcode != OpcodeBrnz && condBranch.opcode != OpcodeBrz) {
 		return false
 	}
@@ -641,39 +664,60 @@ func maybeInvertBranch(now *basicBlock, nextInRPO *basicBlock) bool {
 	// So this block has two branches (a conditional branch followed by an unconditional branch) at the end.
 	// We can invert the condition of the branch if it makes the fallthrough more likely.
 
-	if target := tailBranch.blk.(*basicBlock); target.loopHeader {
+	fallthroughTarget, condTarget := fallthourghBranch.blk.(*basicBlock), condBranch.blk.(*basicBlock)
+
+	if fallthroughTarget.loopHeader {
 		// First, if the tail's target is loopHeader, we don't need to do anything here,
-		// because the edge is highly likely (probably 100% for reducible CFGs once dead blocks are removed?) to be critical edge.
+		// because the edge is likely to be critical edge for complex loops (e.g. loop with branches inside it).
 		// That means, we will split the edge in the end of LayoutBlocks function, and insert the trampoline block
 		// right after this block, which will be fallthrough in any way.
 		return false
-	} else if target == nextInRPO {
+	} else if condTarget.loopHeader {
+		// On the other hand, if the condBranch's target is loopHeader, we invert the condition of the branch
+		// so that we could get the fallthrough to the trampoline block.
+		goto invert
+	}
+
+	if fallthroughTarget == nextInRPO {
 		// Also, if the tail's target is the next block in the reverse post-order, we don't need to do anything here,
 		// because if this is not critical edge, we would end up placing these two blocks adjacent to each other.
 		// Even if it is the critical edge, we place the trampoline block right after this block, which will be fallthrough in any way.
 		return false
-	}
-
-	// Intentionally have two blocks, so we can clarify the meaning of each
-	if target := condBranch.blk.(*basicBlock); target.loopHeader {
-		// On the other hand, if the condBranch's target is loopHeader, we invert the condition of the branch
-		// so that we could get the fallthrough to the trampoline block.
-		condBranch.InvertConditionalBrx()
-		condBranch.blk = tailBranch.blk
-		tailBranch.blk = target
-	} else if target == nextInRPO {
+	} else if condTarget == nextInRPO {
 		// If the condBranch's target is the next block in the reverse post-order, we invert the condition of the branch
 		// so that we could get the fallthrough to the block.
-		condBranch.InvertConditionalBrx()
-		condBranch.blk = tailBranch.blk
-		tailBranch.blk = target
+		goto invert
+	} else {
+		return false
 	}
+
+invert:
+	for i := range fallthroughTarget.preds {
+		pred := &fallthroughTarget.preds[i]
+		if pred.blk == now {
+			pred.branch = condBranch
+			break
+		}
+	}
+	for i := range condTarget.preds {
+		pred := &condTarget.preds[i]
+		if pred.blk == now {
+			pred.branch = fallthourghBranch
+			break
+		}
+	}
+
+	condBranch.InvertBrx()
+	condBranch.blk = fallthroughTarget
+	fallthourghBranch.blk = condTarget
 	return true
 }
 
 // splitCriticalEdge splits the critical edge between the given predecessor (`pred`) and successor (owning `predInfo`).
 //
-// pred is the source of the critical edge, predInfo is the predecessor info in the successor's preds[] slice which represents the critical edge.
+// - `pred` is the source of the critical edge,
+// - `succ` is the destination of the critical edge,
+// - `predInfo` is the predecessor info in the succ.preds slice which represents the critical edge.
 //
 // Why splitting critical edges is important? See following links:
 //
@@ -681,7 +725,7 @@ func maybeInvertBranch(now *basicBlock, nextInRPO *basicBlock) bool {
 //   - https://nickdesaulniers.github.io/blog/2023/01/27/critical-edge-splitting/
 //
 // The returned basic block is the trampoline block which is inserted to split the critical edge.
-func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredecessorInfo) *basicBlock {
+func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlockPredecessorInfo) *basicBlock {
 	// In the following, we convert the following CFG:
 	//
 	//     pred --(originalBranch)--> succ
@@ -699,7 +743,13 @@ func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredec
 	newBranch := b.AllocateInstruction()
 	newBranch.opcode = originalBranch.opcode
 	newBranch.blk = trampoline
-	if newBranch.opcode == OpcodeBrTable {
+	switch originalBranch.opcode {
+	case OpcodeJump:
+	case OpcodeBrz, OpcodeBrnz:
+		originalBranch.opcode = OpcodeJump // Trampoline consists of one unconditional branch.
+		newBranch.v = originalBranch.v
+		originalBranch.v = valueInvalid
+	default:
 		panic("BUG: critical edge shouldn't be originated from br_table")
 	}
 	swapInstruction(pred, originalBranch, newBranch)
@@ -707,7 +757,7 @@ func (b *builder) splitCriticalEdge(pred *basicBlock, predInfo *basicBlockPredec
 	// Replace the original branch with the new branch.
 	trampoline.rootInstr = originalBranch
 	trampoline.currentInstr = originalBranch
-	trampoline.success = append(trampoline.success, pred) // Do not use []*basicBlock{pred} because we might have already allocated the slice.
+	trampoline.success = append(trampoline.success, succ) // Do not use []*basicBlock{pred} because we might have already allocated the slice.
 	trampoline.preds = append(trampoline.preds,           // same as ^.
 		basicBlockPredecessorInfo{blk: pred, branch: newBranch})
 	b.Seal(trampoline)

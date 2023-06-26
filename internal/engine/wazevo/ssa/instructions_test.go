@@ -8,8 +8,8 @@ import (
 
 func TestInstruction_InvertConditionalBrx(t *testing.T) {
 	i := &Instruction{opcode: OpcodeBrnz}
-	i.InvertConditionalBrx()
+	i.InvertBrx()
 	require.Equal(t, OpcodeBrz, i.opcode)
-	i.InvertConditionalBrx()
+	i.InvertBrx()
 	require.Equal(t, OpcodeBrnz, i.opcode)
 }

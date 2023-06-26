@@ -952,8 +952,8 @@ func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.blk = target
 }
 
-// InvertConditionalBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
-func (i *Instruction) InvertConditionalBrx() {
+// InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
+func (i *Instruction) InvertBrx() {
 	switch i.opcode {
 	case OpcodeBrz:
 		i.opcode = OpcodeBrnz
