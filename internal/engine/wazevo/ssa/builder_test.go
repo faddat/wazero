@@ -167,7 +167,7 @@ func Test_maybeInvertBranch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewBuilder().(*builder)
 			now, next, verify := tc.setup(b)
-			actual := maybeInvertBranch(now, next)
+			actual := maybeInvertBranches(now, next)
 			verify(t)
 			require.Equal(t, tc.exp, actual)
 		})

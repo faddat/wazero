@@ -41,7 +41,7 @@ func (p *Pool[T]) Allocate() *T {
 	return ret
 }
 
-// View returns the i-th T from the pool.
+// View returns the pointer to i-th item from the pool.
 func (p *Pool[T]) View(i int) *T {
 	page, index := i/poolPageSize, i%poolPageSize
 	return &p.pages[page][index]

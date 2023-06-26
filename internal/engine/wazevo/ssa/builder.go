@@ -548,7 +548,7 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 //  1. a split edge trampoline towards loop headers will be placed as a fallthrough.
 //  2. we invert the brz to brnz if it makes the fallthrough more likely.
 //
-// This heuristic is done in maybeInvertBranch function.
+// This heuristic is done in maybeInvertBranches function.
 func (b *builder) LayoutBlocks() {
 	if !b.donePasses {
 		panic("SplitCriticalEdges must be called after all passes are done")
@@ -561,7 +561,7 @@ func (b *builder) LayoutBlocks() {
 	for i, blk := range b.reversePostOrderedBasicBlocks {
 		nonSplitBlocks = append(nonSplitBlocks, blk)
 		if i != len(b.reversePostOrderedBasicBlocks)-1 {
-			_ = maybeInvertBranch(blk, b.reversePostOrderedBasicBlocks[i+1])
+			_ = maybeInvertBranches(blk, b.reversePostOrderedBasicBlocks[i+1])
 		}
 	}
 
@@ -646,11 +646,11 @@ func (b *builder) LayoutBlocks() {
 	b.blkStack2 = uninsertedTrampolines[:0]
 }
 
-// maybeInvertBranch inverts the branch instruction if it makes the fallthrough more likely with simple heuristics.
+// maybeInvertBranches inverts the branch instructions if it is likely possible to the fallthrough more likely with simple heuristics.
 // nextInRPO is the next block in the reverse post-order.
 //
 // Returns true if the branch is inverted for testing purpose.
-func maybeInvertBranch(now *basicBlock, nextInRPO *basicBlock) bool {
+func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 	fallthourghBranch := now.currentInstr
 	if fallthourghBranch.opcode == OpcodeBrTable {
 		return false
