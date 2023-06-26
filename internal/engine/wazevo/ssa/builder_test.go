@@ -119,7 +119,6 @@ func Test_maybeInvertBranch(t *testing.T) {
 				require.Equal(t, conditionalBr, loopHeader.preds[0].branch)
 				require.Equal(t, tail, next.preds[0].branch)
 				verify = func(t *testing.T) {
-
 					require.Equal(t, OpcodeJump, tail.opcode)
 					require.Equal(t, OpcodeBrnz, conditionalBr.opcode) // inversion.
 					require.Equal(t, loopHeader, tail.blk)             // swapped.
@@ -297,7 +296,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 		exp   []basicBlockID
 	}{
 		{
-			name: "no blocks - no critical edge",
+			name: "sequential - no critical edge",
 			setup: func(b *builder) {
 				b1, b2, b3, b4 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b1, b2)
@@ -327,7 +326,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    v
 			//    1<--+
 			//    |   | <---- critical
-			//    2 --+
+			//    2---+
 			//    v
 			//    3
 			//
@@ -337,7 +336,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    v
 			//    1<---+
 			//    |    |
-			//    2 -->4
+			//    2--->4
 			//    v
 			//    3
 			setup: func(b *builder) {
@@ -356,7 +355,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    v
 			//    1<--+
 			//    |   | <---- critical
-			//    2 --+
+			//    2---+
 			//    v
 			//    3
 			//
@@ -366,7 +365,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    v
 			//    1<---+
 			//    |    |
-			//    2 -->4
+			//    2--->4
 			//    v
 			//    3
 			setup: func(b *builder) {
@@ -387,7 +386,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//  / |   |
 			// 3  2   | <--- critical
 			//  \ |   |
-			//    4 --+
+			//    4---+
 			//    v
 			//    5
 			//
@@ -399,12 +398,11 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//  / |     |
 			// 3  2     |
 			//  \ |     |
-			//    4 --> 6
+			//    4---->6
 			//    v
 			//    5
 			setup: func(b *builder) {
-				b0, b1, b2, b3, b4, b5 :=
-					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
+				b0, b1, b2, b3, b4, b5 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
 					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
 				insertBrz(b, b1, b2)
@@ -440,8 +438,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//               |   v
 			//               +-->3--->4
 			setup: func(b *builder) {
-				b0, b1, b2, b3, b4 :=
-					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
+				b0, b1, b2, b3, b4 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
 					b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
 				insertBrz(b, b1, b2)

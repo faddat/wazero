@@ -73,7 +73,7 @@ type (
 		loopHeader bool
 
 		// reversePostOrder is used to sort all the blocks in the function in reverse post order.
-		// This is used in SplitCriticalEdges.
+		// This is used in builder.LayoutBlocks.
 		reversePostOrder int
 	}
 	// basicBlockID is the unique ID of a basicBlock.

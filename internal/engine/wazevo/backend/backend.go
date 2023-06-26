@@ -21,7 +21,6 @@ type Compiler struct {
 
 // Generate generates the machine code.
 func (c *Compiler) Generate() ([]byte, error) {
-	c.assignVirtualRegisters()
 	return nil, nil
 }
 
@@ -31,41 +30,4 @@ func (c *Compiler) Reset() {
 		c.ssaValuesToVRegs[i] = vRegInvalid
 	}
 	c.nextVRegID = 0
-}
-
-// assignVirtualRegisters assigns a virtual register to each ssa.ValueID valid in the ssa.Builder.
-func (c *Compiler) assignVirtualRegisters() {
-	builder := c.ssaBuilder
-	refCounts := builder.ValueRefCountMap()
-
-	if len(refCounts) >= len(c.ssaValuesToVRegs) {
-		c.ssaValuesToVRegs = append(c.ssaValuesToVRegs,
-			make([]vReg, len(refCounts))...)
-	}
-
-	for blk := builder.BlockIteratorBegin(); blk != nil; blk = builder.BlockIteratorNext() {
-		// First we assign a virtual register to each parameter.
-		for i := 0; i < blk.Params(); i++ {
-			p := blk.Param(i)
-			c.ssaValuesToVRegs[p.ID()] = c.allocateVReg()
-		}
-
-		// Assigns each value to a virtual register produced by instructions.
-		for cur := blk.Root(); cur != nil; cur = cur.Next() {
-			r, rs := cur.Returns()
-			if r.Valid() {
-				c.ssaValuesToVRegs[r.ID()] = c.allocateVReg()
-			}
-			for _, r := range rs {
-				c.ssaValuesToVRegs[r.ID()] = c.allocateVReg()
-			}
-		}
-	}
-}
-
-// allocateVReg allocates a new virtual register.
-func (c *Compiler) allocateVReg() vReg {
-	ret := vReg(c.nextVRegID)
-	c.nextVRegID++
-	return ret
 }

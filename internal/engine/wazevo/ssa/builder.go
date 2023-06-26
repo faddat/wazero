@@ -545,13 +545,13 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 // builder.reversePostOrderedBasicBlocks.
 //
 // Currently, we just place blocks using the DFS reverse post-order of the dominator tree with the heuristics:
-//  1. a split edge trampoline towards loop headers will be placed as a fallthrough.
-//  2. we invert the brz to brnz if it makes the fallthrough more likely.
+//  1. a split edge trampoline towards a loop header will be placed as a fallthrough.
+//  2. we invert the brz and brnz if it makes the fallthrough more likely.
 //
 // This heuristic is done in maybeInvertBranches function.
 func (b *builder) LayoutBlocks() {
 	if !b.donePasses {
-		panic("SplitCriticalEdges must be called after all passes are done")
+		panic("LayoutBlocks must be called after all passes are done")
 	}
 
 	// We might end up splitting critical edges which adds more basic blocks,
@@ -635,9 +635,7 @@ func (b *builder) LayoutBlocks() {
 				// This means the critical edge was backward, so we insert after the current block immediately.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				inserted[trampoline] = 0 // mark as inserted, the value is not used.
-			} else {
-				// If the target is forward, we can wait to insert until the target is inserted.
-			}
+			} // If the target is forward, we can wait to insert until the target is inserted.
 		}
 		uninsertedTrampolines = uninsertedTrampolines[:0] // Reuse the stack for the next block.
 	}
@@ -694,14 +692,14 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 invert:
 	for i := range fallthroughTarget.preds {
 		pred := &fallthroughTarget.preds[i]
-		if pred.blk == now {
+		if pred.branch == fallthourghBranch {
 			pred.branch = condBranch
 			break
 		}
 	}
 	for i := range condTarget.preds {
 		pred := &condTarget.preds[i]
-		if pred.blk == now {
+		if pred.branch == condBranch {
 			pred.branch = fallthourghBranch
 			break
 		}
