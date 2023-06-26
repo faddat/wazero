@@ -632,7 +632,7 @@ func (b *builder) LayoutBlocks() {
 
 		for _, trampoline := range uninsertedTrampolines {
 			if trampoline.success[0].reversePostOrder < trampoline.reversePostOrder {
-				// This means the critical edge was backward, so in any way insert after the current block.
+				// This means the critical edge was backward, so we insert after the current block immediately.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				inserted[trampoline] = 0 // mark as inserted, the value is not used.
 			} else {
