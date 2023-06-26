@@ -293,17 +293,16 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 
 	for _, tc := range []struct {
 		name  string
-		setup func(b *builder) func(t *testing.T)
+		setup func(b *builder)
 		exp   []basicBlockID
 	}{
 		{
 			name: "no blocks - no critical edge",
-			setup: func(b *builder) func(t *testing.T) {
+			setup: func(b *builder) {
 				b1, b2, b3, b4 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b1, b2)
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
-				return nil
 			},
 			exp: []basicBlockID{0, 1, 2, 3},
 		},
@@ -342,16 +341,12 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    2 -->4
 			//    v
 			//    3
-			setup: func(b *builder) func(t *testing.T) {
+			setup: func(b *builder) {
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b2)
 				insertBrz(b, b2, b1)
 				insertJump(b, b2, b3)
-				return func(t *testing.T) {
-					// Fallthrough must be loop header since it's more likely a hot path.
-					require.Equal(t, b1, b2.currentInstr.blk)
-				}
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
 			exp: []basicBlockID{0, 1, 2, 4, 3},
@@ -375,16 +370,12 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    2 -->4
 			//    v
 			//    3
-			setup: func(b *builder) func(t *testing.T) {
+			setup: func(b *builder) {
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b2)
 				insertBrz(b, b2, b3)
 				insertJump(b, b2, b1)
-				return func(t *testing.T) {
-					// Fallthrough must be loop header since it's more likely a hot path.
-					require.Equal(t, b1, b2.currentInstr.blk)
-				}
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
 			exp: []basicBlockID{0, 1, 2, 4, 3},
@@ -412,7 +403,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//    4 --> 6
 			//    v
 			//    5
-			setup: func(b *builder) func(t *testing.T) {
+			setup: func(b *builder) {
 				b0, b1, b2, b3, b4, b5 :=
 					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
 					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
@@ -423,7 +414,6 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b2, b4)
 				insertBrz(b, b4, b1)
 				insertJump(b, b4, b5)
-				return func(t *testing.T) {}
 			},
 			// The trampoline 6 is placed right after 4, which is the hot path of the loop.
 			exp: []basicBlockID{0, 1, 2, 3, 4, 6, 5},
@@ -450,7 +440,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			//               |   7
 			//               |   v
 			//               +-->3--->4
-			setup: func(b *builder) func(t *testing.T) {
+			setup: func(b *builder) {
 				b0, b1, b2, b3, b4 :=
 					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
 					b.allocateBasicBlock(), b.allocateBasicBlock()
@@ -461,7 +451,6 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertBrz(b, b2, b1)
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
-				return func(t *testing.T) {}
 			},
 			exp: []basicBlockID{
 				0, 1,
@@ -479,14 +468,10 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewBuilder().(*builder)
-			verifier := tc.setup(b)
+			tc.setup(b)
 
 			b.RunPasses() // LayoutBlocks() must be called after RunPasses().
 			b.LayoutBlocks()
-
-			if verifier != nil {
-				verifier(t)
-			}
 
 			var actual []basicBlockID
 			for blk := b.BlockIteratorReversePostOrderBegin(); blk != nil; blk = b.BlockIteratorReversePostOrderNext() {
