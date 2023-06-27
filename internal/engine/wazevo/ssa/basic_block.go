@@ -32,6 +32,12 @@ type BasicBlock interface {
 	// Root returns the root instruction of this block.
 	Root() *Instruction
 
+	// Tail returns the tail instruction of this block.
+	Tail() *Instruction
+
+	// EntryBlock returns true if this block represents the function entry.
+	EntryBlock() bool
+
 	// ReturnBlock returns ture if this block represents the function return.
 	ReturnBlock() bool
 
@@ -107,6 +113,11 @@ type basicBlockPredecessorInfo struct {
 	branch *Instruction
 }
 
+// EntryBlock implements BasicBlock.EntryBlock.
+func (bb *basicBlock) EntryBlock() bool {
+	return bb.id == 0
+}
+
 // ReturnBlock implements BasicBlock.ReturnBlock.
 func (bb *basicBlock) ReturnBlock() bool {
 	return bb.id == basicBlockIDReturnBlock
@@ -163,6 +174,11 @@ func (bb *basicBlock) InsertInstruction(next *Instruction) {
 // Root implements BasicBlock.Root.
 func (bb *basicBlock) Root() *Instruction {
 	return bb.rootInstr
+}
+
+// Tail implements BasicBlock.Tail.
+func (bb *basicBlock) Tail() *Instruction {
+	return bb.currentInstr
 }
 
 // reset resets the basicBlock to its initial state so that it can be reused for another function.

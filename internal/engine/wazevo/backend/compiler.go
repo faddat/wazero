@@ -8,14 +8,22 @@ import (
 //
 // The type parameter T must be a type that implements MachineBackend.
 func NewBackendCompiler[T Machine](mach T, builder ssa.Builder) Compiler {
-	return &compiler[T]{mach: mach, ssaBuilder: builder}
+	c := &compiler[T]{mach: mach, ssaBuilder: builder}
+	mach.SetCompilationContext(c)
+	return c
 }
 
 // Compiler is the backend of wazevo which lowers the state stored in ssa.Builder
 // into the ISA-specific machine code.
 type Compiler interface {
+	CompilationContext
+
 	// Compile lowers the state stored in ssa.Builder into the ISA-specific machine code.
 	Compile() ([]byte, error)
+
+	// MarkLowered is used to mark the given instruction as already lowered
+	// which tells the compiler to skip it when traversing.
+	MarkLowered(inst *ssa.Instruction)
 
 	// Reset should be called to allow this Compiler to use for the next function.
 	Reset()
@@ -34,6 +42,8 @@ type compiler[T Machine] struct {
 	ssaValueDefinitions []SSAValueDefinition
 	// returnVRegs is the list of virtual registers that store the return values.
 	returnVRegs []VReg
+
+	alreadyLowered map[*ssa.Instruction]struct{}
 }
 
 // Compile implements Compiler.Compile.
@@ -52,8 +62,17 @@ func (c *compiler[T]) lowerBlocks() {
 }
 
 func (c *compiler[T]) lowerBlock(blk ssa.BasicBlock) {
-	c.mach.StartBlock(blk)
-	c.mach.EndBlock()
+	mach := c.mach
+	mach.StartBlock(blk)
+	// We traverse the instructions in reverse order because we might want to lower multiple
+	// instructions together.
+	for cur := blk.Tail(); cur != nil; cur = cur.Prev() {
+		if _, ok := c.alreadyLowered[cur]; ok {
+			continue
+		}
+		mach.LowerInstr(cur)
+	}
+	mach.EndBlock()
 }
 
 // assignVirtualRegisters assigns a virtual register to each ssa.ValueID Valid in the ssa.Builder.
@@ -126,4 +145,14 @@ func (c *compiler[T]) Reset() {
 	c.nextVRegID = 0
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
+}
+
+// MarkLowered implements CompilationContext.MarkLowered.
+func (c *compiler[T]) MarkLowered(inst *ssa.Instruction) {
+	c.alreadyLowered[inst] = struct{}{}
+}
+
+// ValueDefinition implements CompilationContext.ValueDefinition.
+func (c *compiler[T]) ValueDefinition(value ssa.Value) *SSAValueDefinition {
+	return &c.ssaValueDefinitions[value.ID()]
 }

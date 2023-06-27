@@ -22,7 +22,6 @@ type Instruction struct {
 	typ        Type
 	blk        BasicBlock
 	prev, next *Instruction
-	srcPos     uint64
 
 	rValue  Value
 	rValues []Value
@@ -71,16 +70,6 @@ func (i *Instruction) Next() *Instruction {
 // Prev returns the previous instruction laid out prior to itself.
 func (i *Instruction) Prev() *Instruction {
 	return i.prev
-}
-
-// SetSourcePos sets the opaque source position of this instruction.
-func (i *Instruction) SetSourcePos(p uint64) {
-	i.srcPos = p
-}
-
-// SourcePos returns the opaque source position of this instruction set by SetSourcePos.
-func (i *Instruction) SourcePos() (p uint64) {
-	return i.srcPos
 }
 
 // Followings match the generated code from https://github.com/bytecodealliance/wasmtime/blob/v9.0.3/cranelift/codegen/meta/src/shared/instructions.rs
@@ -950,6 +939,22 @@ func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.opcode = OpcodeJump
 	i.vs = vs
 	i.blk = target
+}
+
+// IsFallthroughJump returns true if this instruction is a fallthrough jump.
+func (i *Instruction) IsFallthroughJump() bool {
+	if i.opcode != OpcodeJump {
+		panic("BUG: IsFallthrough only available for OpcodeJump")
+	}
+	return i.opcode == OpcodeJump && i.blk == nil
+}
+
+// AsFallthroughJump marks this instruction as a fallthrough jump.
+func (i *Instruction) AsFallthroughJump() {
+	if i.opcode != OpcodeJump {
+		panic("BUG: AsFallthroughJump only available for OpcodeJump")
+	}
+	i.blk = nil
 }
 
 // InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.

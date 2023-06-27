@@ -653,6 +653,22 @@ func (b *builder) LayoutBlocks() {
 
 	// Reuse the stack for the next iteration.
 	b.blkStack2 = uninsertedTrampolines[:0]
+
+	// Now that we know the final placement of the blocks, we can explicitly mark the fallthrough jumps.
+	b.markFallthroughJumps()
+}
+
+// markFallthroughJumps finds the fallthrough jumps and marks them as such.
+func (b *builder) markFallthroughJumps() {
+	l := len(b.reversePostOrderedBasicBlocks) - 1
+	for i, blk := range b.reversePostOrderedBasicBlocks {
+		if i < l {
+			cur := blk.currentInstr
+			if cur.opcode == OpcodeJump && cur.blk == b.reversePostOrderedBasicBlocks[i+1] {
+				cur.AsFallthroughJump()
+			}
+		}
+	}
 }
 
 // maybeInvertBranches inverts the branch instructions if it is likely possible to the fallthrough more likely with simple heuristics.
