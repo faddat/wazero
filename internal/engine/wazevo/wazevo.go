@@ -70,7 +70,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	bodies := make([][]byte, localFns)
 
 	ssaBuilder := ssa.NewBuilder()
-	fe, be := frontend.NewFrontendCompiler(offsets, module, ssaBuilder), backend.NewBackendCompiler(ssaBuilder)
+	fe := frontend.NewFrontendCompiler(offsets, module, ssaBuilder)
+	machine := newMachine()
+	be := backend.NewBackendCompiler(machine, ssaBuilder)
 	for i := range module.CodeSection {
 		typ := &module.TypeSection[module.FunctionSection[i]]
 
@@ -95,7 +97,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 		// Now our ssaBuilder contains the necessary information to further lower them to
 		// machine code.
-		body, err := be.Generate()
+		body, err := be.Compile()
 		if err != nil {
 			return fmt.Errorf("ssa->machine code: %v", err)
 		}

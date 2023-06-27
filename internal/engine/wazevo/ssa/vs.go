@@ -32,37 +32,37 @@ const (
 )
 
 // Format creates a debug string for this Value using the data stored in Builder.
-func (v *Value) format(b Builder) string {
+func (v Value) format(b Builder) string {
 	if annotation, ok := b.(*builder).valueAnnotations[v.ID()]; ok {
 		return annotation
 	}
 	return fmt.Sprintf("v%d", v.ID())
 }
 
-func (v *Value) formatWithType(b Builder) string {
+func (v Value) formatWithType(b Builder) string {
 	if annotation, ok := b.(*builder).valueAnnotations[v.ID()]; ok {
-		return annotation + ":" + v._Type().String()
+		return annotation + ":" + v.Type().String()
 	} else {
-		return fmt.Sprintf("v%d:%s", v.ID(), v._Type())
+		return fmt.Sprintf("v%d:%s", v.ID(), v.Type())
 	}
 }
 
 // Valid returns true if this value is valid.
-func (v *Value) Valid() bool {
+func (v Value) Valid() bool {
 	return v.ID() != valueIDInvalid
 }
 
-// _Type returns the Type of this value.
-func (v *Value) _Type() Type {
-	return Type(*v >> 32)
+// Type returns the Type of this value.
+func (v Value) Type() Type {
+	return Type(v >> 32)
 }
 
 // ID returns the valueID of this value.
-func (v *Value) ID() ValueID {
-	return ValueID(*v)
+func (v Value) ID() ValueID {
+	return ValueID(v)
 }
 
-// setType sets a type of this Value.
-func (v *Value) setType(typ Type) {
-	*v |= Value(typ) << 32
+// setType sets a type to this Value and returns the updated Value.
+func (v Value) setType(typ Type) Value {
+	return v | Value(typ)<<32
 }

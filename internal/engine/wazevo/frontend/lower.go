@@ -112,7 +112,7 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	c.loweringState.ctrlPush(controlFrame{
 		kind:           controlFrameKindFunction,
 		blockType:      c.wasmFunctionTyp,
-		followingBlock: ssa.BasicBlockReturn,
+		followingBlock: c.ssaBuilder.ReturnBlock(),
 	})
 
 	for c.loweringState.pc < len(c.wasmFunctionBody) {

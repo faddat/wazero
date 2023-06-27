@@ -2,39 +2,39 @@ package backend
 
 import "math"
 
-// vReg represents a register which is assigned to an SSA value. This is used to represent a register in the backend.
-// A vReg may or may not be a physical register, and the info of physical register can be obtained by realReg.
-// Note that a vReg can be assigned to multiple SSA values. Notably that means
+// VReg represents a register which is assigned to an SSA value. This is used to represent a register in the backend.
+// A VReg may or may not be a physical register, and the info of physical register can be obtained by RealReg.
+// Note that a VReg can be assigned to multiple SSA values. Notably that means
 // in the backend, we loosen the assumption of SSA.
-type vReg uint64
+type VReg uint64
 
-// vRegID is the lower 32bit of vReg, which is the pure identifier of vReg without realReg info.
-type vRegID uint32
+// VRegID is the lower 32bit of VReg, which is the pure identifier of VReg without RealReg info.
+type VRegID uint32
 
-// realReg returns the realReg of this vReg.
-func (v *vReg) realReg() realReg {
-	return realReg(*v >> 32)
+// RealReg returns the RealReg of this VReg.
+func (v VReg) RealReg() RealReg {
+	return RealReg(v >> 32)
 }
 
-// setRealReg sets the realReg of this vReg.
-func (v *vReg) setRealReg(r realReg) {
-	*v = vReg(r)<<32 | *v&0xffffffff
+// setRealReg sets the RealReg of this VReg and returns the updated VReg.
+func (v VReg) setRealReg(r RealReg) VReg {
+	return VReg(r)<<32 | v&0xffffffff
 }
 
-// id returns the vRegID of this vReg.
-func (v *vReg) id() vRegID {
-	return vRegID(*v & 0xffffffff)
+// ID returns the VRegID of this VReg.
+func (v VReg) ID() VRegID {
+	return VRegID(v & 0xffffffff)
 }
 
-// valid returns true if this vReg is valid.
-func (v *vReg) valid() bool {
-	return v.id() != vRegIDInvalid
+// Valid returns true if this VReg is Valid.
+func (v VReg) Valid() bool {
+	return v.ID() != vRegIDInvalid
 }
 
-// realReg represents a physical register.
-type realReg uint32
+// RealReg represents a physical register.
+type RealReg uint16
 
 const (
-	vRegIDInvalid vRegID = math.MaxUint32
-	vRegInvalid   vReg   = vReg(vRegIDInvalid)
+	vRegIDInvalid VRegID = math.MaxUint32
+	vRegInvalid   VReg   = VReg(vRegIDInvalid)
 )

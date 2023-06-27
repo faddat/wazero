@@ -91,10 +91,6 @@ type (
 
 const basicBlockIDReturnBlock = 0xffffffff
 
-// BasicBlockReturn is a special BasicBlock which represents a function return which
-// can be a virtual target of branch instructions.
-var BasicBlockReturn BasicBlock = &basicBlock{id: basicBlockIDReturnBlock}
-
 // Name implements BasicBlock.Name.
 func (bb *basicBlock) Name() string {
 	if bb.id == basicBlockIDReturnBlock {
@@ -184,10 +180,6 @@ func (bb *basicBlock) reset() {
 
 // addPred adds a predecessor to this block specified by the branch instruction.
 func (bb *basicBlock) addPred(blk BasicBlock, branch *Instruction) {
-	if blk.ReturnBlock() {
-		// Return Block does not need to know the predecessors.
-		return
-	}
 	if bb.sealed {
 		panic("BUG: trying to add predecessor to a sealed block: " + bb.Name())
 	}

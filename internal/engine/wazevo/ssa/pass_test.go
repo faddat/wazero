@@ -217,7 +217,7 @@ blk2: () <-- (blk1)
 				b.InsertInstruction(jmp)
 
 				b.SetCurrentBlock(end)
-				aliasedRefOnceVal := b.allocateValue(refOnceVal._Type())
+				aliasedRefOnceVal := b.allocateValue(refOnceVal.Type())
 				b.alias(aliasedRefOnceVal, refOnceVal)
 
 				add := b.AllocateInstruction()

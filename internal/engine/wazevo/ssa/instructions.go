@@ -893,7 +893,7 @@ func (i *Instruction) AsIadd(x, y Value) {
 	i.opcode = OpcodeIadd
 	i.v = x
 	i.v2 = y
-	i.typ = x._Type()
+	i.typ = x.Type()
 }
 
 // AsIsub initializes this instruction as an integer subtraction instruction with OpcodeIsub.
@@ -901,7 +901,7 @@ func (i *Instruction) AsIsub(x, y Value) {
 	i.opcode = OpcodeIsub
 	i.v = x
 	i.v2 = y
-	i.typ = x._Type()
+	i.typ = x.Type()
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
@@ -909,7 +909,7 @@ func (i *Instruction) AsFadd(x, y Value) {
 	i.opcode = OpcodeFadd
 	i.v = x
 	i.v2 = y
-	i.typ = x._Type()
+	i.typ = x.Type()
 }
 
 // AsFsub initializes this instruction as a floating-point subtraction instruction with OpcodeFsub.
@@ -917,7 +917,7 @@ func (i *Instruction) AsFsub(x, y Value) {
 	i.opcode = OpcodeFsub
 	i.v = x
 	i.v2 = y
-	i.typ = x._Type()
+	i.typ = x.Type()
 }
 
 // AsF32const initializes this instruction as a 32-bit floating-point constant instruction with OpcodeF32const.

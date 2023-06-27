@@ -96,6 +96,9 @@ type Builder interface {
 	// BlockIteratorReversePostOrderNext is almost the same as BlockIteratorPostOrderNext except it returns the BasicBlock in the reverse post-order.
 	// This is available after RunPasses is run.
 	BlockIteratorReversePostOrderNext() BasicBlock
+
+	// ReturnBlock returns the BasicBlock which is used to return from the function.
+	ReturnBlock() BasicBlock
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -108,6 +111,7 @@ func NewBuilder() Builder {
 		blkVisited:                     make(map[*basicBlock]int),
 		valueIDAliases:                 make(map[ValueID]Value),
 		redundantParameterIndexToValue: make(map[int]Value),
+		returnBlk:                      &basicBlock{id: basicBlockIDReturnBlock},
 	}
 }
 
@@ -120,6 +124,7 @@ type builder struct {
 	// reversePostOrderedBasicBlocks are the BasicBlock(s) ordered in the reverse post-order after passCalculateImmediateDominators.
 	reversePostOrderedBasicBlocks []*basicBlock
 	currentBB                     *basicBlock
+	returnBlk                     *basicBlock
 
 	// variables track the types for Variable with the index regarded Variable.
 	variables []Type
@@ -155,8 +160,14 @@ type builder struct {
 	donePasses bool
 }
 
+// ReturnBlock implements Builder.ReturnBlock.
+func (b *builder) ReturnBlock() BasicBlock {
+	return b.returnBlk
+}
+
 // Reset implements Builder.Reset.
 func (b *builder) Reset() {
+	b.returnBlk.reset()
 	b.instructionsPool.Reset()
 	b.donePasses = false
 	for _, sig := range b.signatures {
@@ -311,7 +322,7 @@ func (b *builder) allocateVariable() (ret Variable) {
 // allocateValue implements Builder.AllocateValue.
 func (b *builder) allocateValue(typ Type) (v Value) {
 	v = Value(b.nextValueID)
-	v.setType(typ)
+	v = v.setType(typ)
 	b.nextValueID++
 	return
 }
@@ -649,12 +660,12 @@ func (b *builder) LayoutBlocks() {
 //
 // Returns true if the branch is inverted for testing purpose.
 func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
-	fallthourghBranch := now.currentInstr
-	if fallthourghBranch.opcode == OpcodeBrTable {
+	fallthroughBranch := now.currentInstr
+	if fallthroughBranch.opcode == OpcodeBrTable {
 		return false
 	}
 
-	condBranch := fallthourghBranch.prev
+	condBranch := fallthroughBranch.prev
 	if condBranch == nil || (condBranch.opcode != OpcodeBrnz && condBranch.opcode != OpcodeBrz) {
 		return false
 	}
@@ -662,7 +673,7 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 	// So this block has two branches (a conditional branch followed by an unconditional branch) at the end.
 	// We can invert the condition of the branch if it makes the fallthrough more likely.
 
-	fallthroughTarget, condTarget := fallthourghBranch.blk.(*basicBlock), condBranch.blk.(*basicBlock)
+	fallthroughTarget, condTarget := fallthroughBranch.blk.(*basicBlock), condBranch.blk.(*basicBlock)
 
 	if fallthroughTarget.loopHeader {
 		// First, if the tail's target is loopHeader, we don't need to do anything here,
@@ -692,7 +703,7 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 invert:
 	for i := range fallthroughTarget.preds {
 		pred := &fallthroughTarget.preds[i]
-		if pred.branch == fallthourghBranch {
+		if pred.branch == fallthroughBranch {
 			pred.branch = condBranch
 			break
 		}
@@ -700,14 +711,14 @@ invert:
 	for i := range condTarget.preds {
 		pred := &condTarget.preds[i]
 		if pred.branch == condBranch {
-			pred.branch = fallthourghBranch
+			pred.branch = fallthroughBranch
 			break
 		}
 	}
 
 	condBranch.InvertBrx()
 	condBranch.blk = fallthroughTarget
-	fallthourghBranch.blk = condTarget
+	fallthroughBranch.blk = condTarget
 	return true
 }
 
