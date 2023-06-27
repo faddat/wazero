@@ -12,12 +12,12 @@ type (
 		// StartBlock is called when the compilation of the given block is started.
 		StartBlock(ssa.BasicBlock)
 
+		// EndBlock is called when the compilation of the current block is finished.
+		EndBlock()
+
 		// LowerInstr is called for each instruction in the given block except for the ones marked as already lowered
 		// via CompilationContext.MarkLowered. The order is reverse, i.e. from the last instruction to the first one.
 		LowerInstr(*ssa.Instruction)
-
-		// EndBlock is called when the compilation of the current block is finished.
-		EndBlock()
 
 		// Reset resets the machine state for the next compilation.
 		Reset()
@@ -29,5 +29,8 @@ type (
 		// MarkLowered is used to mark the given instruction as already lowered
 		// which tells the compiler to skip it when traversing.
 		MarkLowered(inst *ssa.Instruction)
+
+		// ValueDefinition returns the definition of the given value.
+		ValueDefinition(ssa.Value) *SSAValueDefinition
 	}
 )

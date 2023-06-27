@@ -4,6 +4,8 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 
 // SSAValueDefinition represents a definition of an SSA value.
 type SSAValueDefinition struct {
+	refCount int
+
 	// isBlockParam indicates whether this value is a block parameter.
 	isBlockParam bool
 

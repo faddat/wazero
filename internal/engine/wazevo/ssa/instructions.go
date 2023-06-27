@@ -800,27 +800,39 @@ var (
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
 )
 
+type sideEffect int
+
+const (
+	sideEffectUnknown sideEffect = iota
+	sideEffectTrue
+	sideEffectFalse
+)
+
 // instructionSideEffects provides the info to determine if an instruction has side effects.
 // Instructions with side effects must not be eliminated regardless whether the result is used or not.
-var instructionSideEffects = [opcodeEnd]bool{
-	OpcodeJump:     true,
-	OpcodeIconst:   false,
-	OpcodeCall:     true,
-	OpcodeIadd:     false,
-	OpcodeIsub:     false,
-	OpcodeFadd:     false,
-	OpcodeFsub:     false,
-	OpcodeF32const: false,
-	OpcodeF64const: false,
-	OpcodeStore:    true,
-	OpcodeTrap:     true,
-	OpcodeReturn:   true,
-	OpcodeBrz:      true,
+var instructionSideEffects = [opcodeEnd]sideEffect{
+	OpcodeJump:     sideEffectTrue,
+	OpcodeIconst:   sideEffectFalse,
+	OpcodeCall:     sideEffectTrue,
+	OpcodeIadd:     sideEffectFalse,
+	OpcodeIsub:     sideEffectFalse,
+	OpcodeFadd:     sideEffectFalse,
+	OpcodeFsub:     sideEffectFalse,
+	OpcodeF32const: sideEffectFalse,
+	OpcodeF64const: sideEffectFalse,
+	OpcodeStore:    sideEffectTrue,
+	OpcodeTrap:     sideEffectTrue,
+	OpcodeReturn:   sideEffectTrue,
+	OpcodeBrz:      sideEffectTrue,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
 func (i *Instruction) HasSideEffects() bool {
-	return instructionSideEffects[i.opcode]
+	if e := instructionSideEffects[i.opcode]; e == sideEffectUnknown {
+		panic("BUG: side effect info not registered for " + i.opcode.String())
+	} else {
+		return e == sideEffectTrue
+	}
 }
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.

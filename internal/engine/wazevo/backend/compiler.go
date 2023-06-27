@@ -7,8 +7,11 @@ import (
 // NewBackendCompiler returns a new Compiler that can generate a machine code.
 //
 // The type parameter T must be a type that implements MachineBackend.
-func NewBackendCompiler[T Machine](mach T, builder ssa.Builder) Compiler {
-	c := &compiler[T]{mach: mach, ssaBuilder: builder}
+func NewBackendCompiler(mach Machine, builder ssa.Builder) Compiler {
+	c := &compiler{
+		mach: mach, ssaBuilder: builder,
+		alreadyLowered: make(map[*ssa.Instruction]struct{}),
+	}
 	mach.SetCompilationContext(c)
 	return c
 }
@@ -31,8 +34,8 @@ type Compiler interface {
 
 // Compiler is the backend of wazevo which takes ssa.Builder and
 // use the information there to emit the final machine code.
-type compiler[T Machine] struct {
-	mach       T
+type compiler struct {
+	mach       Machine
 	ssaBuilder ssa.Builder
 	// nextVRegID is the next virtual register ID to be allocated.
 	nextVRegID VRegID
@@ -47,21 +50,21 @@ type compiler[T Machine] struct {
 }
 
 // Compile implements Compiler.Compile.
-func (c *compiler[T]) Compile() ([]byte, error) {
+func (c *compiler) Compile() ([]byte, error) {
 	c.assignVirtualRegisters()
 	c.lowerBlocks()
 	return nil, nil
 }
 
 // lowerBlocks lowers each block in the ssa.Builder.
-func (c *compiler[T]) lowerBlocks() {
+func (c *compiler) lowerBlocks() {
 	builder := c.ssaBuilder
 	for blk := builder.BlockIteratorReversePostOrderBegin(); blk != nil; blk = builder.BlockIteratorReversePostOrderNext() {
 		c.lowerBlock(blk)
 	}
 }
 
-func (c *compiler[T]) lowerBlock(blk ssa.BasicBlock) {
+func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	mach := c.mach
 	mach.StartBlock(blk)
 	// We traverse the instructions in reverse order because we might want to lower multiple
@@ -76,7 +79,7 @@ func (c *compiler[T]) lowerBlock(blk ssa.BasicBlock) {
 }
 
 // assignVirtualRegisters assigns a virtual register to each ssa.ValueID Valid in the ssa.Builder.
-func (c *compiler[T]) assignVirtualRegisters() {
+func (c *compiler) assignVirtualRegisters() {
 	builder := c.ssaBuilder
 	refCounts := builder.ValueRefCountMap()
 
@@ -98,6 +101,7 @@ func (c *compiler[T]) assignVirtualRegisters() {
 				isBlockParam: true,
 				blk:          blk,
 				n:            i,
+				refCount:     refCounts[p],
 			}
 		}
 
@@ -111,6 +115,7 @@ func (c *compiler[T]) assignVirtualRegisters() {
 					isBlockParam: false,
 					instr:        cur,
 					n:            0,
+					refCount:     refCounts[id],
 				}
 			}
 			for i, r := range rs {
@@ -120,6 +125,7 @@ func (c *compiler[T]) assignVirtualRegisters() {
 					isBlockParam: false,
 					instr:        cur,
 					n:            i,
+					refCount:     refCounts[id],
 				}
 			}
 		}
@@ -131,14 +137,14 @@ func (c *compiler[T]) assignVirtualRegisters() {
 }
 
 // allocateVReg allocates a new virtual register.
-func (c *compiler[T]) allocateVReg() VReg {
+func (c *compiler) allocateVReg() VReg {
 	ret := VReg(c.nextVRegID)
 	c.nextVRegID++
 	return ret
 }
 
 // Reset implements Compiler.Reset.
-func (c *compiler[T]) Reset() {
+func (c *compiler) Reset() {
 	for i := VRegID(0); i < c.nextVRegID; i++ {
 		c.ssaValuesToVRegs[i] = vRegInvalid
 	}
@@ -148,11 +154,11 @@ func (c *compiler[T]) Reset() {
 }
 
 // MarkLowered implements CompilationContext.MarkLowered.
-func (c *compiler[T]) MarkLowered(inst *ssa.Instruction) {
+func (c *compiler) MarkLowered(inst *ssa.Instruction) {
 	c.alreadyLowered[inst] = struct{}{}
 }
 
 // ValueDefinition implements CompilationContext.ValueDefinition.
-func (c *compiler[T]) ValueDefinition(value ssa.Value) *SSAValueDefinition {
+func (c *compiler) ValueDefinition(value ssa.Value) *SSAValueDefinition {
 	return &c.ssaValueDefinitions[value.ID()]
 }
