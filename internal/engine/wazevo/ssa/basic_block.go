@@ -7,12 +7,18 @@ import (
 )
 
 // BasicBlock represents the Basic Block of an SSA function.
+// Each BasicBlock always ends with branching instructions (e.g. Branch, Return, etc.),
+// and at most two branches are allowed. If there's two branches, these two are placed together at the end of the block.
+// In other words, there's no branching instruction in the middle of the block.
 //
 // Note: we use the "block argument" variant of SSA, instead of PHI functions. See the package level doc comments.
 //
 // Note: we use "parameter/param" as a placeholder which represents a variant of PHI, and "argument/arg" as an actual
 // Value passed to that "parameter/param".
 type BasicBlock interface {
+	// ID returns the unique ID of this block.
+	ID() BasicBlockID
+
 	// Name returns the unique string ID of this block. e.g. blk0, blk1, ...
 	Name() string
 
@@ -51,7 +57,7 @@ type BasicBlock interface {
 type (
 	// basicBlock is a basic block in a SSA-transformed function.
 	basicBlock struct {
-		id                      basicBlockID
+		id                      BasicBlockID
 		rootInstr, currentInstr *Instruction
 		params                  []blockParam
 		preds                   []basicBlockPredecessorInfo
@@ -82,8 +88,8 @@ type (
 		// This is used in builder.LayoutBlocks.
 		reversePostOrder int
 	}
-	// basicBlockID is the unique ID of a basicBlock.
-	basicBlockID uint32
+	// BasicBlockID is the unique ID of a basicBlock.
+	BasicBlockID uint32
 
 	// blockParam implements Value and represents a parameter to a basicBlock.
 	blockParam struct {
@@ -104,6 +110,11 @@ func (bb *basicBlock) Name() string {
 	} else {
 		return fmt.Sprintf("blk%d", bb.id)
 	}
+}
+
+// ID implements BasicBlock.ID.
+func (bb *basicBlock) ID() BasicBlockID {
+	return bb.id
 }
 
 // basicBlockPredecessorInfo is the information of a predecessor of a basicBlock.

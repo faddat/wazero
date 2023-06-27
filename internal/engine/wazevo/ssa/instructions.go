@@ -29,6 +29,11 @@ type Instruction struct {
 	live    bool
 }
 
+// Opcode returns the opcode of this instruction.
+func (i *Instruction) Opcode() Opcode {
+	return i.opcode
+}
+
 // reset resets this instruction to the initial state.
 func (i *Instruction) reset() {
 	*i = Instruction{}
@@ -70,6 +75,16 @@ func (i *Instruction) Next() *Instruction {
 // Prev returns the previous instruction laid out prior to itself.
 func (i *Instruction) Prev() *Instruction {
 	return i.prev
+}
+
+// IsBranching returns true if this instruction is a branching instruction.
+func (i *Instruction) IsBranching() bool {
+	switch i.opcode {
+	case OpcodeJump, OpcodeBrz, OpcodeBrnz, OpcodeBrTable:
+		return true
+	default:
+		return false
+	}
 }
 
 // Followings match the generated code from https://github.com/bytecodealliance/wasmtime/blob/v9.0.3/cranelift/codegen/meta/src/shared/instructions.rs

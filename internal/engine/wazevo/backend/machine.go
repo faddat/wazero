@@ -9,14 +9,28 @@ type (
 		// This is only called once per Machine, i.e. before the first compilation.
 		SetCompilationContext(CompilationContext)
 
+		// StartFunction is called when the compilation of the given function is started.
+		// n is the number of ssa.BasicBlock(s) existing in the function.
+		StartFunction(n int)
+
 		// StartBlock is called when the compilation of the given block is started.
 		StartBlock(ssa.BasicBlock)
 
 		// EndBlock is called when the compilation of the current block is finished.
 		EndBlock()
 
+		// LowerBranches is called right after StartBlock and before LowerInstr if
+		// there are branches to the given block. br0 is the very end of the block and b1 is the before the br0 if it exists.
+		// At least br0 is not nil, but br1 can be nil if there's no branching before br0.
+		//
+		// See ssa.Instruction IsBranching, and the comment on ssa.BasicBlock.
+		LowerBranches(br0, br1 *ssa.Instruction)
+
 		// LowerInstr is called for each instruction in the given block except for the ones marked as already lowered
 		// via CompilationContext.MarkLowered. The order is reverse, i.e. from the last instruction to the first one.
+		//
+		// Note: this can lower multiple instructions (which produce the inputs) at once whenever it's possible
+		// for optimization.
 		LowerInstr(*ssa.Instruction)
 
 		// Reset resets the machine state for the next compilation.
@@ -34,3 +48,5 @@ type (
 		ValueDefinition(ssa.Value) *SSAValueDefinition
 	}
 )
+
+var _ CompilationContext = (*compiler)(nil)

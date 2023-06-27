@@ -239,7 +239,7 @@ func (b *builder) AllocateBasicBlock() BasicBlock {
 
 // allocateBasicBlock allocates a new basicBlock.
 func (b *builder) allocateBasicBlock() *basicBlock {
-	id := basicBlockID(b.basicBlocksPool.Allocated())
+	id := BasicBlockID(b.basicBlocksPool.Allocated())
 	blk := b.basicBlocksPool.Allocate()
 	blk.id = id
 	blk.lastDefinitions = make(map[Variable]Value)

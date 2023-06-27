@@ -19,8 +19,6 @@ func NewBackendCompiler(mach Machine, builder ssa.Builder) Compiler {
 // Compiler is the backend of wazevo which lowers the state stored in ssa.Builder
 // into the ISA-specific machine code.
 type Compiler interface {
-	CompilationContext
-
 	// Compile lowers the state stored in ssa.Builder into the ISA-specific machine code.
 	Compile() ([]byte, error)
 
@@ -67,14 +65,34 @@ func (c *compiler) lowerBlocks() {
 func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	mach := c.mach
 	mach.StartBlock(blk)
+
 	// We traverse the instructions in reverse order because we might want to lower multiple
 	// instructions together.
-	for cur := blk.Tail(); cur != nil; cur = cur.Prev() {
+	cur := blk.Tail()
+
+	// First gather the branching instructions at the end of the blocks.
+	var br0, br1 *ssa.Instruction
+	if cur.IsBranching() {
+		br0 = cur
+		cur = cur.Prev()
+		if cur != nil && cur.IsBranching() {
+			br1 = cur
+			cur = cur.Prev()
+		}
+	}
+
+	if br0 != nil {
+		mach.LowerBranches(br0, br1)
+	}
+
+	// Now start lowering the non-branching instructions.
+	for ; cur != nil; cur = cur.Prev() {
 		if _, ok := c.alreadyLowered[cur]; ok {
 			continue
 		}
 		mach.LowerInstr(cur)
 	}
+
 	mach.EndBlock()
 }
 
