@@ -42,10 +42,3 @@ func (s *SSAValueDefinition) Instr() (instr *ssa.Instruction, n int, ok bool) {
 func (s *SSAValueDefinition) RefCount() int {
 	return s.refCount
 }
-
-// reset resets this SSAValueDefinition so that it can be reused in the next compilation.
-func (s *SSAValueDefinition) reset() {
-	s.blk = nil
-	s.instr = nil
-	s.n = -1
-}

@@ -17,8 +17,11 @@ type (
 		head, tail    *instruction
 		nextLabel     label
 
-		// ssaBlockIDToLabels maps a SSA block ID to the labels of the generated code.
+		// ssaBlockIDToLabels maps an SSA block ID to the label.
 		ssaBlockIDToLabels []label
+		// labelToInstructions maps a label to the instructions of the region which the label represents.
+		labelPositions    map[label]*labelPosition
+		labelPositionPool wazevoapi.Pool[labelPosition]
 	}
 
 	// label represents a position in the generated code which is either
@@ -26,12 +29,19 @@ type (
 	//
 	// This is exactly the same as the traditional "label" in assembly code.
 	label uint32
+
+	// labelPosition represents the regions of the generated code which the label represents.
+	labelPosition struct{ begin, end *instruction }
 )
+
+const invalidLabel = 0
 
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
 	return &machine{
-		instrPool: wazevoapi.NewPool[instruction](),
+		instrPool:      wazevoapi.NewPool[instruction](),
+		labelPositions: make(map[label]*labelPosition),
+		nextLabel:      invalidLabel,
 	}
 }
 
@@ -40,6 +50,7 @@ func (m *machine) Reset() {
 	m.instrPool.Reset()
 	m.ctx = nil
 	m.currentSSABlk = nil
+	m.nextLabel = invalidLabel
 }
 
 // allocateLabel allocates an unused label.
@@ -61,17 +72,62 @@ func (m *machine) StartFunction(n int) {
 	}
 }
 
+// EndFunction implements backend.Machine.
+func (m *machine) EndFunction() {}
+
 // StartBlock implements backend.Machine.
 func (m *machine) StartBlock(blk ssa.BasicBlock) {
 	m.currentSSABlk = blk
-	l := m.allocateLabel()
-	m.ssaBlockIDToLabels[blk.ID()] = l
+
+	l := m.ssaBlockIDToLabels[m.currentSSABlk.ID()]
+	if l == invalidLabel {
+		l = m.allocateLabel()
+		m.ssaBlockIDToLabels[blk.ID()] = l
+	}
+
+	end := m.allocateNop()
+	m.insertAtHead(end)
+	m.labelPositions[l] = &labelPosition{end, end}
+}
+
+func (m *machine) insertAtHead(i *instruction) {
+	if m.head == nil {
+		m.head = i
+		m.tail = i
+		return
+	}
+	i.next = m.head
+	m.head.prev = i
+	m.head = i
 }
 
 // EndBlock implements backend.Machine.
-func (m *machine) EndBlock() {}
+func (m *machine) EndBlock() {
+	l := m.ssaBlockIDToLabels[m.currentSSABlk.ID()]
+	m.labelPositions[l].begin = m.head
+}
 
 // String implements backend.Machine.
 func (l label) String() string {
 	return fmt.Sprintf("L%d", l)
+}
+
+func (m *machine) allocateInstr() *instruction {
+	instr := m.instrPool.Allocate()
+	return instr
+}
+
+func (m *machine) allocateNop() *instruction {
+	instr := m.instrPool.Allocate()
+	instr.asNop0()
+	return instr
+}
+
+func (m *machine) getOrAllocateSSABlockLabel(blk ssa.BasicBlock) label {
+	l := m.ssaBlockIDToLabels[blk.ID()]
+	if l == invalidLabel {
+		l = m.allocateLabel()
+		m.ssaBlockIDToLabels[blk.ID()] = l
+	}
+	return l
 }

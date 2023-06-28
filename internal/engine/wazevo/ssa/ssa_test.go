@@ -4,8 +4,8 @@ import (
 	"sort"
 )
 
-// edgesCase is a map from basicBlockID to its successors.
-type edgesCase map[basicBlockID][]basicBlockID
+// edgesCase is a map from BasicBlockID to its successors.
+type edgesCase map[BasicBlockID][]BasicBlockID
 
 // constructGraphFromEdges constructs a graph from edgesCase.
 // This comes in handy when we want to test the CFG related passes.
@@ -13,14 +13,14 @@ func constructGraphFromEdges(edges edgesCase) (b *builder) {
 	b = NewBuilder().(*builder)
 
 	// Collect edges.
-	var maxID basicBlockID
-	var pairs [][2]basicBlockID
+	var maxID BasicBlockID
+	var pairs [][2]BasicBlockID
 	for fromID, toIDs := range edges {
 		if maxID < fromID {
 			maxID = fromID
 		}
 		for _, toID := range toIDs {
-			pairs = append(pairs, [2]basicBlockID{fromID, toID})
+			pairs = append(pairs, [2]BasicBlockID{fromID, toID})
 			if maxID < toID {
 				maxID = toID
 			}
@@ -28,7 +28,7 @@ func constructGraphFromEdges(edges edgesCase) (b *builder) {
 	}
 
 	// Allocate blocks.
-	blocks := make(map[basicBlockID]*basicBlock, maxID+1)
+	blocks := make(map[BasicBlockID]*basicBlock, maxID+1)
 	for i := 0; i < int(maxID)+1; i++ {
 		blk := b.AllocateBasicBlock().(*basicBlock)
 		blocks[blk.id] = blk

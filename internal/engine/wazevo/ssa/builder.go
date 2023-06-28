@@ -13,6 +13,9 @@ type Builder interface {
 	// Reset must be called to reuse this builder for the next function.
 	Reset()
 
+	// Blocks returns the number of BasicBlocks(s) existing in the currently-compiled function.
+	Blocks() int
+
 	// AllocateBasicBlock creates a basic block in SSA function.
 	AllocateBasicBlock() BasicBlock
 
@@ -543,6 +546,11 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 		n = doms[n.id]
 	}
 	return n == d
+}
+
+// Blocks implements Builder.Blocks.
+func (b *builder) Blocks() int {
+	return len(b.reversePostOrderedBasicBlocks)
 }
 
 // LayoutBlocks implements Builder.LayoutBlocks. This re-organizes builder.reversePostOrderedBasicBlocks.

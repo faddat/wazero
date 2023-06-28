@@ -3,12 +3,16 @@ package arm64
 import "fmt"
 
 type (
-	// instruction represents an instruction in arm64, including the meta instructions
-	// that are convenient for code generation. Basically, each instruction knows how to get
-	// encoded in binaries. Hence, the final output of compilation can be equivalent to the
-	// sequence of instructions.
+	// instruction represents either a real instruction in arm64, or the meta instructions
+	// that are convenient for code generation. For example, inline constants are also treated
+	// as instructions.
+	//
+	// Basically, each instruction knows how to get encoded in binaries. Hence, the final output of compilation
+	// can be considered equivalent to the sequence of such instructions.
 	//
 	// Each field is interpreted depending on the kind.
+	//
+	// TODO: optimize the layout later once the impl settles.
 	instruction struct {
 		kind       instructionKind
 		prev, next *instruction
@@ -20,17 +24,26 @@ type (
 	instructionKind int
 )
 
+func (i *instruction) asNop0() {
+	i.kind = nop0
+}
+
 func (i *instruction) asCondBr(c cond, target branchTarget) {
 	i.kind = condBr
 	i.u1 = c.asUint64()
 	i.u2 = target.asUint64()
 }
 
+func (i *instruction) asBr(target branchTarget) {
+	i.kind = condBr
+	i.u1 = target.asUint64()
+}
+
 // String implements fmt.Stringer.
-func (i *instruction) String() string {
+func (i *instruction) String() (str string) {
 	switch i.kind {
 	case nop0:
-		panic("TODO")
+		str = "nop0"
 	case nop4:
 		panic("TODO")
 	case aluRRR:
@@ -179,18 +192,19 @@ func (i *instruction) String() string {
 		panic("TODO")
 	case epiloguePlaceholder:
 		panic("TODO")
-	case jump:
-		panic("TODO")
+	case br:
+		target := branchTarget(i.u1)
+		str = fmt.Sprintf("b %s", target.String())
 	case condBr:
 		c := cond(i.u1)
 		target := branchTarget(i.u2)
 		switch c.kind() {
 		case condKindRegisterZero:
-			return fmt.Sprintf("cbz %s, %s", regNames[c.register()], target.String())
+			str = fmt.Sprintf("cbz %s, %s", regNames[c.register()], target.String())
 		case condKindRegisterNotZero:
-			return fmt.Sprintf("cbnz %s, %s", regNames[c.register()], target.String())
+			str = fmt.Sprintf("cbnz %s, %s", regNames[c.register()], target.String())
 		case condKindCondFlagSet:
-			return fmt.Sprintf("b.%s %s", c.flag(), target.String())
+			str = fmt.Sprintf("b.%s %s", c.flag(), target.String())
 		}
 	case trapIf:
 		panic("TODO")
@@ -206,10 +220,13 @@ func (i *instruction) String() string {
 		panic("TODO")
 	case loadAddr:
 		panic("TODO")
+	default:
+		panic(i.kind)
 	}
-	panic(i.kind)
+	return
 }
 
+// TODO: delete unnecessary things. Currently they are derived from
 // https://github.com/bytecodealliance/wasmtime/blob/cb306fd514f34e7dd818bb17658b93fba98e2567/cranelift/codegen/src/isa/aarch64/inst/mod.rs
 const (
 	// nop0 represents a no-op of zero size.
@@ -363,8 +380,8 @@ const (
 	// epiloguePlaceholder is a placeholder instruction, generating no code, meaning that a function epilogue must be
 	// inserted there.
 	epiloguePlaceholder
-	// jump represents an unconditional branch.
-	jump
+	// br represents an unconditional branch.
+	br
 	// condBr represents a conditional branch.
 	condBr
 	// trapIf represents a conditional trap.

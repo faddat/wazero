@@ -10,8 +10,8 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		edges    edgesCase
-		expDoms  map[basicBlockID]basicBlockID
-		expLoops map[basicBlockID]struct{}
+		expDoms  map[BasicBlockID]BasicBlockID
+		expLoops map[BasicBlockID]struct{}
 	}{
 		{
 			name: "linear",
@@ -22,7 +22,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				2: {3},
 				3: {4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 2,
@@ -41,7 +41,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				1: {3},
 				2: {3},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 0,
@@ -58,7 +58,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				1: {3},
 				2: {3},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 0,
@@ -72,7 +72,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 			edges: edgesCase{
 				0: {1, 2},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 			},
@@ -89,12 +89,12 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				2: {3},
 				3: {1},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 2,
 			},
-			expLoops: map[basicBlockID]struct{}{1: {}},
+			expLoops: map[BasicBlockID]struct{}{1: {}},
 		},
 		{
 			name: "larger diamond",
@@ -109,7 +109,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				2: {4},
 				3: {4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 0,
@@ -128,7 +128,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				1: {3},
 				2: {4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 1,
@@ -147,7 +147,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				2: {4},
 				4: {3},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 1,
@@ -167,7 +167,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				2: {4},
 				3: {4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 1,
@@ -188,7 +188,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				1: {3, 4},
 				2: {3, 4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 0,
@@ -214,7 +214,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				3: {4},
 				4: {1},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 0,
 				3: 2,
@@ -238,7 +238,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				5: {4},
 				6: {5},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 2,
@@ -246,7 +246,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				5: 2,
 				6: 3,
 			},
-			expLoops: map[basicBlockID]struct{}{1: {}},
+			expLoops: map[BasicBlockID]struct{}{1: {}},
 		},
 		{
 			name: "loop back edges",
@@ -266,7 +266,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				6: {8},
 				8: {1},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 2,
@@ -275,7 +275,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				6: 3,
 				8: 1,
 			},
-			expLoops: map[basicBlockID]struct{}{1: {}},
+			expLoops: map[BasicBlockID]struct{}{1: {}},
 		},
 		{
 			name: "multiple independent paths",
@@ -296,7 +296,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				8: {3, 9},
 				9: {4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 1,
@@ -325,7 +325,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				6: {7},
 				7: {1},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 2,
@@ -334,7 +334,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				6: 4,
 				7: 1,
 			},
-			expLoops: map[basicBlockID]struct{}{1: {}},
+			expLoops: map[BasicBlockID]struct{}{1: {}},
 		},
 		{
 			name: "double nested loops with branches",
@@ -353,7 +353,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				8: {9},
 				9: {1},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 2,
@@ -364,7 +364,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				8: 2,
 				9: 1,
 			},
-			expLoops: map[basicBlockID]struct{}{1: {}},
+			expLoops: map[BasicBlockID]struct{}{1: {}},
 		},
 		{
 			name: "split paths with a loop",
@@ -387,7 +387,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				4: {6},
 				6: {2, 5},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 1,
@@ -418,7 +418,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				4: {5, 6},
 				5: {4},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 1,
@@ -426,7 +426,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				5: 4,
 				6: 4,
 			},
-			expLoops: map[basicBlockID]struct{}{4: {}},
+			expLoops: map[BasicBlockID]struct{}{4: {}},
 		},
 		{
 			name: "parallel loops with merge",
@@ -452,7 +452,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				6: {7},
 				7: {6},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1: 0,
 				2: 1,
 				3: 1,
@@ -461,7 +461,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				6: 4,
 				7: 4,
 			},
-			expLoops: map[basicBlockID]struct{}{4: {}},
+			expLoops: map[BasicBlockID]struct{}{4: {}},
 		},
 		{
 			name: "two independent loops",
@@ -478,7 +478,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 			//      ^           |
 			//      v           v
 			//      9 <---------10
-			edges: map[basicBlockID][]basicBlockID{
+			edges: map[BasicBlockID][]BasicBlockID{
 				0:  {1},
 				1:  {2, 4},
 				2:  {3},
@@ -491,7 +491,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				9:  {6},
 				10: {9},
 			},
-			expDoms: map[basicBlockID]basicBlockID{
+			expDoms: map[BasicBlockID]BasicBlockID{
 				1:  0,
 				2:  1,
 				3:  2,
@@ -503,7 +503,7 @@ func TestBuilder_passCalculateImmediateDominators(t *testing.T) {
 				9:  6,
 				10: 8,
 			},
-			expLoops: map[basicBlockID]struct{}{1: {}, 6: {}},
+			expLoops: map[BasicBlockID]struct{}{1: {}, 6: {}},
 		},
 	} {
 		tc := tc

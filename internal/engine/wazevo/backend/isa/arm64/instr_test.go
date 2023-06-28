@@ -43,7 +43,9 @@ func TestInstruction_String(t *testing.T) {
 			},
 			exp: "cbnz x29, L50",
 		},
+		{exp: "nop0", i: &instruction{kind: nop0}},
+		{exp: "b L0", i: &instruction{kind: br, u1: label(0).asBranchTarget().asUint64()}},
 	} {
-		require.Equal(t, tc.exp, tc.i.String(), "instruction: %v", tc.i)
+		t.Run(tc.exp, func(t *testing.T) { require.Equal(t, tc.exp, tc.i.String()) })
 	}
 }

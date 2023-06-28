@@ -50,7 +50,9 @@ type compiler struct {
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile() ([]byte, error) {
 	c.assignVirtualRegisters()
+	c.mach.StartFunction(c.ssaBuilder.Blocks())
 	c.lowerBlocks()
+	c.mach.EndFunction()
 	return nil, nil
 }
 

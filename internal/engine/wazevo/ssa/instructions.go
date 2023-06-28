@@ -34,6 +34,11 @@ func (i *Instruction) Opcode() Opcode {
 	return i.opcode
 }
 
+// GroupID returns the InstructionGroupID of this instruction.
+func (i *Instruction) GroupID() InstructionGroupID {
+	return i.gid
+}
+
 // reset resets this instruction to the initial state.
 func (i *Instruction) reset() {
 	*i = Instruction{}
@@ -961,6 +966,33 @@ func (i *Instruction) AsTrap() {
 	i.opcode = OpcodeTrap
 }
 
+// InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
+func (i *Instruction) InvertBrx() {
+	switch i.opcode {
+	case OpcodeBrz:
+		i.opcode = OpcodeBrnz
+	case OpcodeBrnz:
+		i.opcode = OpcodeBrz
+	default:
+		panic("BUG")
+	}
+}
+
+// BranchData returns the branch data for this instruction necessary for backends.
+func (i *Instruction) BranchData() (condVal Value, blockArgs []Value, target BasicBlock) {
+	switch i.opcode {
+	case OpcodeJump:
+		condVal = valueInvalid
+	case OpcodeBrz, OpcodeBrnz:
+		condVal = i.v
+	default:
+		panic("BUG")
+	}
+	blockArgs = i.vs
+	target = i.blk
+	return
+}
+
 // AsJump initializes this instruction as a jump instruction with OpcodeJump.
 func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.opcode = OpcodeJump
@@ -982,18 +1014,6 @@ func (i *Instruction) AsFallthroughJump() {
 		panic("BUG: AsFallthroughJump only available for OpcodeJump")
 	}
 	i.blk = nil
-}
-
-// InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
-func (i *Instruction) InvertBrx() {
-	switch i.opcode {
-	case OpcodeBrz:
-		i.opcode = OpcodeBrnz
-	case OpcodeBrnz:
-		i.opcode = OpcodeBrz
-	default:
-		panic("BUG")
-	}
 }
 
 // AsBrz initializes this instruction as a branch-if-zero instruction with OpcodeBrz.

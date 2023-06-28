@@ -293,7 +293,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		setup func(b *builder)
-		exp   []basicBlockID
+		exp   []BasicBlockID
 	}{
 		{
 			name: "sequential - no critical edge",
@@ -303,7 +303,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
 			},
-			exp: []basicBlockID{0, 1, 2, 3},
+			exp: []BasicBlockID{0, 1, 2, 3},
 		},
 		{
 			name: "merge - no critical edge",
@@ -318,7 +318,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b1, b3)
 				insertJump(b, b2, b3)
 			},
-			exp: []basicBlockID{0, 2, 1, 3},
+			exp: []BasicBlockID{0, 2, 1, 3},
 		},
 		{
 			name: "loop towards loop header in fallthrough",
@@ -347,7 +347,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b2, b3)
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
-			exp: []basicBlockID{0, 1, 2, 4, 3},
+			exp: []BasicBlockID{0, 1, 2, 4, 3},
 		},
 		{
 			name: "loop - towards loop header in conditional branch",
@@ -376,7 +376,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b2, b1)
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
-			exp: []basicBlockID{0, 1, 2, 4, 3},
+			exp: []BasicBlockID{0, 1, 2, 4, 3},
 		},
 		{
 			name: "loop with header is critical backward edge",
@@ -413,7 +413,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b4, b5)
 			},
 			// The trampoline 6 is placed right after 4, which is the hot path of the loop.
-			exp: []basicBlockID{0, 1, 2, 3, 4, 6, 5},
+			exp: []BasicBlockID{0, 1, 2, 3, 4, 6, 5},
 		},
 		{
 			name: "multiple critical edges",
@@ -448,7 +448,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
 			},
-			exp: []basicBlockID{
+			exp: []BasicBlockID{
 				0, 1,
 				// block 2 has loop header (1) as the conditional branch target, so it's inverted,
 				// and the split edge trampoline is placed right after 2 which is the hot path of the loop.
@@ -469,7 +469,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			b.RunPasses() // LayoutBlocks() must be called after RunPasses().
 			b.LayoutBlocks()
 
-			var actual []basicBlockID
+			var actual []BasicBlockID
 			for blk := b.BlockIteratorReversePostOrderBegin(); blk != nil; blk = b.BlockIteratorReversePostOrderNext() {
 				actual = append(actual, blk.(*basicBlock).id)
 			}

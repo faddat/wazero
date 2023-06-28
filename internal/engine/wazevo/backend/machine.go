@@ -13,6 +13,9 @@ type (
 		// n is the number of ssa.BasicBlock(s) existing in the function.
 		StartFunction(n int)
 
+		// EndFunction is called when the compilation of the current function is finished.
+		EndFunction()
+
 		// StartBlock is called when the compilation of the given block is started.
 		StartBlock(ssa.BasicBlock)
 
