@@ -141,6 +141,16 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(iconst)
 		value, _ := iconst.Returns()
 		state.push(value)
+	case wasm.OpcodeI64Const:
+		c := c.readI64s()
+		if state.unreachable {
+			return
+		}
+		iconst := builder.AllocateInstruction()
+		iconst.AsIconst64(uint64(c))
+		builder.InsertInstruction(iconst)
+		value, _ := iconst.Returns()
+		state.push(value)
 	case wasm.OpcodeI32Add, wasm.OpcodeI64Add:
 		if state.unreachable {
 			return
@@ -181,6 +191,56 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(isub)
 		value, _ := isub.Returns()
 		state.push(value)
+	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondEqual)
+	case wasm.OpcodeI32Ne, wasm.OpcodeI64Ne:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondNotEqual)
+	case wasm.OpcodeI32LtS, wasm.OpcodeI64LtS:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondSignedLessThan)
+	case wasm.OpcodeI32LtU, wasm.OpcodeI64LtU:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondUnsignedLessThan)
+	case wasm.OpcodeI32GtS, wasm.OpcodeI64GtS:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondSignedGreaterThan)
+	case wasm.OpcodeI32GtU, wasm.OpcodeI64GtU:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondUnsignedGreaterThan)
+	case wasm.OpcodeI32LeS, wasm.OpcodeI64LeS:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondSignedLessThanOrEqual)
+	case wasm.OpcodeI32LeU, wasm.OpcodeI64LeU:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondUnsignedLessThanOrEqual)
+	case wasm.OpcodeI32GeS, wasm.OpcodeI64GeS:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondSignedGreaterThanOrEqual)
+	case wasm.OpcodeI32GeU, wasm.OpcodeI64GeU:
+		if state.unreachable {
+			return
+		}
+		c.insertIcmp(ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
 		if state.unreachable {
@@ -470,6 +530,16 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	}
 }
 
+func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
+	state, builder := &c.loweringState, c.ssaBuilder
+	y, x := state.pop(), state.pop()
+	cmp := builder.AllocateInstruction()
+	cmp.AsIcmp(x, y, cond)
+	builder.InsertInstruction(cmp)
+	value, _ := cmp.Returns()
+	state.push(value)
+}
+
 // storeCallerModuleContext stores the current module's moduleContextPtr into execContext.callerModuleContextPtr.
 func (c *Compiler) storeCallerModuleContext() {
 	builder := c.ssaBuilder
@@ -490,6 +560,15 @@ func (c *Compiler) readI32u() uint32 {
 
 func (c *Compiler) readI32s() int32 {
 	v, n, err := leb128.LoadInt32(c.wasmFunctionBody[c.loweringState.pc+1:])
+	if err != nil {
+		panic(err) // shouldn't be reached since compilation comes after validation.
+	}
+	c.loweringState.pc += int(n)
+	return v
+}
+
+func (c *Compiler) readI64s() int64 {
+	v, n, err := leb128.LoadInt64(c.wasmFunctionBody[c.loweringState.pc+1:])
 	if err != nil {
 		panic(err) // shouldn't be reached since compilation comes after validation.
 	}

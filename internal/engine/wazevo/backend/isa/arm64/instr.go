@@ -241,11 +241,11 @@ const (
 	aluRRImm12
 	// aluRRImmLogic represents an ALU operation with a register source and an immediate-logic source, with a register destination.
 	aluRRImmLogic
-	// aluRRImmShift represents an ALU operation with a register source and an immediate-shiftamt source, with a register destination.
+	// aluRRImmShift represents an ALU operation with a register source and an immediate-shifted source, with a register destination.
 	aluRRImmShift
 	// aluRRRShift represents an ALU operation with two register sources, one of which can be shifted, with a register destination.
 	aluRRRShift
-	// aluRRRExtend represents an ALU operation with two register sources, one of which can be extended and shifted, with a register destination.
+	// aluRRRExtend represents an ALU operation with two register sources, one of which can be extended, with a register destination.
 	aluRRRExtend
 	// bitRR represents a bit op instruction with a single register source.
 	bitRR

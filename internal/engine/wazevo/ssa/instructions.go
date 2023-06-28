@@ -338,12 +338,10 @@ const (
 	// `x = vhigh_bits a`.
 	OpcodeVhighBits
 
-	// OpcodeIcmp ...
-	// `v = icmp Cond, x, y`.
+	// OpcodeIcmp compares two integer values with the given condition: `v = icmp Cond, x, y`.
 	OpcodeIcmp
 
-	// OpcodeIcmpImm ...
-	// `v = icmp_imm Cond, x, Y`.
+	// OpcodeIcmpImm compares an integer value with the immediate value on the given condition: `v = icmp_imm Cond, x, Y`.
 	OpcodeIcmpImm
 
 	// OpcodeIfcmp ...
@@ -810,12 +808,14 @@ const (
 	opcodeEnd
 )
 
-// opcodeInfo provides the info to determine the type of an instruction.
+// returnTypesFn provides the info to determine the type of instruction.
+// t1 is the type of the first result, ts are the types of the remaining results.
 type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
 
 var (
 	returnTypesFnNoReturns returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return typeInvalid, nil }
 	returnTypesFnSingle                  = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil }
+	returnTypesFnI32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeI32, nil }
 	returnTypesFnF32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
 )
@@ -836,6 +836,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeCall:     sideEffectTrue,
 	OpcodeIadd:     sideEffectFalse,
 	OpcodeIsub:     sideEffectFalse,
+	OpcodeIcmp:     sideEffectFalse,
 	OpcodeFadd:     sideEffectFalse,
 	OpcodeFsub:     sideEffectFalse,
 	OpcodeF32const: sideEffectFalse,
@@ -876,6 +877,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	},
 	OpcodeIadd:     returnTypesFnSingle,
 	OpcodeIsub:     returnTypesFnSingle,
+	OpcodeIcmp:     returnTypesFnI32,
 	OpcodeFadd:     returnTypesFnSingle,
 	OpcodeFsub:     returnTypesFnSingle,
 	OpcodeF32const: returnTypesFnF32,
@@ -923,6 +925,20 @@ func (i *Instruction) AsIsub(x, y Value) {
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+}
+
+// AsIcmp initializes this instruction as an integer comparison instruction with OpcodeIcmp.
+func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) {
+	i.opcode = OpcodeIcmp
+	i.v = x
+	i.v2 = y
+	i.u64 = uint64(c)
+	i.typ = TypeI32
+}
+
+// IcmpData returns the operands and comparison condition of this integer comparison instruction.
+func (i *Instruction) IcmpData() (x, y Value, c IntegerCmpCond) {
+	return i.v, i.v2, IntegerCmpCond(i.u64)
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
@@ -1050,6 +1066,8 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeTrap:
 	case OpcodeIadd, OpcodeIsub, OpcodeFadd, OpcodeFsub:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.format(b), i.v2.format(b))
+	case OpcodeIcmp:
+		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u64), i.v.format(b), i.v2.format(b))
 	case OpcodeCall:
 		vs := make([]string, len(i.vs))
 		for idx := range vs {

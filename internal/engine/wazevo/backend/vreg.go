@@ -16,8 +16,8 @@ func (v VReg) RealReg() RealReg {
 	return RealReg(v >> 32)
 }
 
-// setRealReg sets the RealReg of this VReg and returns the updated VReg.
-func (v VReg) setRealReg(r RealReg) VReg {
+// SetRealReg sets the RealReg of this VReg and returns the updated VReg.
+func (v VReg) SetRealReg(r RealReg) VReg {
 	return VReg(r)<<32 | v&0xffffffff
 }
 

@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"strconv"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -160,5 +161,32 @@ func (c condFlag) String() string {
 		return "nv"
 	default:
 		panic(strconv.Itoa(int(c)))
+	}
+}
+
+func condFlagFromSSAIntegerCmpCond(c ssa.IntegerCmpCond) condFlag {
+	switch c {
+	case ssa.IntegerCmpCondEqual:
+		return eq
+	case ssa.IntegerCmpCondNotEqual:
+		return ne
+	case ssa.IntegerCmpCondSignedLessThan:
+		return lt
+	case ssa.IntegerCmpCondSignedGreaterThanOrEqual:
+		return ge
+	case ssa.IntegerCmpCondSignedGreaterThan:
+		return gt
+	case ssa.IntegerCmpCondSignedLessThanOrEqual:
+		return le
+	case ssa.IntegerCmpCondUnsignedLessThan:
+		return lo
+	case ssa.IntegerCmpCondUnsignedGreaterThanOrEqual:
+		return hs
+	case ssa.IntegerCmpCondUnsignedGreaterThan:
+		return hi
+	case ssa.IntegerCmpCondUnsignedLessThanOrEqual:
+		return ls
+	default:
+		panic(c)
 	}
 }

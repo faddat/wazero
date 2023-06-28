@@ -90,6 +90,24 @@ func (m *machine) StartBlock(blk ssa.BasicBlock) {
 	m.labelPositions[l] = &labelPosition{end, end}
 }
 
+func (m *machine) insertAtHead4(i1, i2, i3, i4 *instruction) {
+	m.insertAtHead(i4)
+	m.insertAtHead(i3)
+	m.insertAtHead(i2)
+	m.insertAtHead(i1)
+}
+
+func (m *machine) insertAtHead3(i1, i2, i3 *instruction) {
+	m.insertAtHead(i3)
+	m.insertAtHead(i2)
+	m.insertAtHead(i1)
+}
+
+func (m *machine) insertAtHead2(i1, i2 *instruction) {
+	m.insertAtHead(i2)
+	m.insertAtHead(i1)
+}
+
 func (m *machine) insertAtHead(i *instruction) {
 	if m.head == nil {
 		m.head = i

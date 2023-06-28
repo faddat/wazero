@@ -658,6 +658,170 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret, v5, v6
 `,
 		},
+
+		{
+			name: "integer comparisons", m: singleFunctionModule(vv, []byte{
+				// eq.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32Eq,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64Eq,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// neq.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32Ne,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64Ne,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// LtS.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32LtS,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64LtS,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// LtU.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32LtU,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64LtU,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// GtS.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32GtS,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64GtS,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// GtU.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32GtU,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64GtU,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// LeS.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32LeS,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64LeS,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// LeU.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32LeU,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64LeU,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// GeS.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32GeS,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64GeS,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				// GeU.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32GeU,
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64GeU,
+				wasm.OpcodeDrop,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{}),
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x1
+	v3:i32 = Iconst_32 0x2
+	v4:i32 = Icmp eq, v2, v3
+	v5:i64 = Iconst_64 0x1
+	v6:i64 = Iconst_64 0x2
+	v7:i32 = Icmp eq, v5, v6
+	v8:i32 = Iconst_32 0x1
+	v9:i32 = Iconst_32 0x2
+	v10:i32 = Icmp neq, v8, v9
+	v11:i64 = Iconst_64 0x1
+	v12:i64 = Iconst_64 0x2
+	v13:i32 = Icmp neq, v11, v12
+	v14:i32 = Iconst_32 0x1
+	v15:i32 = Iconst_32 0x2
+	v16:i32 = Icmp lt_s, v14, v15
+	v17:i64 = Iconst_64 0x1
+	v18:i64 = Iconst_64 0x2
+	v19:i32 = Icmp lt_s, v17, v18
+	v20:i32 = Iconst_32 0x1
+	v21:i32 = Iconst_32 0x2
+	v22:i32 = Icmp lt_u, v20, v21
+	v23:i64 = Iconst_64 0x1
+	v24:i64 = Iconst_64 0x2
+	v25:i32 = Icmp lt_u, v23, v24
+	v26:i32 = Iconst_32 0x1
+	v27:i32 = Iconst_32 0x2
+	v28:i32 = Icmp gt_s, v26, v27
+	v29:i64 = Iconst_64 0x1
+	v30:i64 = Iconst_64 0x2
+	v31:i32 = Icmp gt_s, v29, v30
+	v32:i32 = Iconst_32 0x1
+	v33:i32 = Iconst_32 0x2
+	v34:i32 = Icmp gt_u, v32, v33
+	v35:i64 = Iconst_64 0x1
+	v36:i64 = Iconst_64 0x2
+	v37:i32 = Icmp gt_u, v35, v36
+	v38:i32 = Iconst_32 0x1
+	v39:i32 = Iconst_32 0x2
+	v40:i32 = Icmp le_s, v38, v39
+	v41:i64 = Iconst_64 0x1
+	v42:i64 = Iconst_64 0x2
+	v43:i32 = Icmp le_s, v41, v42
+	v44:i32 = Iconst_32 0x1
+	v45:i32 = Iconst_32 0x2
+	v46:i32 = Icmp le_u, v44, v45
+	v47:i64 = Iconst_64 0x1
+	v48:i64 = Iconst_64 0x2
+	v49:i32 = Icmp le_u, v47, v48
+	v50:i32 = Iconst_32 0x1
+	v51:i32 = Iconst_32 0x2
+	v52:i32 = Icmp ge_s, v50, v51
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = Iconst_64 0x2
+	v55:i32 = Icmp ge_s, v53, v54
+	v56:i32 = Iconst_32 0x1
+	v57:i32 = Iconst_32 0x2
+	v58:i32 = Icmp ge_u, v56, v57
+	v59:i64 = Iconst_64 0x1
+	v60:i64 = Iconst_64 0x2
+	v61:i32 = Icmp ge_u, v59, v60
+	Jump blk_ret
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk_ret
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

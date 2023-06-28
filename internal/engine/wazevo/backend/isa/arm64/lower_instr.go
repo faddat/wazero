@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	"fmt"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -42,23 +40,26 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 		panic("conditional branch shouldn't have args; likely a bug in critical edge splitting")
 	}
 	targetLabel := m.getOrAllocateSSABlockLabel(targetBlk)
-	targetLabel.asBranchTarget()
+	target := targetLabel.asBranchTarget()
 
 	cvalDef := m.ctx.ValueDefinition(cval)
-	if instr, n, condValInstr := cvalDef.Instr(); condValInstr {
-		gid := b.GroupID()
-		switch {
+	if instr, _, isCondValFromInstr := cvalDef.Instr(); isCondValFromInstr {
+		x, y, c := instr.IcmpData()
+
+		cc := condFlagFromSSAIntegerCmpCond(c)
+		if instr.Opcode() == ssa.OpcodeBrz {
+			cc = cc.invert()
+		}
+
+		switch gid := b.GroupID(); {
 		case m.matchInstr(instr, gid, cvalDef, ssa.OpcodeIcmp):
-			// cbr := m.allocateInstr()
-			// cbr.asCondBr()
-			// Recursively lower the conditional value.
-			m.LowerInstr(instr)
+			cbr := m.allocateInstr()
+			cbr.asCondBr(cc.asCond(), target)
+
 		case m.matchInstr(instr, gid, cvalDef, ssa.OpcodeFcmp):
 			panic("TODO")
-		default:
-			fmt.Println(n)
-			panic("TODO")
 		}
+		return
 	}
 	return
 }
