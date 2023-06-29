@@ -2352,6 +2352,7 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 					1<<7|0b0_01_00000 /* shift by 16 */ |byte(c16>>11),
 					0b0_11_10010,
 				)
+				panic("TODO")
 			}
 		}
 	case MOVD:

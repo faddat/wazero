@@ -1392,7 +1392,6 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			buf := code.NextCodeSection()
 			err := a.encodeConstToRegister(buf, tc.n)
 			require.NoError(t, err)
-
 			err = a.Assemble(buf)
 			require.NoError(t, err)
 

@@ -21,7 +21,7 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr backend.VReg) {
 		loadF.asLoadFpuConst64(vr, v)
 		m.insert(loadF)
 	case ssa.TypeI32:
-		m.lowerConstantI32(vr, int64(v))
+		m.lowerConstantI32(vr, int32(v))
 	case ssa.TypeI64:
 		m.lowerConstantI64(vr, int64(v))
 	default:
@@ -33,31 +33,31 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr backend.VReg) {
 // The following logics are based on the old asm/arm64 package.
 // https://github.com/tetratelabs/wazero/blob/39f2ff23a6d609e10c82b9cc0b981f6de5b87a9c/internal/asm/arm64/impl.go
 
-func (m *machine) lowerConstantI32(dst backend.VReg, c int64) {
+func (m *machine) lowerConstantI32(dst backend.VReg, c int32) {
 	// Following the logic here:
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1637
-	c32 := uint32(c)
-	if c >= 0 && (c <= 0xfff || (c&0xfff) == 0 && (uint64(c>>12) <= 0xfff)) {
+	ic := int64(uint32(c))
+	if ic >= 0 && (ic <= 0xfff || (ic&0xfff) == 0 && (uint64(ic>>12) <= 0xfff)) {
 		if isBitMaskImmediate(uint64(c)) {
-			m.lowerConstViaBitMaskImmediate(uint64(c), dst, false)
+			m.lowerConstViaBitMaskImmediate(uint64(uint32(c)), dst, false)
 			return
 		}
 	}
 
-	if t := const16bitAligned(int64(c32)); t >= 0 {
+	if t := const16bitAligned(int64(uint32(c))); t >= 0 {
 		// If the const can fit within 16-bit alignment, for example, 0xffff, 0xffff_0000 or 0xffff_0000_0000_0000
 		// We could load it into temporary with movk.
-		m.insertMOVZ(dst, uint64(int64(c32)>>(16*t)), t, false)
-	} else if t := const16bitAligned(int64(^c32)); t >= 0 {
+		m.insertMOVZ(dst, uint64(uint32(c)>>(16*t)), t, false)
+	} else if t := const16bitAligned(int64(^c)); t >= 0 {
 		// Also, if the inverse of the const can fit within 16-bit range, do the same ^^.
-		m.insertMOVN(dst, uint64(int64(^c32)>>(16*t)), t, false)
+		m.insertMOVN(dst, uint64(^c>>(16*t)), t, false)
 	} else if isBitMaskImmediate(uint64(c)) {
 		m.lowerConstViaBitMaskImmediate(uint64(c), dst, false)
 	} else {
 		// Otherwise, we use MOVZ and MOVK to load it.
-		c16 := uint16(c32)
+		c16 := uint16(c)
 		m.insertMOVZ(dst, uint64(c16), 0, false)
-		c16 = uint16(c32 >> 16)
+		c16 = uint16(uint32(c) >> 16)
 		m.insertMOVK(dst, uint64(c16), 1, false)
 	}
 }
@@ -88,11 +88,8 @@ func (m *machine) lowerConstantI64(dst backend.VReg, c int64) {
 
 func (m *machine) lowerConstViaBitMaskImmediate(c uint64, dst backend.VReg, b64 bool) {
 	instr := m.allocateInstr()
-	if b64 {
-		instr.asALUBitmaskImm(orr64, xzrVReg, dst, c)
-	} else {
-		instr.asALUBitmaskImm(orr32, xzrVReg, dst, c)
-	}
+	instr.asALUBitmaskImm(aluOpOrr, xzrVReg, dst, c, b64)
+	m.insert(instr)
 }
 
 // isBitMaskImmediate determines if the value can be encoded as "bitmask immediate".

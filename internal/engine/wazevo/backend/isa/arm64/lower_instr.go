@@ -74,11 +74,12 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 		alu := m.allocateInstr()
 		// subs zr, rn, rm!
 		alu.asALU(
-			pickByBits(bits, subS32, subS64),
+			aluOpSubS,
 			// We don't need the result, just need to set flags.
-			operandNR(pickByBits(bits, wzrVReg, xzrVReg)),
+			operandNR(xzrVReg),
 			rn,
 			rm,
+			bits == 64,
 		)
 		m.insert2(alu, cbr)
 	case m.matchInstr(cvalDef, ssa.OpcodeFcmp):

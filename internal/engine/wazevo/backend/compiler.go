@@ -11,7 +11,7 @@ func NewBackendCompiler(mach Machine, builder ssa.Builder) Compiler {
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
 		alreadyLowered: make(map[*ssa.Instruction]struct{}),
-		nextVRegID:     VRegIDUnreservedBegin,
+		nextVRegID:     0,
 	}
 	mach.SetCompilationContext(c)
 	return c
@@ -90,6 +90,10 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 		mach.LowerBranches(br0, br1)
 	}
 
+	if br1 != nil && br0 == nil {
+		panic("BUG? when a block has conditional branch but doesn't end with an unconditional branch?")
+	}
+
 	// Now start lowering the non-branching instructions.
 	for ; cur != nil; cur = cur.Prev() {
 		if _, ok := c.alreadyLowered[cur]; ok {
@@ -106,7 +110,7 @@ func (c *compiler) assignVirtualRegisters() {
 	builder := c.ssaBuilder
 	refCounts := builder.ValueRefCountMap()
 
-	need := len(refCounts) + int(VRegIDUnreservedBegin)
+	need := len(refCounts)
 	if need >= len(c.ssaValuesToVRegs) {
 		c.ssaValuesToVRegs = append(c.ssaValuesToVRegs, make([]VReg, need)...)
 	}
@@ -159,7 +163,7 @@ func (c *compiler) AllocateVReg(regType RegType) VReg {
 	r := VReg(c.nextVRegID)
 	if ir := int(r); len(c.vRegToRegType) <= ir {
 		// Eagerly allocate the slice to reduce reallocation in the future iterations.
-		c.vRegToRegType = append(c.vRegToRegType, make([]RegType, int(r)+1)...)
+		c.vRegToRegType = append(c.vRegToRegType, make([]RegType, ir+1)...)
 	}
 	c.vRegToRegType[r.ID()] = regType
 	c.nextVRegID++
@@ -172,7 +176,7 @@ func (c *compiler) Reset() {
 		c.ssaValuesToVRegs[i] = vRegInvalid
 		c.vRegToRegType[i] = RegTypeInvalid
 	}
-	c.nextVRegID = VRegIDUnreservedBegin
+	c.nextVRegID = 0
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
 }

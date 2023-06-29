@@ -89,7 +89,7 @@ func (i *instruction) asLoadFpuConst64(rd backend.VReg, raw uint64) {
 }
 
 // asALU setups a basic ALU instruction.
-func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand) {
+func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand, dst64bit bool) {
 	switch rm.kind {
 	case operandKindNR:
 		i.kind = aluRRR
@@ -102,13 +102,19 @@ func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand) {
 	}
 	i.u1 = uint64(aluOp)
 	i.rd, i.rn, i.rm = rd, rn, rm
+	if dst64bit {
+		i.u3 = 1
+	}
 }
 
-func (i *instruction) asALUBitmaskImm(aluOp aluOp, src, dst backend.VReg, imm uint64) {
+func (i *instruction) asALUBitmaskImm(aluOp aluOp, src, dst backend.VReg, imm uint64, dst64bit bool) {
 	i.kind = aluRRBitmaskImm
 	i.u1 = uint64(aluOp)
 	i.rn, i.rd = operandNR(src), operandNR(dst)
-	i.u1 = imm
+	i.u2 = imm
+	if dst64bit {
+		i.u3 = 1
+	}
 }
 
 // String implements fmt.Stringer.
@@ -125,7 +131,16 @@ func (i *instruction) String() (str string) {
 	case aluRRImm12:
 		panic("TODO")
 	case aluRRBitmaskImm:
-		panic("TODO")
+		is32bit := i.u3 == 0
+		rd, rn, rm :=
+			formatVRegSized(i.rd.nr(), is32bit),
+			formatVRegSized(i.rn.nr(), is32bit),
+			formatVRegSized(i.rm.nr(), is32bit)
+		if is32bit {
+			str = fmt.Sprintf("%s %s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, rm, uint32(i.u2))
+		} else {
+			str = fmt.Sprintf("%s %s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, rm, i.u2)
+		}
 	case aluRRImmShift:
 		panic("TODO")
 	case aluRRRShift:
@@ -165,11 +180,11 @@ func (i *instruction) String() (str string) {
 	case mov32:
 		panic("TODO")
 	case movZ:
-		panic("TODO")
+		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), i.u1, i.u2*16)
 	case movN:
-		panic("TODO")
+		str = fmt.Sprintf("movn %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), i.u1, i.u2*16)
 	case movK:
-		panic("TODO")
+		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), i.u1, i.u2*16)
 	case extend:
 		panic("TODO")
 	case cSel:
@@ -209,9 +224,9 @@ func (i *instruction) String() (str string) {
 	case fpuStore128:
 		panic("TODO")
 	case loadFpuConst32:
-		str = fmt.Sprintf("ldr %s, pc+8; b 8; data.f32 %f", prettyVReg(i.rd.nr()), math.Float32frombits(uint32(i.u1)))
+		str = fmt.Sprintf("ldr %s, pc+8; b 8; data.f32 %f", formatVReg(i.rd.nr()), math.Float32frombits(uint32(i.u1)))
 	case loadFpuConst64:
-		str = fmt.Sprintf("ldr %s, pc+8; b 16; data.f64 %f", prettyVReg(i.rd.nr()), math.Float64frombits(i.u1))
+		str = fmt.Sprintf("ldr %s, pc+8; b 16; data.f64 %f", formatVReg(i.rd.nr()), math.Float64frombits(i.u1))
 	case loadFpuConst128:
 		panic("TODO")
 	case fpuToInt:
@@ -272,9 +287,9 @@ func (i *instruction) String() (str string) {
 		target := branchTarget(i.u2)
 		switch c.kind() {
 		case condKindRegisterZero:
-			str = fmt.Sprintf("cbz %s, %s", prettyVReg(c.register()), target.String())
+			str = fmt.Sprintf("cbz %s, %s", formatVReg(c.register()), target.String())
 		case condKindRegisterNotZero:
-			str = fmt.Sprintf("cbnz %s, %s", prettyVReg(c.register()), target.String())
+			str = fmt.Sprintf("cbnz %s, %s", formatVReg(c.register()), target.String())
 		case condKindCondFlagSet:
 			str = fmt.Sprintf("b.%s %s", c.flag(), target.String())
 		}
@@ -477,71 +492,77 @@ const (
 // would use this type.
 type aluOp int
 
+func (a aluOp) String() string {
+	switch a {
+	case aluOpAdd:
+		return "add"
+	case aluOpSub:
+		return "sub"
+	case aluOpOrr:
+		return "orr"
+	case aluOpAnd:
+		return "and"
+	case aluOpBic:
+		return "bic"
+	case aluOpEor:
+		return "eor"
+	case aluOpAddS:
+		return "adds"
+	case aluOpSubS:
+		return "sub"
+	case aluOpSMulH:
+		return "sMulH"
+	case aluOpUMulH:
+		return "uMulH"
+	case aluOpSDiv64:
+		return "sDiv64"
+	case aluOpUDiv64:
+		return "uDiv64"
+	case aluOpRotR:
+		return "rotR"
+	case aluOpLsr:
+		return "lsr"
+	case aluOpAsr:
+		return "asr"
+	case aluOpLsl:
+		return "lsl"
+	}
+	panic(int(a))
+}
+
 const (
-	// 32-bit Add.
-	add32 aluOp = iota
-	// 64-bit Add.
-	add64
-	// 32-bit Subtract.
-	sub32
-	// 64-bit Subtract.
-	sub64
-	// 32-bit Bitwise OR.
-	orr32
-	// 64-bit Bitwise OR.
-	orr64
-	// 32-bit Bitwise OR NOT.
-	orrNot32
-	// 64-bit Bitwise OR NOT.
-	orrNot64
-	// 32-bit Bitwise AND.
-	and32
-	// 64-bit Bitwise AND.
-	and64
-	// 32-bit Bitwise AND NOT.
-	andNot32
-	// 64-bit Bitwise AND NOT.
-	andNot64
-	// 32-bit Bitwise XOR (Exclusive OR).
-	eor32
-	// 64-bit Bitwise XOR (Exclusive OR).
-	eor64
-	// 32-bit Bitwise XNOR (Exclusive OR NOT).
-	eorNot32
-	// 64-bit Bitwise XNOR (Exclusive OR NOT).
-	eorNot64
-	// 32-bit Add setting flags.
-	addS32
-	// 64-bit Add setting flags.
-	addS64
-	// 32-bit Subtract setting flags.
-	subS32
-	// 64-bit Subtract setting flags.
-	subS64
+	// 32/64-bit Add.
+	aluOpAdd aluOp = iota
+	// 32/64-bit Subtract.
+	aluOpSub
+	// 32/64-bit Bitwise OR.
+	aluOpOrr
+	// 32/64-bit Bitwise AND.
+	aluOpAnd
+	// 32/64-bit Bitwise AND NOT.
+	aluOpBic
+	// 32/64-bit Bitwise XOR (Exclusive OR).
+	aluOpEor
+	// 32/64-bit Add setting flags.
+	aluOpAddS
+	// 32/64-bit Subtract setting flags.
+	aluOpSubS
 	// Signed multiply, high-word result.
-	sMulH
+	aluOpSMulH
 	// Unsigned multiply, high-word result.
-	uMulH
+	aluOpUMulH
 	// 64-bit Signed divide.
-	sDiv64
+	aluOpSDiv64
 	// 64-bit Unsigned divide.
-	uDiv64
-	// 32-bit Rotate right.
-	rotR32
-	// 64-bit Rotate right.
-	rotR64
-	// 32-bit Logical shift right.
-	lsr32
-	// 64-bit Logical shift right.
-	lsr64
-	// 32-bit Arithmetic shift right.
-	asr32
-	// 64-bit Arithmetic shift right.
-	asr64
-	// 32-bit Logical shift left.
-	lsl32
-	// 64-bit Logical shift left.
-	lsl64
+	aluOpUDiv64
+	// 32/64-bit Rotate right.
+	aluOpRotR
+	// 32/64-bit Logical shift right.
+	aluOpLsr
+	// 32/64-bit Arithmetic shift right.
+	aluOpAsr
+	// 32/64-bit Logical shift left.
+	aluOpLsl
 )
 
 // extMode represents the mode of a register operand extension.
