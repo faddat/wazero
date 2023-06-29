@@ -4,9 +4,7 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 
 // SSAValueDefinition represents a definition of an SSA value.
 type SSAValueDefinition struct {
-	Kind SSAValueDefinitionKind
-
-	// blk is valid if Kind == SSAValueDefinitionKindBlockParam.
+	// blk is valid if Instr == nil
 	BlkParamVReg VReg
 
 	// Instr is not nil if Kind == SSAValueDefinitionKindInstr.
@@ -17,10 +15,10 @@ type SSAValueDefinition struct {
 	RefCount int
 }
 
-// SSAValueDefinitionKind represents the kind of SSA value definition.
-type SSAValueDefinitionKind byte
+func (d *SSAValueDefinition) IsFromInstr() bool {
+	return d.Instr != nil
+}
 
-const (
-	SSAValueDefinitionKindBlockParam SSAValueDefinitionKind = iota
-	SSAValueDefinitionKindInstr
-)
+func (d *SSAValueDefinition) IsFromBlockParam() bool {
+	return d.Instr != nil
+}

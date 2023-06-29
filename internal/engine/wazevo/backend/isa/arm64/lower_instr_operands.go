@@ -48,8 +48,8 @@ func (o operand) imm12NeedShift() bool {
 	return o.data>>32 != 0
 }
 
-func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
-	if def.Kind == backend.SSAValueDefinitionKindBlockParam {
+func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+	if def.IsFromBlockParam() {
 		return operandNR(def.BlkParamVReg)
 	}
 
@@ -62,8 +62,8 @@ func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mod
 	return m.getOperand_ER_SR_NR(def, mode)
 }
 
-func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
-	if def.Kind == backend.SSAValueDefinitionKindBlockParam {
+func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+	if def.IsFromInstr() {
 		return operandNR(def.BlkParamVReg)
 	}
 
@@ -77,8 +77,8 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode exte
 	return m.getOperand_SR_NR(def, mode)
 }
 
-func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
-	if def.Kind == backend.SSAValueDefinitionKindBlockParam {
+func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+	if def.IsFromBlockParam() {
 		return operandNR(def.BlkParamVReg)
 	}
 
@@ -93,10 +93,12 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extensi
 //
 // This doesn't merge any instruction, just check if it is a constant instruction, and inline it if so.
 // Otherwise, use the default backend.VReg.
-func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
+func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
 	var v backend.VReg
-	switch def.Kind {
-	case backend.SSAValueDefinitionKindInstr:
+
+	if def.IsFromBlockParam() {
+		v = def.BlkParamVReg
+	} else {
 		instr := def.Instr
 		if instr.Constant() {
 			// We inline all the constant instructions so that we could reduce the register usage.
@@ -109,14 +111,13 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extensionM
 				v = m.ctx.VRegOf(rs[n-1])
 			}
 		}
-	case backend.SSAValueDefinitionKindBlockParam:
-		v = def.BlkParamVReg
 	}
+
 	switch mode {
-	case extensionModeNone:
-	case extensionModeZeroExtend64:
+	case extModeNone:
+	case extModeZeroExtend64:
 		panic("TODO")
-	case extensionModeSignExtend64:
+	case extModeSignExtend64:
 		panic("TODO")
 	}
 	return operandNR(v)

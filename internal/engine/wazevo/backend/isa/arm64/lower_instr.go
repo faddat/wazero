@@ -60,7 +60,7 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 			panic("TODO(maybe): support icmp with different types")
 		}
 
-		extMod := extensionModeOf(x.Type(), signed)
+		extMod := extModeOf(x.Type(), signed)
 		bits := x.Type().Bits()
 
 		cbr := m.allocateInstr()
@@ -82,7 +82,7 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 		)
 		m.insert2(alu, cbr)
 	case m.matchInstr(cvalDef, ssa.OpcodeFcmp):
-		// TODO: this should be able to reuse the code in the above case.
+		// TODO: this should be able to share the code in the above case.
 		panic("TODO")
 	default:
 		panic("TODO")
@@ -123,10 +123,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	m.flushPendingInstructions()
 }
 
-func (m *machine) matchInstr(vdef *backend.SSAValueDefinition, opcode ssa.Opcode) bool {
-	instr := vdef.Instr
-	return vdef.Kind != backend.SSAValueDefinitionKindBlockParam &&
+func (m *machine) matchInstr(def *backend.SSAValueDefinition, opcode ssa.Opcode) bool {
+	instr := def.Instr
+	return def.IsFromInstr() &&
 		instr.Opcode() == opcode &&
 		instr.GroupID() == m.currentGID &&
-		vdef.RefCount < 2
+		def.RefCount < 2
 }

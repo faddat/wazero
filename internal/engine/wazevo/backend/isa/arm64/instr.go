@@ -54,6 +54,7 @@ func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand) {
 	case operandKindImm12:
 		i.kind = aluRRImm12
 	}
+	panic("TODO")
 }
 
 // String implements fmt.Stringer.
@@ -489,24 +490,24 @@ const (
 	lsl64
 )
 
-// extensionMode represents the mode of a register operand extension.
+// extMode represents the mode of a register operand extension.
 // For example, aluRRRExtend instructions need this info to determine the extensions.
-type extensionMode byte
+type extMode byte
 
 const (
-	extensionModeNone extensionMode = iota
-	// extensionModeZeroExtend64 suggests a zero-extension to 64 bits if the original bit size is less than 64.
-	extensionModeZeroExtend64
-	// extensionModeSignExtend64 stands for a sign-extension to 64 bits if the original bit size is less than 64.
-	extensionModeSignExtend64
+	extModeNone extMode = iota
+	// extModeZeroExtend64 suggests a zero-extension to 64 bits if the original bit size is less than 64.
+	extModeZeroExtend64
+	// extModeSignExtend64 stands for a sign-extension to 64 bits if the original bit size is less than 64.
+	extModeSignExtend64
 )
 
-func extensionModeOf(t ssa.Type, signed bool) extensionMode {
+func extModeOf(t ssa.Type, signed bool) extMode {
 	if t.Bits() < 32 {
 		panic("TODO? do we need narrower than 32 bits")
 	}
 	if signed {
-		return extensionModeSignExtend64
+		return extModeSignExtend64
 	}
-	return extensionModeZeroExtend64
+	return extModeZeroExtend64
 }
