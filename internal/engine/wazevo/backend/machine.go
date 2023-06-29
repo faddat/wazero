@@ -3,7 +3,7 @@ package backend
 import "github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 
 type (
-	// Machine is a backend for a specific machine.
+	// Machine is a backend for a specific ISA machine.
 	Machine interface {
 		// SetCompilationContext sets the compilation context used for the lifetime of Machine.
 		// This is only called once per Machine, i.e. before the first compilation.

@@ -20,5 +20,5 @@ func (d *SSAValueDefinition) IsFromInstr() bool {
 }
 
 func (d *SSAValueDefinition) IsFromBlockParam() bool {
-	return d.Instr != nil
+	return d.Instr == nil
 }
