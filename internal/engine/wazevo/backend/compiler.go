@@ -11,6 +11,7 @@ func NewBackendCompiler(mach Machine, builder ssa.Builder) Compiler {
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
 		alreadyLowered: make(map[*ssa.Instruction]struct{}),
+		nextVRegID:     vRegIDUnreservedBegin,
 	}
 	mach.SetCompilationContext(c)
 	return c
@@ -41,6 +42,8 @@ type compiler struct {
 	ssaValuesToVRegs []VReg
 	// ssaValueDefinitions maps ssa.ValueID to its definition.
 	ssaValueDefinitions []SSAValueDefinition
+	// vRegToRegType maps VRegID to its register type.
+	vRegToRegType []RegType
 	// returnVRegs is the list of virtual registers that store the return values.
 	returnVRegs []VReg
 
@@ -103,26 +106,22 @@ func (c *compiler) assignVirtualRegisters() {
 	builder := c.ssaBuilder
 	refCounts := builder.ValueRefCountMap()
 
-	if len(refCounts) >= len(c.ssaValuesToVRegs) {
-		c.ssaValuesToVRegs = append(c.ssaValuesToVRegs,
-			make([]VReg, len(refCounts))...)
+	need := len(refCounts) + vRegIDUnreservedBegin
+	if need >= len(c.ssaValuesToVRegs) {
+		c.ssaValuesToVRegs = append(c.ssaValuesToVRegs, make([]VReg, need)...)
 	}
-	if len(refCounts) >= len(c.ssaValueDefinitions) {
-		c.ssaValueDefinitions = append(c.ssaValueDefinitions,
-			make([]SSAValueDefinition, len(refCounts))...)
+	if need >= len(c.ssaValueDefinitions) {
+		c.ssaValueDefinitions = append(c.ssaValueDefinitions, make([]SSAValueDefinition, need)...)
 	}
 
 	for blk := builder.BlockIteratorReversePostOrderBegin(); blk != nil; blk = builder.BlockIteratorReversePostOrderNext() {
 		// First we assign a virtual register to each parameter.
 		for i := 0; i < blk.Params(); i++ {
-			p := blk.Param(i).ID()
-			c.ssaValuesToVRegs[p] = c.allocateVReg()
-			c.ssaValueDefinitions[p] = SSAValueDefinition{
-				isBlockParam: true,
-				blk:          blk,
-				n:            i,
-				refCount:     refCounts[p],
-			}
+			p := blk.Param(i)
+			pid := p.ID()
+			vreg := c.AllocateVReg(RegTypeOf(p.Type()))
+			c.ssaValuesToVRegs[pid] = vreg
+			c.ssaValueDefinitions[pid] = SSAValueDefinition{Kind: SSAValueDefinitionKindBlockParam, BlkParamVReg: vreg}
 		}
 
 		// Assigns each value to a virtual register produced by instructions.
@@ -130,45 +129,52 @@ func (c *compiler) assignVirtualRegisters() {
 			r, rs := cur.Returns()
 			if r.Valid() {
 				id := r.ID()
-				c.ssaValuesToVRegs[id] = c.allocateVReg()
+				c.ssaValuesToVRegs[id] = c.AllocateVReg(RegTypeOf(r.Type()))
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
-					isBlockParam: false,
-					instr:        cur,
-					n:            0,
-					refCount:     refCounts[id],
+					Kind:     SSAValueDefinitionKindInstr,
+					Instr:    cur,
+					N:        0,
+					RefCount: refCounts[id],
 				}
 			}
 			for i, r := range rs {
 				id := r.ID()
-				c.ssaValuesToVRegs[id] = c.allocateVReg()
+				c.ssaValuesToVRegs[id] = c.AllocateVReg(RegTypeOf(r.Type()))
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
-					isBlockParam: false,
-					instr:        cur,
-					n:            i,
-					refCount:     refCounts[id],
+					Kind:     SSAValueDefinitionKindInstr,
+					Instr:    cur,
+					N:        i,
+					RefCount: refCounts[id],
 				}
 			}
 		}
 	}
 
-	for i := 0; i < builder.ReturnBlock().Params(); i++ {
-		c.returnVRegs = append(c.returnVRegs, c.allocateVReg())
+	for i, retBlk := 0, builder.ReturnBlock(); i < retBlk.Params(); i++ {
+		typ := retBlk.Param(i).Type()
+		c.returnVRegs = append(c.returnVRegs, c.AllocateVReg(RegTypeOf(typ)))
 	}
 }
 
-// allocateVReg allocates a new virtual register.
-func (c *compiler) allocateVReg() VReg {
-	ret := VReg(c.nextVRegID)
+// AllocateVReg implements CompilationContext.AllocateVReg.
+func (c *compiler) AllocateVReg(regType RegType) VReg {
+	r := VReg(c.nextVRegID)
+	if ir := int(r); len(c.vRegToRegType) <= ir {
+		// Eagerly allocate the slice to reduce reallocation in the future iterations.
+		c.vRegToRegType = append(c.vRegToRegType, make([]RegType, int(r)+1)...)
+	}
+	c.vRegToRegType[r.ID()] = regType
 	c.nextVRegID++
-	return ret
+	return r
 }
 
 // Reset implements Compiler.Reset.
 func (c *compiler) Reset() {
 	for i := VRegID(0); i < c.nextVRegID; i++ {
 		c.ssaValuesToVRegs[i] = vRegInvalid
+		c.vRegToRegType[i] = RegTypeInvalid
 	}
-	c.nextVRegID = 0
+	c.nextVRegID = vRegIDUnreservedBegin
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
 }
@@ -181,4 +187,9 @@ func (c *compiler) MarkLowered(inst *ssa.Instruction) {
 // ValueDefinition implements CompilationContext.ValueDefinition.
 func (c *compiler) ValueDefinition(value ssa.Value) *SSAValueDefinition {
 	return &c.ssaValueDefinitions[value.ID()]
+}
+
+// VRegOf implements CompilationContext.VRegOf.
+func (c *compiler) VRegOf(value ssa.Value) VReg {
+	return c.ssaValuesToVRegs[value.ID()]
 }

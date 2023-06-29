@@ -39,37 +39,82 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 	if len(args) > 0 {
 		panic("conditional branch shouldn't have args; likely a bug in critical edge splitting")
 	}
-	targetLabel := m.getOrAllocateSSABlockLabel(targetBlk)
-	target := targetLabel.asBranchTarget()
 
+	target := m.getOrAllocateSSABlockLabel(targetBlk).asBranchTarget()
 	cvalDef := m.ctx.ValueDefinition(cval)
-	if instr, _, isCondValFromInstr := cvalDef.Instr(); isCondValFromInstr {
-		x, y, c := instr.IcmpData()
 
-		cc := condFlagFromSSAIntegerCmpCond(c)
-		if instr.Opcode() == ssa.OpcodeBrz {
-			cc = cc.invert()
-		}
-
+	switch cvalDef.Kind {
+	case backend.SSAValueDefinitionKindInstr:
+		instr := cvalDef.Instr
 		switch gid := b.GroupID(); {
-		case m.matchInstr(instr, gid, cvalDef, ssa.OpcodeIcmp):
+		case matchInstr(instr, gid, cvalDef, ssa.OpcodeIcmp):
+			x, y, c := instr.IcmpData()
+			cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
+			if instr.Opcode() == ssa.OpcodeBrz {
+				cc = cc.invert()
+			}
+
+			if x.Type() != y.Type() {
+				panic("TODO(maybe): support icmp with different types")
+			}
+
+			extMod := extensionModeOf(x.Type(), signed)
+			bits := x.Type().Bits()
+
 			cbr := m.allocateInstr()
 			cbr.asCondBr(cc.asCond(), target)
 
-		case m.matchInstr(instr, gid, cvalDef, ssa.OpcodeFcmp):
+			// First operand must be in pure register form.
+			rn := m.getOperand_NR(x, extMod)
+			// Second operand can be in any of Imm12, ER, SR, or NR form supported by the SUBS instructions.
+			rm := m.getOperand_Imm12_ER_SR_NR(y, extMod)
+
+			alu := m.allocateInstr()
+			// subs zr, rn, rm!
+			alu.asALU(
+				pickByBits(bits, subS32, subS64),
+				// We don't need the result, just need to set flags.
+				operandNR(pickByBits(bits, wzrVReg, xzrVReg)),
+				rn,
+				rm,
+			)
+			m.insertAtHead2(alu, cbr)
+		case matchInstr(instr, gid, cvalDef, ssa.OpcodeFcmp):
+			// TODO: this should be able to reuse the code in the above case.
+			panic("TODO")
+		default:
 			panic("TODO")
 		}
-		return
+	case backend.SSAValueDefinitionKindBlockParam:
+		panic("TODO")
 	}
 	return
 }
 
-func (m *machine) matchInstr(instr *ssa.Instruction, gid ssa.InstructionGroupID, vdef *backend.SSAValueDefinition, opcode ssa.Opcode) (ok bool) {
-	return instr.Opcode() == opcode && instr.GroupID() == gid && vdef.RefCount() > 1
+func pickByBits[T any](bits byte, v32, v64 T) T {
+	if bits == 32 {
+		return v32
+	}
+	return v64
+}
+
+// allocateALU allocates an ALU instruction except for aluRRRR which is barely used, and special
+// because it takes four operands unlink three for the ones supposed here.
+func (m *machine) allocateALU(aluOp aluOp, rd, rn, rm operand) (alu *instruction) {
+	alu = m.allocateInstr()
+	switch rm.kind {
+	case operandKindNR:
+		alu.kind = aluRRR
+	case operandKindSR:
+		alu.kind = aluRRRShift
+	case operandKindER:
+		alu.kind = aluRRRExtend
+	case operandKindImm12:
+		alu.kind = aluRRImm12
+	}
+	return alu
 }
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
-	// TODO
-	m.ctx.MarkLowered(instr)
 }

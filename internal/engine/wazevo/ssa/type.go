@@ -38,6 +38,18 @@ func (t Type) String() (ret string) {
 	}
 }
 
+// Bits returns the number of bits required to represent the type.
+func (t Type) Bits() byte {
+	switch t {
+	case TypeI32, TypeF32:
+		return 32
+	case TypeI64, TypeF64:
+		return 64
+	default:
+		panic(int(t))
+	}
+}
+
 func (t Type) invalid() bool {
 	return t == typeInvalid
 }

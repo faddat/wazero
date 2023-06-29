@@ -8,7 +8,7 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 const (
 	// General purpose registers.
 
-	w0 backend.RealReg = iota
+	w0 = backend.RealRegInvalid + 1 + iota
 	w1
 	w2
 	w3
@@ -83,6 +83,11 @@ const (
 	lr
 
 	numRegisters
+)
+
+var (
+	wzrVReg = backend.VRegFromRealRegister(wzr)
+	xzrVReg = backend.VRegFromRealRegister(xzr)
 )
 
 var regNames = [...]string{

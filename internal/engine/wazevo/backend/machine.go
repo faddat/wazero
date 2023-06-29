@@ -43,12 +43,18 @@ type (
 	// CompilationContext is passed to MachineBackend to perform the lowering in the machine specific backend by
 	// leveraging the information held by *compiler.
 	CompilationContext interface {
+		// AllocateVReg allocates a new virtual register of the given type.
+		AllocateVReg(regType RegType) VReg
+
 		// MarkLowered is used to mark the given instruction as already lowered
 		// which tells the compiler to skip it when traversing.
 		MarkLowered(inst *ssa.Instruction)
 
 		// ValueDefinition returns the definition of the given value.
 		ValueDefinition(ssa.Value) *SSAValueDefinition
+
+		// VRegOf returns the virtual register of the given ssa.Value.
+		VRegOf(value ssa.Value) VReg
 	}
 )
 

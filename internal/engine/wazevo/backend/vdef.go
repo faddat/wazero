@@ -4,41 +4,23 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 
 // SSAValueDefinition represents a definition of an SSA value.
 type SSAValueDefinition struct {
-	refCount int
+	Kind SSAValueDefinitionKind
 
-	// isBlockParam indicates whether this value is a block parameter.
-	isBlockParam bool
+	// blk is valid if Kind == SSAValueDefinitionKindBlockParam.
+	BlkParamVReg VReg
 
-	// blk is not nil if this value is a block parameter, i.e. isBlockParam is true.
-	blk ssa.BasicBlock
-	// instr is not nil if this value is defined by an instruction, i.e. isBlockParam is false.
-	instr *ssa.Instruction
-	// n is the index of the parameter in the blk's parameter list if isBlockParam is true.
-	// Otherwise, n is the index of the return value in the instr's return values list.
-	n int
+	// Instr is not nil if Kind == SSAValueDefinitionKindInstr.
+	Instr *ssa.Instruction
+	// N is the index of the return value in the instr's return values list.
+	N int
+	// RefCount is the number of references to the result.
+	RefCount int
 }
 
-// Param returns the block and the index of the parameter if this value is a block parameter.
-func (s *SSAValueDefinition) Param() (blk ssa.BasicBlock, n int, ok bool) {
-	if s.isBlockParam {
-		blk = s.blk
-		n = s.n
-		ok = true
-	}
-	return
-}
+// SSAValueDefinitionKind represents the kind of SSA value definition.
+type SSAValueDefinitionKind byte
 
-// Instr returns the instruction and the index of the return value if this value is defined by an instruction.
-func (s *SSAValueDefinition) Instr() (instr *ssa.Instruction, n int, ok bool) {
-	if !s.isBlockParam {
-		instr = s.instr
-		n = s.n
-		ok = true
-	}
-	return
-}
-
-// RefCount returns the reference count of the ssa.Value.
-func (s *SSAValueDefinition) RefCount() int {
-	return s.refCount
-}
+const (
+	SSAValueDefinitionKindBlockParam SSAValueDefinitionKind = iota
+	SSAValueDefinitionKindInstr
+)

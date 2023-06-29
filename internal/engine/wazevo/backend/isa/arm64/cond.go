@@ -1,10 +1,10 @@
 package arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"strconv"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
 type (

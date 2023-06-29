@@ -1144,6 +1144,15 @@ func (i *Instruction) addArgumentBranchInst(v Value) {
 	}
 }
 
+// Constant returns true if this instruction is a constant instruction.
+func (i *Instruction) Constant() bool {
+	switch i.opcode {
+	case OpcodeIconst, OpcodeF32const, OpcodeF64const:
+		return true
+	}
+	return false
+}
+
 // String implements fmt.Stringer.
 func (o Opcode) String() (ret string) {
 	switch o {

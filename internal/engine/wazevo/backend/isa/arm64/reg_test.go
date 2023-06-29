@@ -1,15 +1,16 @@
 package arm64
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // Test_regNames tests whether regNames is initialized correctly.
 func Test_regNames(t *testing.T) {
-	for i := backend.RealReg(0); i < numRegisters; i++ {
+	for i := w1; i < numRegisters; i++ {
+		fmt.Println(i)
 		require.NotEqual(t, "", regNames[i])
 	}
 }

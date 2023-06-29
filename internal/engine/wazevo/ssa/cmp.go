@@ -53,3 +53,14 @@ func (i IntegerCmpCond) String() string {
 		panic("invalid integer comparison condition")
 	}
 }
+
+// Signed returns true if the condition is signed integer comparison.
+func (i IntegerCmpCond) Signed() bool {
+	switch i {
+	case IntegerCmpCondSignedLessThan, IntegerCmpCondSignedGreaterThanOrEqual,
+		IntegerCmpCondSignedGreaterThan, IntegerCmpCondSignedLessThanOrEqual:
+		return true
+	default:
+		return false
+	}
+}
