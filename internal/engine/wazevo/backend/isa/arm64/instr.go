@@ -23,7 +23,6 @@ type (
 		kind       instructionKind
 		prev, next *instruction
 		u1, u2, u3 uint64
-		v1, v2, v3 backend.VReg
 		rd, rm, rn operand
 	}
 
@@ -34,7 +33,7 @@ type (
 
 func (i *instruction) asMOVZ(dst backend.VReg, imm uint64, shift uint64, dst64bit bool) {
 	i.kind = movZ
-	i.v1 = dst
+	i.rd = operandNR(dst)
 	i.u1 = imm
 	i.u2 = shift
 	if dst64bit {
@@ -44,7 +43,7 @@ func (i *instruction) asMOVZ(dst backend.VReg, imm uint64, shift uint64, dst64bi
 
 func (i *instruction) asMOVK(dst backend.VReg, imm uint64, shift uint64, dst64bit bool) {
 	i.kind = movK
-	i.v1 = dst
+	i.rd = operandNR(dst)
 	i.u1 = imm
 	i.u2 = shift
 	if dst64bit {
@@ -54,7 +53,7 @@ func (i *instruction) asMOVK(dst backend.VReg, imm uint64, shift uint64, dst64bi
 
 func (i *instruction) asMOVN(dst backend.VReg, imm uint64, shift uint64, dst64bit bool) {
 	i.kind = movN
-	i.v1 = dst
+	i.rd = operandNR(dst)
 	i.u1 = imm
 	i.u2 = shift
 	if dst64bit {
@@ -80,13 +79,13 @@ func (i *instruction) asBr(target branchTarget) {
 func (i *instruction) asLoadFpuConst32(rd backend.VReg, raw uint64) {
 	i.kind = loadFpuConst32
 	i.u1 = raw
-	i.v1 = rd
+	i.rd = operandNR(rd)
 }
 
 func (i *instruction) asLoadFpuConst64(rd backend.VReg, raw uint64) {
 	i.kind = loadFpuConst64
 	i.u1 = raw
-	i.v1 = rd
+	i.rd = operandNR(rd)
 }
 
 // asALU setups a basic ALU instruction.
@@ -108,8 +107,8 @@ func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand) {
 func (i *instruction) asALUBitmaskImm(aluOp aluOp, src, dst backend.VReg, imm uint64) {
 	i.kind = aluRRBitmaskImm
 	i.u1 = uint64(aluOp)
-	i.v1, i.v2 = src, dst
-	i.u1 = uint64(imm)
+	i.rn, i.rd = operandNR(src), operandNR(dst)
+	i.u1 = imm
 }
 
 // String implements fmt.Stringer.
@@ -210,9 +209,9 @@ func (i *instruction) String() (str string) {
 	case fpuStore128:
 		panic("TODO")
 	case loadFpuConst32:
-		str = fmt.Sprintf("ldr %s, pc+8; b 8; data.f32 %f", prettyVReg(i.v1), math.Float32frombits(uint32(i.u1)))
+		str = fmt.Sprintf("ldr %s, pc+8; b 8; data.f32 %f", prettyVReg(i.rd.nr()), math.Float32frombits(uint32(i.u1)))
 	case loadFpuConst64:
-		str = fmt.Sprintf("ldr %s, pc+8; b 16; data.f64 %f", prettyVReg(i.v1), math.Float64frombits(i.u1))
+		str = fmt.Sprintf("ldr %s, pc+8; b 16; data.f64 %f", prettyVReg(i.rd.nr()), math.Float64frombits(i.u1))
 	case loadFpuConst128:
 		panic("TODO")
 	case fpuToInt:

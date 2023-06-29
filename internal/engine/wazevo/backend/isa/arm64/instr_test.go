@@ -49,7 +49,7 @@ func TestInstruction_String(t *testing.T) {
 			i: &instruction{
 				kind: loadFpuConst32,
 				u1:   uint64(math.Float32bits(3.0)),
-				v1:   backend.VReg(backend.VRegIDUnreservedBegin),
+				rd:   operandNR(backend.VReg(backend.VRegIDUnreservedBegin)),
 			},
 			exp: "ldr v?0, pc+8; b 8; data.f32 3.000000",
 		},
@@ -57,7 +57,7 @@ func TestInstruction_String(t *testing.T) {
 			i: &instruction{
 				kind: loadFpuConst64,
 				u1:   math.Float64bits(12345.987491),
-				v1:   backend.VReg(backend.VRegIDUnreservedBegin),
+				rd:   operandNR(backend.VReg(backend.VRegIDUnreservedBegin)),
 			},
 			exp: "ldr v?0, pc+8; b 16; data.f64 12345.987491",
 		},
