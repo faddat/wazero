@@ -1,6 +1,8 @@
 package arm64
 
-// This file contains the logic to "find operands" for instructions.
+// This file contains the logic to "find and determine operands" for instructions.
+// In order to finalize the form of an operand, we might end up merging
+// the source instructions into one whenever possible.
 
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -32,22 +34,30 @@ const (
 	operandKindImm12
 )
 
+// operandNR encodes the given VReg as an operand of operandKindNR.
 func operandNR(r backend.VReg) operand {
 	return operand{kind: operandKindNR, data: uint64(r)}
 }
 
-func (o operand) NR() backend.VReg {
+// nr decodes the underlying VReg assuming the operand is of operandKindNR.
+func (o operand) nr() backend.VReg {
 	return backend.VReg(o.data)
 }
 
+// operandImm12 encodes the given imm12 as an operand of operandKindImm12.
 func operandImm12(imm12 uint16, shiftBit byte) operand {
 	return operand{kind: operandKindImm12, data: uint64(imm12) | uint64(shiftBit)<<32}
 }
 
-func (o operand) imm12NeedShift() bool {
-	return o.data>>32 != 0
+// imm12 decodes the underlying imm12 data assuming the operand is of operandKindImm12.
+func (o operand) imm12() (v uint16, shiftBit byte) {
+	return uint16(o.data), byte(o.data >> 32 & 0b1)
 }
 
+// ensureValueNR returns an operand of either operandKindER, operandKindSR, or operandKindNR from the given value (defined by `def).
+//
+// `mode` is used to extend the operand if the bit length is smaller than mode.bits().
+// If the operand can be expressed as operandKindImm12, `mode` is ignored.
 func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
 	if def.IsFromBlockParam() {
 		return operandNR(def.BlkParamVReg)
@@ -62,6 +72,9 @@ func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mod
 	return m.getOperand_ER_SR_NR(def, mode)
 }
 
+// ensureValueNR returns an operand of either operandKindER, operandKindSR, or operandKindNR from the given value (defined by `def).
+//
+// `mode` is used to extend the operand if the bit length is smaller than mode.bits().
 func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
 	if def.IsFromInstr() {
 		return operandNR(def.BlkParamVReg)
@@ -77,6 +90,9 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 	return m.getOperand_SR_NR(def, mode)
 }
 
+// ensureValueNR returns an operand of either operandKindSR or operandKindNR from the given value (defined by `def).
+//
+// `mode` is used to extend the operand if the bit length is smaller than mode.bits().
 func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
 	if def.IsFromBlockParam() {
 		return operandNR(def.BlkParamVReg)
@@ -89,13 +105,11 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 	return m.getOperand_NR(def, mode)
 }
 
-// ensureValueNR ensures that the given value is a normal register.
+// ensureValueNR returns an operand of operandKindNR from the given value (defined by `def).
 //
-// This doesn't merge any instruction, just check if it is a constant instruction, and inline it if so.
-// Otherwise, use the default backend.VReg.
+// `mode` is used to extend the operand if the bit length is smaller than mode.bits().
 func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
 	var v backend.VReg
-
 	if def.IsFromBlockParam() {
 		v = def.BlkParamVReg
 	} else {
@@ -129,7 +143,7 @@ func (m *machine) emitConstant(instr *ssa.Instruction) (v backend.VReg) {
 
 func asImm12(val uint64) (v uint16, shiftBit byte, ok bool) {
 	if val < 0xfff {
-		return uint16(v), 1, true
+		return uint16(v), 0, true
 	} else if val < 0xfff_000 && (val&0xfff == 0) {
 		return uint16(v >> 12), 1, true
 	} else {

@@ -496,18 +496,53 @@ type extMode byte
 
 const (
 	extModeNone extMode = iota
+	// extModeZeroExtend64 suggests a zero-extension to 32 bits if the original bit size is less than 32.
+	extModeZeroExtend32
+	// extModeSignExtend64 stands for a sign-extension to 32 bits if the original bit size is less than 32.
+	extModeSignExtend32
 	// extModeZeroExtend64 suggests a zero-extension to 64 bits if the original bit size is less than 64.
 	extModeZeroExtend64
 	// extModeSignExtend64 stands for a sign-extension to 64 bits if the original bit size is less than 64.
 	extModeSignExtend64
 )
 
+func (e extMode) bits() int {
+	switch e {
+	case extModeZeroExtend32, extModeSignExtend32:
+		return 32
+	case extModeZeroExtend64, extModeSignExtend64:
+		return 64
+	default:
+		return 0
+	}
+}
+
 func extModeOf(t ssa.Type, signed bool) extMode {
-	if t.Bits() < 32 {
+	switch t.Bits() {
+	case 32:
+		if signed {
+			return extModeSignExtend32
+		}
+		return extModeZeroExtend32
+	case 64:
+		if signed {
+			return extModeSignExtend64
+		}
+		return extModeZeroExtend64
+	default:
 		panic("TODO? do we need narrower than 32 bits")
 	}
-	if signed {
-		return extModeSignExtend64
-	}
-	return extModeZeroExtend64
 }
+
+type extendOp byte
+
+const (
+	extendOpUXTB = 0b000
+	extendOpUXTH = 0b001
+	extendOpUXTW = 0b010
+	extendOpUXTX = 0b011
+	extendOpSXTB = 0b100
+	extendOpSXTH = 0b101
+	extendOpSXTW = 0b110
+	extendOpSXTX = 0b111
+)
