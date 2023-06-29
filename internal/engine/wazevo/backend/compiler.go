@@ -11,7 +11,7 @@ func NewBackendCompiler(mach Machine, builder ssa.Builder) Compiler {
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
 		alreadyLowered: make(map[*ssa.Instruction]struct{}),
-		nextVRegID:     vRegIDUnreservedBegin,
+		nextVRegID:     VRegIDUnreservedBegin,
 	}
 	mach.SetCompilationContext(c)
 	return c
@@ -106,7 +106,7 @@ func (c *compiler) assignVirtualRegisters() {
 	builder := c.ssaBuilder
 	refCounts := builder.ValueRefCountMap()
 
-	need := len(refCounts) + vRegIDUnreservedBegin
+	need := len(refCounts) + int(VRegIDUnreservedBegin)
 	if need >= len(c.ssaValuesToVRegs) {
 		c.ssaValuesToVRegs = append(c.ssaValuesToVRegs, make([]VReg, need)...)
 	}
@@ -121,7 +121,7 @@ func (c *compiler) assignVirtualRegisters() {
 			pid := p.ID()
 			vreg := c.AllocateVReg(RegTypeOf(p.Type()))
 			c.ssaValuesToVRegs[pid] = vreg
-			c.ssaValueDefinitions[pid] = SSAValueDefinition{Kind: SSAValueDefinitionKindBlockParam, BlkParamVReg: vreg}
+			c.ssaValueDefinitions[pid] = SSAValueDefinition{BlkParamVReg: vreg}
 		}
 
 		// Assigns each value to a virtual register produced by instructions.
@@ -131,7 +131,6 @@ func (c *compiler) assignVirtualRegisters() {
 				id := r.ID()
 				c.ssaValuesToVRegs[id] = c.AllocateVReg(RegTypeOf(r.Type()))
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
-					Kind:     SSAValueDefinitionKindInstr,
 					Instr:    cur,
 					N:        0,
 					RefCount: refCounts[id],
@@ -141,7 +140,6 @@ func (c *compiler) assignVirtualRegisters() {
 				id := r.ID()
 				c.ssaValuesToVRegs[id] = c.AllocateVReg(RegTypeOf(r.Type()))
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
-					Kind:     SSAValueDefinitionKindInstr,
 					Instr:    cur,
 					N:        i,
 					RefCount: refCounts[id],
@@ -174,7 +172,7 @@ func (c *compiler) Reset() {
 		c.ssaValuesToVRegs[i] = vRegInvalid
 		c.vRegToRegType[i] = RegTypeInvalid
 	}
-	c.nextVRegID = vRegIDUnreservedBegin
+	c.nextVRegID = VRegIDUnreservedBegin
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
 }

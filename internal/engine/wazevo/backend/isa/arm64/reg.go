@@ -1,6 +1,8 @@
 package arm64
 
-import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+)
 
 // Arm64-specific registers.
 //
@@ -87,6 +89,37 @@ const (
 )
 
 var (
+	w0Vreg  = backend.VRegFromRealRegister(w0)
+	w1Vreg  = backend.VRegFromRealRegister(w1)
+	w2Vreg  = backend.VRegFromRealRegister(w2)
+	w3Vreg  = backend.VRegFromRealRegister(w3)
+	w4Vreg  = backend.VRegFromRealRegister(w4)
+	w5Vreg  = backend.VRegFromRealRegister(w5)
+	w6Vreg  = backend.VRegFromRealRegister(w6)
+	w7Vreg  = backend.VRegFromRealRegister(w7)
+	w8Vreg  = backend.VRegFromRealRegister(w8)
+	w9Vreg  = backend.VRegFromRealRegister(w9)
+	w10Vreg = backend.VRegFromRealRegister(w10)
+	w11Vreg = backend.VRegFromRealRegister(w11)
+	w12Vreg = backend.VRegFromRealRegister(w12)
+	w13Vreg = backend.VRegFromRealRegister(w13)
+	w14Vreg = backend.VRegFromRealRegister(w14)
+	w15Vreg = backend.VRegFromRealRegister(w15)
+	w16Vreg = backend.VRegFromRealRegister(w16)
+	w17Vreg = backend.VRegFromRealRegister(w17)
+	w18Vreg = backend.VRegFromRealRegister(w18)
+	w19Vreg = backend.VRegFromRealRegister(w19)
+	w20Vreg = backend.VRegFromRealRegister(w20)
+	w21Vreg = backend.VRegFromRealRegister(w21)
+	w22Vreg = backend.VRegFromRealRegister(w22)
+	w23Vreg = backend.VRegFromRealRegister(w23)
+	w24Vreg = backend.VRegFromRealRegister(w24)
+	w25Vreg = backend.VRegFromRealRegister(w25)
+	w26Vreg = backend.VRegFromRealRegister(w26)
+	w27Vreg = backend.VRegFromRealRegister(w27)
+	w28Vreg = backend.VRegFromRealRegister(w28)
+	w29Vreg = backend.VRegFromRealRegister(w29)
+	w30Vreg = backend.VRegFromRealRegister(w30)
 	wzrVReg = backend.VRegFromRealRegister(wzr)
 	xzrVReg = backend.VRegFromRealRegister(xzr)
 )
@@ -159,4 +192,12 @@ var regNames = [...]string{
 	wsp: "wsp",
 	sp:  "sp",
 	lr:  "lr",
+}
+
+func prettyVReg(r backend.VReg) string {
+	if r.RealReg() != backend.RealRegInvalid {
+		return regNames[r.RealReg()]
+	} else {
+		return r.String()
+	}
 }

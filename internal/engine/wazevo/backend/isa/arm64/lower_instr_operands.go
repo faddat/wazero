@@ -116,7 +116,7 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 		instr := def.Instr
 		if instr.Constant() {
 			// We inline all the constant instructions so that we could reduce the register usage.
-			v = m.emitConstant(instr)
+			v = m.lowerConstant(instr)
 		} else {
 			r1, rs := instr.Returns()
 			if n := def.N; n == 0 {
@@ -137,15 +137,12 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 	return operandNR(v)
 }
 
-func (m *machine) emitConstant(instr *ssa.Instruction) (v backend.VReg) {
-	panic("TODO")
-}
-
 func asImm12(val uint64) (v uint16, shiftBit byte, ok bool) {
-	if val < 0xfff {
-		return uint16(v), 0, true
-	} else if val < 0xfff_000 && (val&0xfff == 0) {
-		return uint16(v >> 12), 1, true
+	const mask1, mask2 uint64 = 0xfff, 0xfff_000
+	if val&^mask1 == 0 {
+		return uint16(val), 0, true
+	} else if val&^mask2 == 0 {
+		return uint16(val >> 12), 1, true
 	} else {
 		return 0, 0, false
 	}

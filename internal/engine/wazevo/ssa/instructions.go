@@ -1153,9 +1153,11 @@ func (i *Instruction) Constant() bool {
 	return false
 }
 
+// ConstantVal returns the constant value of this instruction.
+// How to interpret the return value depends on the opcode.
 func (i *Instruction) ConstantVal() (ret uint64) {
 	switch i.opcode {
-	case OpcodeIconst:
+	case OpcodeIconst, OpcodeF32const, OpcodeF64const:
 		ret = i.u64
 	default:
 		panic("TODO")

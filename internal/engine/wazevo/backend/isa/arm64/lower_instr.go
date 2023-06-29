@@ -87,7 +87,6 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 	default:
 		panic("TODO")
 	}
-	return
 }
 
 func pickByBits[T any](bits byte, v32, v64 T) T {
@@ -95,23 +94,6 @@ func pickByBits[T any](bits byte, v32, v64 T) T {
 		return v32
 	}
 	return v64
-}
-
-// allocateALU allocates an ALU instruction except for aluRRRR which is barely used, and special
-// because it takes four operands unlink three for the ones supposed here.
-func (m *machine) allocateALU(aluOp aluOp, rd, rn, rm operand) (alu *instruction) {
-	alu = m.allocateInstr()
-	switch rm.kind {
-	case operandKindNR:
-		alu.kind = aluRRR
-	case operandKindSR:
-		alu.kind = aluRRRShift
-	case operandKindER:
-		alu.kind = aluRRRExtend
-	case operandKindImm12:
-		alu.kind = aluRRImm12
-	}
-	return alu
 }
 
 // LowerInstr implements backend.Machine.

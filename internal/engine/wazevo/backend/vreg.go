@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -41,13 +42,18 @@ type RealReg byte
 const RealRegInvalid = RealReg(0)
 
 const (
-	// vRegIDReservedBegin is the beginning of unreserved VRegID.
+	// VRegIDUnreservedBegin is the beginning of unreserved VRegID.
 	// The reserved IDs are used for assigning fixed physical registers.
 	// See VRegFromRealRegister.
-	vRegIDUnreservedBegin        = 256
+	VRegIDUnreservedBegin VRegID = 256
 	vRegIDInvalid         VRegID = math.MaxUint32
 	vRegInvalid                  = VReg(vRegIDInvalid)
 )
+
+// String implements fmt.Stringer.
+func (v VReg) String() string {
+	return fmt.Sprintf("v?%d", v.ID()-VRegIDUnreservedBegin)
+}
 
 // VRegFromRealRegister returns a VReg which is assigned to the given physical register.
 func VRegFromRealRegister(real RealReg) VReg {

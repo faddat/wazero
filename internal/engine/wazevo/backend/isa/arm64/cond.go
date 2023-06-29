@@ -36,18 +36,18 @@ func (c cond) asUint64() uint64 {
 
 // register returns the register for register conditions.
 // This panics if the condition is not a register condition (condKindRegisterZero or condKindRegisterNotZero).
-func (c cond) register() backend.RealReg {
+func (c cond) register() backend.VReg {
 	if c.kind() != condKindRegisterZero && c.kind() != condKindRegisterNotZero {
 		panic("condition is not a register")
 	}
-	return backend.RealReg(c >> 2)
+	return backend.VReg(c >> 2)
 }
 
-func registerAsRegZeroCond(r backend.RealReg) cond {
+func registerAsRegZeroCond(r backend.VReg) cond {
 	return cond(r<<2) | cond(condKindRegisterZero)
 }
 
-func registerAsRegNonZeroCond(r backend.RealReg) cond {
+func registerAsRegNonZeroCond(r backend.VReg) cond {
 	return cond(r<<2) | cond(condKindRegisterNotZero)
 }
 

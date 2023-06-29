@@ -106,7 +106,7 @@ func (m *machine) flushPendingInstructions() {
 	if l == 0 {
 		return
 	}
-	for i := l - 1; i > -0; i-- { // reverse because we lower instructions in reverse order.
+	for i := l - 1; i >= 0; i-- { // reverse because we lower instructions in reverse order.
 		m.insertAtHead(m.pendingInstructions[i])
 	}
 	m.pendingInstructions = m.pendingInstructions[:0]

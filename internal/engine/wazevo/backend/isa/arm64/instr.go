@@ -2,7 +2,9 @@ package arm64
 
 import (
 	"fmt"
+	"math"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
@@ -20,13 +22,45 @@ type (
 	instruction struct {
 		kind       instructionKind
 		prev, next *instruction
-		u1, u2     uint64
+		u1, u2, u3 uint64
+		v1, v2, v3 backend.VReg
+		rd, rm, rn operand
 	}
 
 	// instructionKind represents the kind of instruction.
 	// This controls how the instruction struct is interpreted.
 	instructionKind int
 )
+
+func (i *instruction) asMOVZ(dst backend.VReg, imm uint64, shift uint64, dst64bit bool) {
+	i.kind = movZ
+	i.v1 = dst
+	i.u1 = imm
+	i.u2 = shift
+	if dst64bit {
+		i.u3 = 1
+	}
+}
+
+func (i *instruction) asMOVK(dst backend.VReg, imm uint64, shift uint64, dst64bit bool) {
+	i.kind = movK
+	i.v1 = dst
+	i.u1 = imm
+	i.u2 = shift
+	if dst64bit {
+		i.u3 = 1
+	}
+}
+
+func (i *instruction) asMOVN(dst backend.VReg, imm uint64, shift uint64, dst64bit bool) {
+	i.kind = movN
+	i.v1 = dst
+	i.u1 = imm
+	i.u2 = shift
+	if dst64bit {
+		i.u3 = 1
+	}
+}
 
 func (i *instruction) asNop0() {
 	i.kind = nop0
@@ -43,6 +77,19 @@ func (i *instruction) asBr(target branchTarget) {
 	i.u1 = target.asUint64()
 }
 
+func (i *instruction) asLoadFpuConst32(rd backend.VReg, raw uint64) {
+	i.kind = loadFpuConst32
+	i.u1 = raw
+	i.v1 = rd
+}
+
+func (i *instruction) asLoadFpuConst64(rd backend.VReg, raw uint64) {
+	i.kind = loadFpuConst64
+	i.u1 = raw
+	i.v1 = rd
+}
+
+// asALU setups a basic ALU instruction.
 func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand) {
 	switch rm.kind {
 	case operandKindNR:
@@ -54,7 +101,15 @@ func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand) {
 	case operandKindImm12:
 		i.kind = aluRRImm12
 	}
-	panic("TODO")
+	i.u1 = uint64(aluOp)
+	i.rd, i.rn, i.rm = rd, rn, rm
+}
+
+func (i *instruction) asALUBitmaskImm(aluOp aluOp, src, dst backend.VReg, imm uint64) {
+	i.kind = aluRRBitmaskImm
+	i.u1 = uint64(aluOp)
+	i.v1, i.v2 = src, dst
+	i.u1 = uint64(imm)
 }
 
 // String implements fmt.Stringer.
@@ -70,7 +125,7 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case aluRRImm12:
 		panic("TODO")
-	case aluRRImmLogic:
+	case aluRRBitmaskImm:
 		panic("TODO")
 	case aluRRImmShift:
 		panic("TODO")
@@ -155,9 +210,9 @@ func (i *instruction) String() (str string) {
 	case fpuStore128:
 		panic("TODO")
 	case loadFpuConst32:
-		panic("TODO")
+		str = fmt.Sprintf("ldr %s, pc+8; b 8; data.f32 %f", prettyVReg(i.v1), math.Float32frombits(uint32(i.u1)))
 	case loadFpuConst64:
-		panic("TODO")
+		str = fmt.Sprintf("ldr %s, pc+8; b 16; data.f64 %f", prettyVReg(i.v1), math.Float64frombits(i.u1))
 	case loadFpuConst128:
 		panic("TODO")
 	case fpuToInt:
@@ -218,9 +273,9 @@ func (i *instruction) String() (str string) {
 		target := branchTarget(i.u2)
 		switch c.kind() {
 		case condKindRegisterZero:
-			str = fmt.Sprintf("cbz %s, %s", regNames[c.register()], target.String())
+			str = fmt.Sprintf("cbz %s, %s", prettyVReg(c.register()), target.String())
 		case condKindRegisterNotZero:
-			str = fmt.Sprintf("cbnz %s, %s", regNames[c.register()], target.String())
+			str = fmt.Sprintf("cbnz %s, %s", prettyVReg(c.register()), target.String())
 		case condKindCondFlagSet:
 			str = fmt.Sprintf("b.%s %s", c.flag(), target.String())
 		}
@@ -257,8 +312,8 @@ const (
 	aluRRRR
 	// aluRRImm12 represents an ALU operation with a register source and an immediate-12 source, with a register destination.
 	aluRRImm12
-	// aluRRImmLogic represents an ALU operation with a register source and an immediate-logic source, with a register destination.
-	aluRRImmLogic
+	// aluRRBitmaskImm represents an ALU operation with a register source and a bitmask immediate, with a register destination.
+	aluRRBitmaskImm
 	// aluRRImmShift represents an ALU operation with a register source and an immediate-shifted source, with a register destination.
 	aluRRImmShift
 	// aluRRRShift represents an ALU operation with two register sources, one of which can be shifted, with a register destination.
@@ -419,7 +474,7 @@ const (
 )
 
 // aluOp determines the type of ALU operation. Instructions whose kind is one of
-// aluRRR, aluRRRR, aluRRImm12, aluRRImmLogic, aluRRImmShift, aluRRRShift and aluRRRExtend
+// aluRRR, aluRRRR, aluRRImm12, aluRRBitmaskImm, aluRRImmShift, aluRRRShift and aluRRRExtend
 // would use this type.
 type aluOp int
 
