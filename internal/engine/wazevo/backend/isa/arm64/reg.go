@@ -5,6 +5,7 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 // Arm64-specific registers.
 //
 // See https://developer.arm.com/documentation/dui0801/a/Overview-of-AArch64-state/Predeclared-core-register-names-in-AArch64-state
+
 const (
 	// General purpose registers.
 

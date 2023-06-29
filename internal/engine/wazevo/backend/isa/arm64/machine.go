@@ -11,11 +11,13 @@ import (
 type (
 	// machine implements backend.Machine.
 	machine struct {
-		ctx           backend.CompilationContext
-		currentSSABlk ssa.BasicBlock
-		instrPool     wazevoapi.Pool[instruction]
-		head, tail    *instruction
-		nextLabel     label
+		ctx                 backend.CompilationContext
+		currentSSABlk       ssa.BasicBlock
+		currentGID          ssa.InstructionGroupID
+		instrPool           wazevoapi.Pool[instruction]
+		pendingInstructions []*instruction
+		head, tail          *instruction
+		nextLabel           label
 
 		// ssaBlockIDToLabels maps an SSA block ID to the label.
 		ssaBlockIDToLabels []label
@@ -51,6 +53,7 @@ func (m *machine) Reset() {
 	m.ctx = nil
 	m.currentSSABlk = nil
 	m.nextLabel = invalidLabel
+	m.pendingInstructions = m.pendingInstructions[:0]
 }
 
 // allocateLabel allocates an unused label.
@@ -90,22 +93,23 @@ func (m *machine) StartBlock(blk ssa.BasicBlock) {
 	m.labelPositions[l] = &labelPosition{end, end}
 }
 
-func (m *machine) insertAtHead4(i1, i2, i3, i4 *instruction) {
-	m.insertAtHead(i4)
-	m.insertAtHead(i3)
-	m.insertAtHead(i2)
-	m.insertAtHead(i1)
+func (m *machine) insert(i *instruction) {
+	m.pendingInstructions = append(m.pendingInstructions, i)
 }
 
-func (m *machine) insertAtHead3(i1, i2, i3 *instruction) {
-	m.insertAtHead(i3)
-	m.insertAtHead(i2)
-	m.insertAtHead(i1)
+func (m *machine) insert2(i1, i2 *instruction) {
+	m.pendingInstructions = append(m.pendingInstructions, i1, i2)
 }
 
-func (m *machine) insertAtHead2(i1, i2 *instruction) {
-	m.insertAtHead(i2)
-	m.insertAtHead(i1)
+func (m *machine) flushPendingInstructions() {
+	l := len(m.pendingInstructions)
+	if l == 0 {
+		return
+	}
+	for i := l - 1; i > -0; i-- { // reverse because we lower instructions in reverse order.
+		m.insertAtHead(m.pendingInstructions[i])
+	}
+	m.pendingInstructions = m.pendingInstructions[:0]
 }
 
 func (m *machine) insertAtHead(i *instruction) {
@@ -148,4 +152,8 @@ func (m *machine) getOrAllocateSSABlockLabel(blk ssa.BasicBlock) label {
 		m.ssaBlockIDToLabels[blk.ID()] = l
 	}
 	return l
+}
+
+func (m *machine) setCurrentInstructionGroupID(gid ssa.InstructionGroupID) {
+	m.currentGID = gid
 }

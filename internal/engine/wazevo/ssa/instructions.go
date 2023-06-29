@@ -1153,6 +1153,16 @@ func (i *Instruction) Constant() bool {
 	return false
 }
 
+func (i *Instruction) ConstantVal() (ret uint64) {
+	switch i.opcode {
+	case OpcodeIconst:
+		ret = i.u64
+	default:
+		panic("TODO")
+	}
+	return
+}
+
 // String implements fmt.Stringer.
 func (o Opcode) String() (ret string) {
 	switch o {

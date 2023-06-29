@@ -7,9 +7,13 @@ import (
 
 // LowerBranches implements backend.Machine.
 func (m *machine) LowerBranches(br0, br1 *ssa.Instruction) {
+	m.setCurrentInstructionGroupID(br0.GroupID())
 	m.lowerSingleBranch(br0)
+	m.flushPendingInstructions()
 	if br1 != nil {
+		m.setCurrentInstructionGroupID(br1.GroupID())
 		m.lowerConditionalBranch(br1)
+		m.flushPendingInstructions()
 	}
 }
 
@@ -28,7 +32,7 @@ func (m *machine) lowerSingleBranch(br *ssa.Instruction) {
 		}
 		b := m.allocateInstr()
 		b.asBr(targetLabel.asBranchTarget())
-		m.insertAtHead(b)
+		m.insert(b)
 	case ssa.OpcodeBrTable:
 		panic("TODO: support OpcodeBrTable")
 	}
@@ -43,49 +47,44 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 	target := m.getOrAllocateSSABlockLabel(targetBlk).asBranchTarget()
 	cvalDef := m.ctx.ValueDefinition(cval)
 
-	switch cvalDef.Kind {
-	case backend.SSAValueDefinitionKindInstr:
-		instr := cvalDef.Instr
-		switch gid := b.GroupID(); {
-		case matchInstr(instr, gid, cvalDef, ssa.OpcodeIcmp):
-			x, y, c := instr.IcmpData()
-			cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
-			if instr.Opcode() == ssa.OpcodeBrz {
-				cc = cc.invert()
-			}
-
-			if x.Type() != y.Type() {
-				panic("TODO(maybe): support icmp with different types")
-			}
-
-			extMod := extensionModeOf(x.Type(), signed)
-			bits := x.Type().Bits()
-
-			cbr := m.allocateInstr()
-			cbr.asCondBr(cc.asCond(), target)
-
-			// First operand must be in pure register form.
-			rn := m.getOperand_NR(x, extMod)
-			// Second operand can be in any of Imm12, ER, SR, or NR form supported by the SUBS instructions.
-			rm := m.getOperand_Imm12_ER_SR_NR(y, extMod)
-
-			alu := m.allocateInstr()
-			// subs zr, rn, rm!
-			alu.asALU(
-				pickByBits(bits, subS32, subS64),
-				// We don't need the result, just need to set flags.
-				operandNR(pickByBits(bits, wzrVReg, xzrVReg)),
-				rn,
-				rm,
-			)
-			m.insertAtHead2(alu, cbr)
-		case matchInstr(instr, gid, cvalDef, ssa.OpcodeFcmp):
-			// TODO: this should be able to reuse the code in the above case.
-			panic("TODO")
-		default:
-			panic("TODO")
+	switch {
+	case m.matchInstr(cvalDef, ssa.OpcodeIcmp):
+		cvalInstr := cvalDef.Instr
+		x, y, c := cvalInstr.IcmpData()
+		cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
+		if b.Opcode() == ssa.OpcodeBrz {
+			cc = cc.invert()
 		}
-	case backend.SSAValueDefinitionKindBlockParam:
+
+		if x.Type() != y.Type() {
+			panic("TODO(maybe): support icmp with different types")
+		}
+
+		extMod := extensionModeOf(x.Type(), signed)
+		bits := x.Type().Bits()
+
+		cbr := m.allocateInstr()
+		cbr.asCondBr(cc.asCond(), target)
+
+		// First operand must be in pure register form.
+		rn := m.getOperand_NR(m.ctx.ValueDefinition(x), extMod)
+		// Second operand can be in any of Imm12, ER, SR, or NR form supported by the SUBS instructions.
+		rm := m.getOperand_Imm12_ER_SR_NR(m.ctx.ValueDefinition(y), extMod)
+
+		alu := m.allocateInstr()
+		// subs zr, rn, rm!
+		alu.asALU(
+			pickByBits(bits, subS32, subS64),
+			// We don't need the result, just need to set flags.
+			operandNR(pickByBits(bits, wzrVReg, xzrVReg)),
+			rn,
+			rm,
+		)
+		m.insert2(alu, cbr)
+	case m.matchInstr(cvalDef, ssa.OpcodeFcmp):
+		// TODO: this should be able to reuse the code in the above case.
+		panic("TODO")
+	default:
 		panic("TODO")
 	}
 	return
@@ -117,4 +116,17 @@ func (m *machine) allocateALU(aluOp aluOp, rd, rn, rm operand) (alu *instruction
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	m.setCurrentInstructionGroupID(instr.GroupID())
+
+	// TODO: lowering logic.
+
+	m.flushPendingInstructions()
+}
+
+func (m *machine) matchInstr(vdef *backend.SSAValueDefinition, opcode ssa.Opcode) bool {
+	instr := vdef.Instr
+	return vdef.Kind != backend.SSAValueDefinitionKindBlockParam &&
+		instr.Opcode() == opcode &&
+		instr.GroupID() == m.currentGID &&
+		vdef.RefCount < 2
 }

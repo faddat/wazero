@@ -40,22 +40,61 @@ func (o operand) NR() backend.VReg {
 	return backend.VReg(o.data)
 }
 
-func matchInstr(
-	instr *ssa.Instruction,
-	gid ssa.InstructionGroupID,
-	vdef *backend.SSAValueDefinition,
-	opcode ssa.Opcode,
-) bool {
-	return instr.Opcode() == opcode && instr.GroupID() == gid && vdef.RefCount < 2
+func operandImm12(imm12 uint16, shiftBit byte) operand {
+	return operand{kind: operandKindImm12, data: uint64(imm12) | uint64(shiftBit)<<32}
+}
+
+func (o operand) imm12NeedShift() bool {
+	return o.data>>32 != 0
+}
+
+func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
+	if def.Kind == backend.SSAValueDefinitionKindBlockParam {
+		return operandNR(def.BlkParamVReg)
+	}
+
+	instr := def.Instr
+	if instr.Opcode() == ssa.OpcodeIconst {
+		if imm12, shift, ok := asImm12(instr.ConstantVal()); ok {
+			return operandImm12(imm12, shift)
+		}
+	}
+	return m.getOperand_ER_SR_NR(def, mode)
+}
+
+func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
+	if def.Kind == backend.SSAValueDefinitionKindBlockParam {
+		return operandNR(def.BlkParamVReg)
+	}
+
+	switch {
+	case m.matchInstr(def, ssa.OpcodeSextend):
+		panic("TODO")
+	case m.matchInstr(def, ssa.OpcodeUextend):
+		panic("TODO")
+	}
+
+	return m.getOperand_SR_NR(def, mode)
+}
+
+func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
+	if def.Kind == backend.SSAValueDefinitionKindBlockParam {
+		return operandNR(def.BlkParamVReg)
+	}
+
+	if m.matchInstr(def, ssa.OpcodeIshl) {
+		// TODO:
+		return
+	}
+	return m.getOperand_NR(def, mode)
 }
 
 // ensureValueNR ensures that the given value is a normal register.
 //
 // This doesn't merge any instruction, just check if it is a constant instruction, and inline it if so.
 // Otherwise, use the default backend.VReg.
-func (m *machine) getOperand_NR(value ssa.Value, mode extensionMode) (op operand) {
+func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extensionMode) (op operand) {
 	var v backend.VReg
-	def := m.ctx.ValueDefinition(value)
 	switch def.Kind {
 	case backend.SSAValueDefinitionKindInstr:
 		instr := def.Instr
@@ -83,20 +122,16 @@ func (m *machine) getOperand_NR(value ssa.Value, mode extensionMode) (op operand
 	return operandNR(v)
 }
 
-func (m *machine) getOperand_Imm12_ER_SR_NR(value ssa.Value, mode extensionMode) (op operand) {
-	panic("TODO")
-}
-
 func (m *machine) emitConstant(instr *ssa.Instruction) (v backend.VReg) {
 	panic("TODO")
 }
 
-func asImm12(val uint64) (v uint16, shift, ok bool) {
+func asImm12(val uint64) (v uint16, shiftBit byte, ok bool) {
 	if val < 0xfff {
-		return uint16(v), false, true
+		return uint16(v), 1, true
 	} else if val < 0xfff_000 && (val&0xfff == 0) {
-		return uint16(v >> 12), true, true
+		return uint16(v >> 12), 1, true
 	} else {
-		return 0, false, false
+		return 0, 0, false
 	}
 }
