@@ -64,7 +64,7 @@ func operandImm12(imm12 uint16, shiftBit byte) operand {
 
 // imm12 decodes the underlying imm12 data assuming the operand is of operandKindImm12.
 func (o operand) imm12() (v uint16, shiftBit byte) {
-	return uint16(o.data), byte(o.data >> 32 & 0b1)
+	return uint16(o.data), byte(o.data >> 32)
 }
 
 // ensureValueNR returns an operand of either operandKindER, operandKindSR, or operandKindNR from the given value (defined by `def).
@@ -95,9 +95,9 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 
 	switch {
 	case m.matchInstr(def, ssa.OpcodeSextend):
-		panic("TODO")
+		panic("TODO: can be zero-extended register operand")
 	case m.matchInstr(def, ssa.OpcodeUextend):
-		panic("TODO")
+		panic("TODO: can be sign-extended register operand")
 	}
 	return m.getOperand_SR_NR(def, mode)
 }
@@ -137,10 +137,10 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 			// We inline all the constant instructions so that we could reduce the register usage.
 			v = m.lowerConstant(instr)
 		} else {
-			r1, rs := instr.Returns()
 			if n := def.N; n == 0 {
-				v = m.ctx.VRegOf(r1)
+				v = m.ctx.VRegOf(instr.Return())
 			} else {
+				_, rs := instr.Returns()
 				v = m.ctx.VRegOf(rs[n-1])
 			}
 		}

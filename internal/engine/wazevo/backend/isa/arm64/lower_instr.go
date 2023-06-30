@@ -1,5 +1,11 @@
 package arm64
 
+// Files prefixed as lower** do the instruction selections, meaning that lowering SSA level instructions
+// into machine specific instructions.
+//
+// Importantly, what the lower** functions does includes tree-matching; find the pattern from the given instruction tree,
+// and merge the multiple instructions if possible. It can be considered as "N:1" instruction selection.
+
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
