@@ -1400,7 +1400,3 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		})
 	}
 }
-
-func u64toi(v uint64) int64 {
-	return int64(v)
-}

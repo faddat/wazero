@@ -1,8 +1,9 @@
 package arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 )
 
 // Arm64-specific registers.

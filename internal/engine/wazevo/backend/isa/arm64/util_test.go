@@ -1,9 +1,10 @@
 package arm64
 
 import (
+	"strings"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
-	"strings"
 )
 
 func getPendingInstr(m *machine) *instruction {

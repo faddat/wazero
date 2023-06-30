@@ -90,13 +90,6 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 	}
 }
 
-func pickByBits[T any](bits byte, v32, v64 T) T {
-	if bits == 32 {
-		return v32
-	}
-	return v64
-}
-
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	m.setCurrentInstructionGroupID(instr.GroupID())
@@ -106,6 +99,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	m.flushPendingInstructions()
 }
 
+// matchInstr returns true if the given definition is from the given opcode and group ID, and has a refcount of 1.
+// That means, the instruction can be merged/swapped within the current instruction group.
 func (m *machine) matchInstr(def *backend.SSAValueDefinition, opcode ssa.Opcode) bool {
 	instr := def.Instr
 	return def.IsFromInstr() &&
