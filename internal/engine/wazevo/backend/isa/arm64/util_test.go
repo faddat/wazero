@@ -43,6 +43,7 @@ func regToVReg(reg backend.RealReg) backend.VReg {
 	return backend.VReg(0).SetRealReg(reg)
 }
 
+// mockCompilationContext implements backend.CompilationContext for testing.
 type mockCompilationContext struct {
 	vRegCounter int
 	vRegMap     map[ssa.Value]backend.VReg
@@ -59,15 +60,18 @@ func newMockCompilationContext() *mockCompilationContext {
 	}
 }
 
+// AllocateVReg implements backend.CompilationContext.
 func (m *mockCompilationContext) AllocateVReg(regType backend.RegType) backend.VReg {
 	m.vRegCounter++
 	return backend.VReg(m.vRegCounter)
 }
 
+// MarkLowered implements backend.CompilationContext.
 func (m *mockCompilationContext) MarkLowered(inst *ssa.Instruction) {
 	m.lowered[inst] = true
 }
 
+// ValueDefinition implements backend.CompilationContext.
 func (m *mockCompilationContext) ValueDefinition(value ssa.Value) *backend.SSAValueDefinition {
 	definition, exists := m.definitions[value]
 	if !exists {
@@ -76,6 +80,7 @@ func (m *mockCompilationContext) ValueDefinition(value ssa.Value) *backend.SSAVa
 	return definition
 }
 
+// VRegOf implements backend.CompilationContext.
 func (m *mockCompilationContext) VRegOf(value ssa.Value) backend.VReg {
 	vReg, exists := m.vRegMap[value]
 	if !exists {
