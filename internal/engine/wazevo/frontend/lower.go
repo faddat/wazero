@@ -139,7 +139,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		iconst := builder.AllocateInstruction()
 		iconst.AsIconst32(uint32(c))
 		builder.InsertInstruction(iconst)
-		value, _ := iconst.Returns()
+		value := iconst.Return()
 		state.push(value)
 	case wasm.OpcodeI64Const:
 		c := c.readI64s()
@@ -149,7 +149,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		iconst := builder.AllocateInstruction()
 		iconst.AsIconst64(uint64(c))
 		builder.InsertInstruction(iconst)
-		value, _ := iconst.Returns()
+		value := iconst.Return()
 		state.push(value)
 	case wasm.OpcodeI32Add, wasm.OpcodeI64Add:
 		if state.unreachable {
@@ -159,7 +159,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		iadd := builder.AllocateInstruction()
 		iadd.AsIadd(x, y)
 		builder.InsertInstruction(iadd)
-		value, _ := iadd.Returns()
+		value := iadd.Return()
 		state.push(value)
 	case wasm.OpcodeI32Sub, wasm.OpcodeI64Sub:
 		if state.unreachable {
@@ -169,7 +169,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		isub := builder.AllocateInstruction()
 		isub.AsIsub(x, y)
 		builder.InsertInstruction(isub)
-		value, _ := isub.Returns()
+		value := isub.Return()
 		state.push(value)
 	case wasm.OpcodeF32Add, wasm.OpcodeF64Add:
 		if state.unreachable {
@@ -179,7 +179,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		iadd := builder.AllocateInstruction()
 		iadd.AsFadd(x, y)
 		builder.InsertInstruction(iadd)
-		value, _ := iadd.Returns()
+		value := iadd.Return()
 		state.push(value)
 	case wasm.OpcodeF32Sub, wasm.OpcodeF64Sub:
 		if state.unreachable {
@@ -189,7 +189,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		isub := builder.AllocateInstruction()
 		isub.AsFsub(x, y)
 		builder.InsertInstruction(isub)
-		value, _ := isub.Returns()
+		value := isub.Return()
 		state.push(value)
 	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
 		if state.unreachable {
@@ -536,7 +536,7 @@ func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
 	cmp := builder.AllocateInstruction()
 	cmp.AsIcmp(x, y, cond)
 	builder.InsertInstruction(cmp)
-	value, _ := cmp.Returns()
+	value := cmp.Return()
 	state.push(value)
 }
 

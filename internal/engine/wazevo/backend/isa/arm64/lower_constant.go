@@ -7,7 +7,7 @@ import (
 
 // lowerConstant allocates the new VReg and inserts the instruction to load the constant value.
 func (m *machine) lowerConstant(instr *ssa.Instruction) (vr backend.VReg) {
-	val, _ := instr.Returns()
+	val := instr.Return()
 	valType := val.Type()
 	v := instr.ConstantVal()
 	vr = m.ctx.AllocateVReg(backend.RegTypeOf(valType))

@@ -162,7 +162,7 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 		}
 
 		c.ssaBuilder.InsertInstruction(zeroInst)
-		value, _ := zeroInst.Returns()
+		value := zeroInst.Return()
 		c.ssaBuilder.DefineVariable(variable, value, entry)
 	}
 }
@@ -220,7 +220,7 @@ func (c *Compiler) emitTrapBlocks() {
 		trapCodeInstr := builder.AllocateInstruction()
 		trapCodeInstr.AsIconst32(uint32(trapCode))
 		builder.InsertInstruction(trapCodeInstr)
-		trapCodeVal, _ := trapCodeInstr.Returns()
+		trapCodeVal := trapCodeInstr.Return()
 
 		execCtx := c.execCtxPtrValue
 		store := builder.AllocateInstruction()

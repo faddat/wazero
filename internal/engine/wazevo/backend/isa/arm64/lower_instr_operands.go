@@ -98,6 +98,8 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 	}
 
 	if m.matchInstr(def, ssa.OpcodeIshl) {
+		//v1, v2, _ := def.Instr.Args()
+
 		// TODO:
 		return
 	}

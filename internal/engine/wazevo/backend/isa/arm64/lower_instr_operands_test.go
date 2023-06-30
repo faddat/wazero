@@ -107,3 +107,31 @@ func TestMachine_getOperand_NR(t *testing.T) {
 		})
 	}
 }
+
+func TestMachine_getOperand_SR_NR(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		setup        func(*mockCompilationContext, ssa.Builder, *machine) (def *backend.SSAValueDefinition, mode extMode)
+		exp          operand
+		instructions []string
+	}{
+		{
+			name: "block param",
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
+				blk := builder.CurrentBlock()
+				v := blk.AddParam(builder, ssa.TypeI64)
+				def = &backend.SSAValueDefinition{BlkParamVReg: regToVReg(x4), BlockParamValue: v}
+				return def, extModeZeroExtend64
+			},
+			exp: operandNR(regToVReg(x4)),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, b, m := newSetupWithMockContext()
+			def, mode := tc.setup(ctx, b, m)
+			actual := m.getOperand_SR_NR(def, mode)
+			require.Equal(t, tc.exp, actual)
+			require.Equal(t, strings.Join(tc.instructions, "\n"), formatEmittedInstructions(m))
+		})
+	}
+}

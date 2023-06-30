@@ -68,7 +68,14 @@ func (i *Instruction) Returns() (first Value, rest []Value) {
 	return i.rValue, i.rValues
 }
 
-func (i *Instruction) args() (v1, v2 Value, vs []Value) {
+// Return returns a Value(s) produced by this instruction if any.
+// If there's multiple return values, only the first one is returned.
+func (i *Instruction) Return() (first Value) {
+	return i.rValue
+}
+
+// Args returns the arguments to this instruction.
+func (i *Instruction) Args() (v1, v2 Value, vs []Value) {
 	return i.v, i.v2, i.vs
 }
 
