@@ -23,10 +23,6 @@ type Compiler interface {
 	// Compile lowers the state stored in ssa.Builder into the ISA-specific machine code.
 	Compile() ([]byte, error)
 
-	// MarkLowered is used to mark the given instruction as already lowered
-	// which tells the compiler to skip it when traversing.
-	MarkLowered(inst *ssa.Instruction)
-
 	// Reset should be called to allow this Compiler to use for the next function.
 	Reset()
 }
@@ -125,7 +121,7 @@ func (c *compiler) assignVirtualRegisters() {
 			pid := p.ID()
 			vreg := c.AllocateVReg(RegTypeOf(p.Type()))
 			c.ssaValuesToVRegs[pid] = vreg
-			c.ssaValueDefinitions[pid] = SSAValueDefinition{BlkParamVReg: vreg}
+			c.ssaValueDefinitions[pid] = SSAValueDefinition{BlockParamValue: p, BlkParamVReg: vreg}
 		}
 
 		// Assigns each value to a virtual register produced by instructions.

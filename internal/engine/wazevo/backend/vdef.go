@@ -4,10 +4,13 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 
 // SSAValueDefinition represents a definition of an SSA value.
 type SSAValueDefinition struct {
-	// blk is valid if Instr == nil
+	// BlockParamValue is valid if Instr == nil
+	BlockParamValue ssa.Value
+
+	// BlkParamVReg is valid if Instr == nil
 	BlkParamVReg VReg
 
-	// Instr is not nil if Kind == SSAValueDefinitionKindInstr.
+	// Instr is not nil if this is a definition from an instruction.
 	Instr *ssa.Instruction
 	// N is the index of the return value in the instr's return values list.
 	N int
@@ -21,4 +24,17 @@ func (d *SSAValueDefinition) IsFromInstr() bool {
 
 func (d *SSAValueDefinition) IsFromBlockParam() bool {
 	return d.Instr == nil
+}
+
+func (d *SSAValueDefinition) SSAValue() ssa.Value {
+	if d.IsFromBlockParam() {
+		return d.BlockParamValue
+	} else {
+		r, rs := d.Instr.Returns()
+		if d.N == 0 {
+			return r
+		} else {
+			return rs[d.N-1]
+		}
+	}
 }

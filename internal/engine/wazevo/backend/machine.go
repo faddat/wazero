@@ -57,5 +57,3 @@ type (
 		VRegOf(value ssa.Value) VReg
 	}
 )
-
-var _ CompilationContext = (*compiler)(nil)

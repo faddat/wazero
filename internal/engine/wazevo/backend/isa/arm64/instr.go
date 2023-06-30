@@ -107,12 +107,22 @@ func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand, dst64bit bool) {
 	}
 }
 
-func (i *instruction) asALUBitmaskImm(aluOp aluOp, src, dst backend.VReg, imm uint64, dst64bit bool) {
+func (i *instruction) asALUBitmaskImm(aluOp aluOp, rn, rd backend.VReg, imm uint64, dst64bit bool) {
 	i.kind = aluRRBitmaskImm
 	i.u1 = uint64(aluOp)
-	i.rn, i.rd = operandNR(src), operandNR(dst)
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
 	i.u2 = imm
 	if dst64bit {
+		i.u3 = 1
+	}
+}
+
+func (i *instruction) asExtend(rd, rn backend.VReg, fromBits, toBits byte, signed bool) {
+	i.kind = extend
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.u1 = uint64(fromBits)
+	i.u2 = uint64(toBits)
+	if signed {
 		i.u3 = 1
 	}
 }
@@ -183,7 +193,16 @@ func (i *instruction) String() (str string) {
 	case movK:
 		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
 	case extend:
-		panic("TODO")
+		fromBits, toBits := i.u1, i.u2
+		if fromBits == 32 && toBits == 64 {
+			if i.u3 == 0 { // unsigned
+				str = fmt.Sprintf("mov %s, %s",
+					formatVRegSized(i.rd.nr(), true), formatVRegSized(i.rn.nr(), true))
+			} else {
+				str = fmt.Sprintf("sxtw %s, %s",
+					formatVRegSized(i.rd.nr(), false), formatVRegSized(i.rn.nr(), true))
+			}
+		}
 	case cSel:
 		panic("TODO")
 	case cSet:
@@ -602,7 +621,7 @@ func extModeOf(t ssa.Type, signed bool) extMode {
 		}
 		return extModeZeroExtend64
 	default:
-		panic("TODO? do we need narrower than 32 bits")
+		panic("TODO? do we need narrower than 32 bits?")
 	}
 }
 

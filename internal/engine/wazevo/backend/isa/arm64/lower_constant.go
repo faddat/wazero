@@ -8,10 +8,15 @@ import (
 // lowerConstant allocates the new VReg and inserts the instruction to load the constant value.
 func (m *machine) lowerConstant(instr *ssa.Instruction) (vr backend.VReg) {
 	val, _ := instr.Returns()
+	valType := val.Type()
 	v := instr.ConstantVal()
-	vr = m.ctx.AllocateVReg(backend.RegTypeOf(val.Type()))
+	vr = m.ctx.AllocateVReg(backend.RegTypeOf(valType))
 
-	switch val.Type() {
+	if valType.Bits() < 64 { // Clear the redundant bits just in case it's unexpectedly sign-extended, etc.
+		v = v & ((1 << valType.Bits()) - 1)
+	}
+
+	switch valType {
 	case ssa.TypeF32:
 		loadF := m.allocateInstr()
 		loadF.asLoadFpuConst32(vr, v)

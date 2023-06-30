@@ -126,12 +126,18 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 		}
 	}
 
-	switch mode {
-	case extModeNone:
-	case extModeZeroExtend64:
-		panic("TODO")
-	case extModeSignExtend64:
-		panic("TODO")
+	switch inBits := def.SSAValue().Type().Bits(); {
+	case mode == extModeNone:
+	case inBits == 32 && (mode == extModeZeroExtend32 || mode == extModeSignExtend32):
+	case inBits == 32 && mode == extModeZeroExtend64:
+		ext := m.allocateInstr()
+		ext.asExtend(v, v, 32, 64, false)
+		m.insert(ext)
+	case inBits == 32 && mode == extModeSignExtend64:
+		ext := m.allocateInstr()
+		ext.asExtend(v, v, 32, 64, true)
+		m.insert(ext)
+	case inBits == 64 && (mode == extModeZeroExtend64 || mode == extModeSignExtend64):
 	}
 	return operandNR(v)
 }

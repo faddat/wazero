@@ -29,6 +29,57 @@ func newSetup() (ssa.Builder, *machine) {
 	return ssaB, m
 }
 
+func newSetupWithMockContext() (*mockCompilationContext, ssa.Builder, *machine) {
+	ctx := newMockCompilationContext()
+	m := NewBackend().(*machine)
+	m.SetCompilationContext(ctx)
+	ssaB := ssa.NewBuilder()
+	blk := ssaB.AllocateBasicBlock()
+	ssaB.SetCurrentBlock(blk)
+	return ctx, ssaB, m
+}
+
 func regToVReg(reg backend.RealReg) backend.VReg {
 	return backend.VReg(0).SetRealReg(reg)
+}
+
+type mockCompilationContext struct {
+	vRegCounter int
+	vRegMap     map[ssa.Value]backend.VReg
+	definitions map[ssa.Value]*backend.SSAValueDefinition
+	lowered     map[*ssa.Instruction]bool
+}
+
+func newMockCompilationContext() *mockCompilationContext {
+	return &mockCompilationContext{
+		vRegCounter: 0,
+		vRegMap:     make(map[ssa.Value]backend.VReg),
+		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
+		lowered:     make(map[*ssa.Instruction]bool),
+	}
+}
+
+func (m *mockCompilationContext) AllocateVReg(regType backend.RegType) backend.VReg {
+	m.vRegCounter++
+	return backend.VReg(m.vRegCounter)
+}
+
+func (m *mockCompilationContext) MarkLowered(inst *ssa.Instruction) {
+	m.lowered[inst] = true
+}
+
+func (m *mockCompilationContext) ValueDefinition(value ssa.Value) *backend.SSAValueDefinition {
+	definition, exists := m.definitions[value]
+	if !exists {
+		return nil
+	}
+	return definition
+}
+
+func (m *mockCompilationContext) VRegOf(value ssa.Value) backend.VReg {
+	vReg, exists := m.vRegMap[value]
+	if !exists {
+		panic("Value does not exist")
+	}
+	return vReg
 }
