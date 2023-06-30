@@ -51,8 +51,8 @@ func TestMachine_lowerConstantI32(t *testing.T) {
 		{val: 0xffff, exp: []string{"movz w0, #0xffff, LSL 0"}},
 		{val: 0xffff_0000, exp: []string{"movz w0, #0xffff, LSL 16"}},
 		{val: 0xffff_fffe, exp: []string{"movn w0, #0x1, LSL 0"}},
-		{val: 0x2, exp: []string{"orr w0 wzr, r0?, #0x2"}},
-		{val: 0x80000001, exp: []string{"orr w0 wzr, r0?, #0x80000001"}},
+		{val: 0x2, exp: []string{"orr w0, wzr, #0x2"}},
+		{val: 0x80000001, exp: []string{"orr w0, wzr, #0x80000001"}},
 		{val: 0xf00000f, exp: []string{
 			"movz w0, #0xf, LSL 0",
 			"movk w0, #0xf00, LSL 16",
@@ -62,6 +62,37 @@ func TestMachine_lowerConstantI32(t *testing.T) {
 		t.Run(fmt.Sprintf("%#x", tc.val), func(t *testing.T) {
 			_, m := newSetup()
 			m.lowerConstantI32(regToVReg(x0), int32(tc.val))
+			exp := strings.Join(tc.exp, "\n")
+			require.Equal(t, exp, formatEmittedInstructions(m))
+		})
+	}
+}
+
+func TestMachine_lowerConstantI64(t *testing.T) {
+	invert := func(v uint64) uint64 { return ^v }
+	for _, tc := range []struct {
+		val uint64
+		exp []string
+	}{
+		{val: 0x0, exp: []string{"movz x0, #0x0, LSL 0"}},
+		{val: 0x1, exp: []string{"orr x0, xzr, #0x1"}},
+		{val: 0x3, exp: []string{"orr x0, xzr, #0x3"}},
+		{val: 0xfff000, exp: []string{"orr x0, xzr, #0xfff000"}},
+		{val: 0x8001 << 16, exp: []string{"movz x0, #0x8001, LSL 16"}},
+		{val: 0x8001 << 32, exp: []string{"movz x0, #0x8001, LSL 32"}},
+		{val: 0x8001 << 48, exp: []string{"movz x0, #0x8001, LSL 48"}},
+		{val: invert(0x8001 << 16), exp: []string{"movn x0, #0x8001, LSL 16"}},
+		{val: invert(0x8001 << 32), exp: []string{"movn x0, #0x8001, LSL 32"}},
+		{val: invert(0x8001 << 48), exp: []string{"movn x0, #0x8001, LSL 48"}},
+		{val: 0x80000001 << 16, exp: []string{
+			"movz x0, #0x1, LSL 16",
+			"movk x0, #0x8000, LSL 32",
+		}},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("%#x", tc.val), func(t *testing.T) {
+			_, m := newSetup()
+			m.lowerConstantI64(regToVReg(x0), int64(tc.val))
 			exp := strings.Join(tc.exp, "\n")
 			require.Equal(t, exp, formatEmittedInstructions(m))
 		})

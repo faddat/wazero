@@ -132,14 +132,11 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case aluRRBitmaskImm:
 		is32bit := i.u3 == 0
-		rd, rn, rm :=
-			formatVRegSized(i.rd.nr(), is32bit),
-			formatVRegSized(i.rn.nr(), is32bit),
-			formatVRegSized(i.rm.nr(), is32bit)
+		rd, rn := formatVRegSized(i.rd.nr(), is32bit), formatVRegSized(i.rn.nr(), is32bit)
 		if is32bit {
-			str = fmt.Sprintf("%s %s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, rm, uint32(i.u2))
+			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, uint32(i.u2))
 		} else {
-			str = fmt.Sprintf("%s %s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, rm, i.u2)
+			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, i.u2)
 		}
 	case aluRRImmShift:
 		panic("TODO")

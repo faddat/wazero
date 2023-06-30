@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"fmt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -75,10 +76,10 @@ func (m *machine) lowerConstantI64(dst backend.VReg, c int64) {
 	if t := const16bitAligned(c); t >= 0 {
 		// If the const can fit within 16-bit alignment, for example, 0xffff, 0xffff_0000 or 0xffff_0000_0000_0000
 		// We could load it into temporary with movk.
-		m.insertMOVZ(dst, uint64(c), t, true)
+		m.insertMOVZ(dst, uint64(c)>>(16*t), t, true)
 	} else if t := const16bitAligned(^c); t >= 0 {
 		// Also, if the reverse of the const can fit within 16-bit range, do the same ^^.
-		m.insertMOVN(dst, uint64((^c)>>(16*t)), t, true)
+		m.insertMOVN(dst, uint64(^c)>>(16*t), t, true)
 	} else if isBitMaskImmediate(uint64(c)) {
 		m.lowerConstViaBitMaskImmediate(uint64(c), dst, true)
 	} else {
@@ -170,6 +171,7 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 	}
 
 	if zeros == 3 {
+		fmt.Println("a")
 		// one MOVZ instruction.
 		for i, v := range bits {
 			if v != 0 {
@@ -177,6 +179,7 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 			}
 		}
 	} else if negs == 3 {
+		fmt.Println("b")
 		// one MOVN instruction.
 		for i, v := range bits {
 			if v != 0xffff {
@@ -189,9 +192,11 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.
+				fmt.Println("c")
 				m.insertMOVZ(dst, v, i, true)
 				movz = true
 			} else if v != 0 {
+				fmt.Println("d")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -205,7 +210,9 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 				// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVN
 				m.insertMOVN(dst, v, i, true)
 				movn = true
+				fmt.Println("e")
 			} else if v != 0xffff {
+				fmt.Println("f")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -215,9 +222,11 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.
+				fmt.Println("g")
 				m.insertMOVZ(dst, v, i, true)
 				movz = true
 			} else if v != 0 {
+				fmt.Println("h")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -227,11 +236,13 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movn bool
 		for i, v := range bits { // Emit MOVN.
 			if !movn && v != 0xffff {
+				fmt.Println("i")
 				v = ^v
 				// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVN
 				m.insertMOVN(dst, v, i, true)
 				movn = true
 			} else if v != 0xffff {
+				fmt.Println("j")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -241,9 +252,11 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.
+				fmt.Println("k")
 				m.insertMOVZ(dst, v, i, true)
 				movz = true
 			} else if v != 0 {
+				fmt.Println("l")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
