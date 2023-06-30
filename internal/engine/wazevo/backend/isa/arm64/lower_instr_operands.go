@@ -86,7 +86,6 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 	case m.matchInstr(def, ssa.OpcodeUextend):
 		panic("TODO")
 	}
-
 	return m.getOperand_SR_NR(def, mode)
 }
 

@@ -2472,7 +2472,6 @@ func (a *AssemblerImpl) load64bitConst(buf asm.Buffer, c int64, dstRegBits byte)
 			}
 		}
 	} else if negs == 3 {
-		// one MOVN instruction.
 		for i, v := range bits {
 			if v != 0xffff {
 				v = ^v
@@ -2480,7 +2479,6 @@ func (a *AssemblerImpl) load64bitConst(buf asm.Buffer, c int64, dstRegBits byte)
 			}
 		}
 	} else if zeros == 2 {
-		// one MOVZ then one OVK.
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.

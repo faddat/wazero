@@ -162,7 +162,7 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 	var bits [4]uint64
 	var zeros, negs int
 	for i := 0; i < 4; i++ {
-		bits[i] = uint64((c >> uint(i*16)) & 0xffff)
+		bits[i] = uint64(c) >> uint(i*16) & 0xffff
 		if v := bits[i]; v == 0 {
 			zeros++
 		} else if v == 0xffff {
@@ -171,7 +171,6 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 	}
 
 	if zeros == 3 {
-		fmt.Println("a")
 		// one MOVZ instruction.
 		for i, v := range bits {
 			if v != 0 {
@@ -179,7 +178,6 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 			}
 		}
 	} else if negs == 3 {
-		fmt.Println("b")
 		// one MOVN instruction.
 		for i, v := range bits {
 			if v != 0xffff {
@@ -192,11 +190,9 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.
-				fmt.Println("c")
 				m.insertMOVZ(dst, v, i, true)
 				movz = true
 			} else if v != 0 {
-				fmt.Println("d")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -210,9 +206,7 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 				// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVN
 				m.insertMOVN(dst, v, i, true)
 				movn = true
-				fmt.Println("e")
 			} else if v != 0xffff {
-				fmt.Println("f")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -222,11 +216,9 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.
-				fmt.Println("g")
 				m.insertMOVZ(dst, v, i, true)
 				movz = true
 			} else if v != 0 {
-				fmt.Println("h")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
@@ -248,15 +240,13 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		}
 
 	} else {
-		// one MOVZ then tree MOVK.
+		// one MOVZ then up to three MOVK.
 		var movz bool
 		for i, v := range bits {
 			if !movz && v != 0 { // MOVZ.
-				fmt.Println("k")
 				m.insertMOVZ(dst, v, i, true)
 				movz = true
 			} else if v != 0 {
-				fmt.Println("l")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}

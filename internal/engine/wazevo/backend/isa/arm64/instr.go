@@ -177,11 +177,11 @@ func (i *instruction) String() (str string) {
 	case mov32:
 		panic("TODO")
 	case movZ:
-		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), i.u1, i.u2*16)
+		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
 	case movN:
-		str = fmt.Sprintf("movn %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), i.u1, i.u2*16)
+		str = fmt.Sprintf("movn %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
 	case movK:
-		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), i.u1, i.u2*16)
+		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
 	case extend:
 		panic("TODO")
 	case cSel:

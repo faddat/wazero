@@ -88,6 +88,30 @@ func TestMachine_lowerConstantI64(t *testing.T) {
 			"movz x0, #0x1, LSL 16",
 			"movk x0, #0x8000, LSL 32",
 		}},
+		{val: 0x40000001, exp: []string{
+			"movz x0, #0x1, LSL 0",
+			"movk x0, #0x4000, LSL 16",
+		}},
+		{val: 0xffffffffff001000, exp: []string{
+			"movn x0, #0xefff, LSL 0",
+			"movk x0, #0xff00, LSL 16",
+		}},
+		{val: 0xffff0000c466361f, exp: []string{
+			"movz x0, #0x361f, LSL 0",
+			"movk x0, #0xc466, LSL 16",
+			"movk x0, #0xffff, LSL 48",
+		}},
+		{val: 0x89705f4136b4a598, exp: []string{
+			"movz x0, #0xa598, LSL 0",
+			"movk x0, #0x36b4, LSL 16",
+			"movk x0, #0x5f41, LSL 32",
+			"movk x0, #0x8970, LSL 48",
+		}},
+		{val: 0xffff_0001_0001_0001, exp: []string{
+			"movn x0, #0xfffe, LSL 0",
+			"movk x0, #0x1, LSL 16",
+			"movk x0, #0x1, LSL 32",
+		}},
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%#x", tc.val), func(t *testing.T) {
