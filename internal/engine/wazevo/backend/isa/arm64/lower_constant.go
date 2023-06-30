@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	"fmt"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -229,13 +227,11 @@ func (m *machine) load64bitConst(c int64, dst backend.VReg) {
 		var movn bool
 		for i, v := range bits { // Emit MOVN.
 			if !movn && v != 0xffff {
-				fmt.Println("i")
 				v = ^v
 				// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVN
 				m.insertMOVN(dst, v, i, true)
 				movn = true
 			} else if v != 0xffff {
-				fmt.Println("j")
 				m.insertMOVK(dst, v, i, true)
 			}
 		}
