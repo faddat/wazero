@@ -848,6 +848,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFsub:     sideEffectFalse,
 	OpcodeF32const: sideEffectFalse,
 	OpcodeF64const: sideEffectFalse,
+	OpcodeIshl:     sideEffectFalse,
 	OpcodeStore:    sideEffectTrue,
 	OpcodeTrap:     sideEffectTrue,
 	OpcodeReturn:   sideEffectTrue,
@@ -865,6 +866,7 @@ func (i *Instruction) HasSideEffects() bool {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
+	OpcodeIshl:   returnTypesFnSingle,
 	OpcodeJump:   returnTypesFnNoReturns,
 	OpcodeIconst: returnTypesFnSingle,
 	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
@@ -941,6 +943,14 @@ func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) {
 	i.v2 = y
 	i.u64 = uint64(c)
 	i.typ = TypeI32
+}
+
+// AsIshl initializes this instruction as an integer shift left instruction with OpcodeIcmp.
+func (i *Instruction) AsIshl(x, amount Value) {
+	i.opcode = OpcodeIshl
+	i.v = x
+	i.v2 = amount
+	i.typ = x.Type()
 }
 
 // IcmpData returns the operands and comparison condition of this integer comparison instruction.
@@ -1119,6 +1129,8 @@ func (i *Instruction) Format(b Builder) string {
 			vs[idx+2] = i.vs[idx].format(b)
 		}
 		instSuffix = strings.Join(vs, ", ")
+	case OpcodeIshl:
+		instSuffix = fmt.Sprintf(" %s, %s", i.v.format(b), i.v2.format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}

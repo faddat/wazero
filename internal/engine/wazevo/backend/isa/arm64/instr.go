@@ -637,3 +637,12 @@ const (
 	extendOpSXTW = 0b110
 	extendOpSXTX = 0b111
 )
+
+type shiftOp byte
+
+const (
+	shiftOpLSL shiftOp = 0b00
+	shiftOpLSR shiftOp = 0b01
+	shiftOpASR shiftOp = 0b10
+	shiftOpROR shiftOp = 0b11
+)

@@ -44,6 +44,19 @@ func (o operand) nr() backend.VReg {
 	return backend.VReg(o.data)
 }
 
+// operandSR encodes the given VReg as an operand of operandKindSR.
+func operandSR(r backend.VReg, amt byte, sop shiftOp) operand {
+	if sop != shiftOpLSL {
+		panic("TODO: do we need to support other shift operations?")
+	}
+	return operand{kind: operandKindSR, data: uint64(r) | uint64(amt)<<32 | uint64(sop)<<40}
+}
+
+// sr decodes the underlying VReg, shift amount, and shift operation assuming the operand is of operandKindSR.
+func (o operand) sr() (r backend.VReg, amt byte, sop shiftOp) {
+	return backend.VReg(o.data), byte(o.data >> 32), shiftOp(o.data >> 40)
+}
+
 // operandImm12 encodes the given imm12 as an operand of operandKindImm12.
 func operandImm12(imm12 uint16, shiftBit byte) operand {
 	return operand{kind: operandKindImm12, data: uint64(imm12) | uint64(shiftBit)<<32}
@@ -98,10 +111,15 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 	}
 
 	if m.matchInstr(def, ssa.OpcodeIshl) {
-		//v1, v2, _ := def.Instr.Args()
-
-		// TODO:
-		return
+		// Check if the shift amount is constant instruction.
+		targetVal, amountVal, _ := def.Instr.Args()
+		amountDef := m.ctx.ValueDefinition(amountVal)
+		if amountDef.IsFromInstr() && amountDef.Instr.Constant() {
+			// If that is the case, we can use the shifted register operand (SR).
+			c := amountDef.Instr.ConstantVal() & 63 // Clears the unnecessary bits.
+			vreg := m.ctx.VRegOf(targetVal)
+			return operandSR(vreg, byte(c), shiftOpLSL)
+		}
 	}
 	return m.getOperand_NR(def, mode)
 }

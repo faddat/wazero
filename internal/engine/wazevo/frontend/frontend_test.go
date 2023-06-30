@@ -658,7 +658,6 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret, v5, v6
 `,
 		},
-
 		{
 			name: "integer comparisons", m: singleFunctionModule(vv, []byte{
 				// eq.
@@ -819,6 +818,30 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 `,
 			expAfterOpt: `
 blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk_ret
+`,
+		},
+		{
+			name: "shift", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 2,
+				wasm.OpcodeI32Shl,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Const, 2,
+				wasm.OpcodeI64Shl,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{}),
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x1
+	v3:i32 = Iconst_32 0x2
+	v4:i32 = Ishl v2, v3
+	v5:i64 = Iconst_64 0x1
+	v6:i64 = Iconst_64 0x2
+	v7:i64 = Ishl v5, v6
 	Jump blk_ret
 `,
 		},

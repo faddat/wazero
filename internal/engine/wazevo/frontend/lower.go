@@ -241,6 +241,16 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		c.insertIcmp(ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
+	case wasm.OpcodeI32Shl, wasm.OpcodeI64Shl:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		ishl := builder.AllocateInstruction()
+		ishl.AsIshl(x, y)
+		builder.InsertInstruction(ishl)
+		value := ishl.Return()
+		state.push(value)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
 		if state.unreachable {

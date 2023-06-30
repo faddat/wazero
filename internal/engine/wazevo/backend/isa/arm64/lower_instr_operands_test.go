@@ -1,11 +1,11 @@
 package arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"strings"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -124,6 +124,67 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 				return def, extModeZeroExtend64
 			},
 			exp: operandNR(regToVReg(x4)),
+		},
+		{
+			name: "ishl but not const amount",
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
+				blk := builder.CurrentBlock()
+				// (p1+p2) << p3
+				p1 := blk.AddParam(builder, ssa.TypeI64)
+				p2 := blk.AddParam(builder, ssa.TypeI64)
+				p3 := blk.AddParam(builder, ssa.TypeI64)
+				add := builder.AllocateInstruction()
+				add.AsIadd(p1, p2)
+				builder.InsertInstruction(add)
+				addResult := add.Return()
+
+				ishl := builder.AllocateInstruction()
+				ishl.AsIshl(addResult, p3)
+				builder.InsertInstruction(ishl)
+
+				ctx.definitions[p1] = &backend.SSAValueDefinition{BlkParamVReg: backend.VReg(1), BlockParamValue: p1}
+				ctx.definitions[p2] = &backend.SSAValueDefinition{BlkParamVReg: backend.VReg(2), BlockParamValue: p2}
+				ctx.definitions[p3] = &backend.SSAValueDefinition{BlkParamVReg: backend.VReg(3), BlockParamValue: p3}
+				ctx.definitions[addResult] = &backend.SSAValueDefinition{Instr: add, N: 0}
+
+				ctx.vRegMap[ishl.Return()] = backend.VReg(10)
+				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
+				return def, extModeZeroExtend64
+			},
+			exp: operandNR(backend.VReg(10)),
+		},
+		{
+			name: "ishl with const amount",
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
+				blk := builder.CurrentBlock()
+				// (p1+p2) << p3
+				p1 := blk.AddParam(builder, ssa.TypeI64)
+				p2 := blk.AddParam(builder, ssa.TypeI64)
+				add := builder.AllocateInstruction()
+				add.AsIadd(p1, p2)
+				builder.InsertInstruction(add)
+				addResult := add.Return()
+
+				amount := builder.AllocateInstruction()
+				amount.AsIconst32(14)
+				builder.InsertInstruction(amount)
+
+				amountVal := amount.Return()
+
+				ishl := builder.AllocateInstruction()
+				ishl.AsIshl(addResult, amountVal)
+				builder.InsertInstruction(ishl)
+
+				ctx.definitions[p1] = &backend.SSAValueDefinition{BlkParamVReg: backend.VReg(1), BlockParamValue: p1}
+				ctx.definitions[p2] = &backend.SSAValueDefinition{BlkParamVReg: backend.VReg(2), BlockParamValue: p2}
+				ctx.definitions[addResult] = &backend.SSAValueDefinition{Instr: add, N: 0}
+				ctx.definitions[amountVal] = &backend.SSAValueDefinition{Instr: amount, N: 0}
+
+				ctx.vRegMap[addResult] = backend.VReg(1234)
+				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
+				return def, extModeZeroExtend64
+			},
+			exp: operandSR(backend.VReg(1234), 14, shiftOpLSL),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
