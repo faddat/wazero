@@ -111,7 +111,7 @@ func TestMachine_getOperand_NR(t *testing.T) {
 func TestMachine_getOperand_SR_NR(t *testing.T) {
 	ishlWithConstAmount := func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
 		blk := builder.CurrentBlock()
-		// (p1+p2) << p3
+		// (p1+p2) << amount
 		p1 := blk.AddParam(builder, ssa.TypeI64)
 		p2 := blk.AddParam(builder, ssa.TypeI64)
 		add := builder.AllocateInstruction()
@@ -200,7 +200,7 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 			exp: operandNR(backend.VReg(10)),
 		},
 		{
-			name: "ishl with const amount but ref coount is larger than 1",
+			name: "ishl with const amount but ref count is larger than 1",
 			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
 				def, mode = ishlWithConstAmount(ctx, builder, m)
 				def.RefCount = 10
@@ -243,6 +243,7 @@ func TestMachine_getOperand_Imm12_ER_SR_NR(t *testing.T) {
 				cinst.AsIconst32(0xfff)
 				builder.InsertInstruction(cinst)
 				def = &backend.SSAValueDefinition{Instr: cinst, N: 0}
+				m.currentGID = 0xff // const can be merged anytime, regardless of the group id.
 				return
 			},
 			exp: operandImm12(0xfff, 0),
@@ -254,6 +255,7 @@ func TestMachine_getOperand_Imm12_ER_SR_NR(t *testing.T) {
 				cinst.AsIconst32(0xabc_000)
 				builder.InsertInstruction(cinst)
 				def = &backend.SSAValueDefinition{Instr: cinst, N: 0}
+				m.currentGID = 0xff // const can be merged anytime, regardless of the group id.
 				return
 			},
 			exp: operandImm12(0xabc, 1),
