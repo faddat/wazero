@@ -53,11 +53,12 @@ type FileEntry struct {
 	// File is always non-nil.
 	File fsapi.File
 
-	// openDir is nil until OpenDir was called.
-	openDir *Readdir
+	// openDir is nil until Opendir was called.
+	openDir *Dir
 }
 
-// OpenDir lazy creates a directory stream for this file.
+// Opendir opens a directory stream associated with file. The Dir result is
+// stateful, so subsequent calls return any next values in directory order.
 //
 // # Parameters
 //
@@ -66,12 +67,19 @@ type FileEntry struct {
 //
 // # Errors
 //
-// # This returns the same errors as fsapi.File Readdir
+// A zero syscall.Errno is success. The below are expected otherwise:
+//   - syscall.ENOSYS: the implementation does not support this function.
+//   - syscall.EBADF: the dir was closed or not readable.
+//   - syscall.ENOTDIR: the file was not a directory.
 //
-// Notes:
-//   - In the future, this may be refactored to allow multiple open directory
-//     streams per file (likely in wasip>1).
-func (f *FileEntry) OpenDir(addDotEntries bool) (dir *Readdir, errno syscall.Errno) {
+// # Notes
+//
+//   - This is like `opendir` in POSIX.
+//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/opendir.html
+//   - `addDotEntries` is only needed to pass wasi-testsuite for
+//     "wasi_snapshot_preview1.fd_readdir". Using this has numerous
+//     downsides as detailed in /RATIONALE.md
+func (f *FileEntry) Opendir(addDotEntries bool) (dir *Dir, errno syscall.Errno) {
 	if dir = f.openDir; dir != nil {
 		return dir, 0
 	} else if dir, errno = newReaddirFromFileEntry(f, addDotEntries); errno != 0 {
@@ -85,18 +93,35 @@ func (f *FileEntry) OpenDir(addDotEntries bool) (dir *Readdir, errno syscall.Err
 
 const direntBufSize = 16
 
-// Readdir is the status of a prior fs.ReadDirFile call.
-type Readdir struct {
-	// cursor is the current position in the buffer.
-	cursor uint64
+// Dir is an open directory stream, created by FileEntry.Opendir.
+//
+// # Notes
+//
+//   - This is similar to DIR in POSIX. See
+//     https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/dirent.h.html
+//   - Tell and Seek are not implemented with system calls, so do not return
+//     syscall.Errno.
+//   - Implementations should consider implementing this with bulk reads, like
+//     `getdents` in Linux. This avoids excessive syscalls when iterating a
+//     large directory.
+//   - `wasi_snapshot_preview1.fd_readdir` is the primary caller of Tell and
+//     Seek. To implement pagination similar to `getdents` on Linux, the value
+//     of Tell is used for `dirent.d_next` and Seek is used to continue at that
+//     position, or a prior in the case of truncation.
+//   - You must call Close to avoid file resource conflicts. For example,
+//     Windows cannot delete the underlying directory while a handle to it
+//     remains open.
+type Dir struct {
+	// pos is the current position in the buffer.
+	pos uint64
 
 	// countRead is the total count of files read including Dirents.
 	//
 	// Notes:
 	//
 	// * countRead is the index of the next file in the list. This is
-	//   also the value that Cookie returns, so it should always be
-	//   higher or equal than the cookie given in Rewind.
+	//   also the value that Tell returns, so it should always be
+	//   higher or equal than the pos given in Seek.
 	//
 	// * this can overflow to negative, which means our implementation
 	//   doesn't support writing greater than max int64 entries.
@@ -121,22 +146,21 @@ type Readdir struct {
 	dirReader func(n uint64) ([]fsapi.Dirent, syscall.Errno)
 }
 
-// NewReaddir is a constructor for Readdir. It takes a dirInit
 func NewReaddir(
 	dirInit func() ([]fsapi.Dirent, syscall.Errno),
 	dirReader func(n uint64) ([]fsapi.Dirent, syscall.Errno),
-) (*Readdir, syscall.Errno) {
-	d := &Readdir{dirReader: dirReader, dirInit: dirInit}
+) (*Dir, syscall.Errno) {
+	d := &Dir{dirReader: dirReader, dirInit: dirInit}
 	return d, d.init()
 }
 
-// init resets the cursor and invokes the dirInit, dirReader
+// init resets the pos and invokes the dirInit, dirReader
 // methods to reset the internal state of the Readdir struct.
 //
 // Note: this is different from Reset, because it will not short-circuit
-// when cursor is already 0, but it will force an unconditional reload.
-func (d *Readdir) init() syscall.Errno {
-	d.cursor = 0
+// when pos is already 0, but it will force an unconditional reload.
+func (d *Dir) init() syscall.Errno {
+	d.pos = 0
 	d.countRead = 0
 	// Reset the buffer to the initial state.
 	initialDirents, errno := d.dirInit()
@@ -162,7 +186,7 @@ func (d *Readdir) init() syscall.Errno {
 }
 
 // newReaddirFromFileEntry is a constructor for Readdir that takes a FileEntry to initialize.
-func newReaddirFromFileEntry(f *FileEntry, addDotEntries bool) (*Readdir, syscall.Errno) {
+func newReaddirFromFileEntry(f *FileEntry, addDotEntries bool) (*Dir, syscall.Errno) {
 	var dotEntries []fsapi.Dirent
 	if addDotEntries {
 		// Generate the dotEntries only once and return it many times in the dirInit closure.
@@ -195,8 +219,8 @@ func synthesizeDotEntries(f *FileEntry) (result []fsapi.Dirent, errno syscall.Er
 	return result, 0
 }
 
-// Reset seeks the internal cursor to 0 and refills the buffer.
-func (d *Readdir) Reset() syscall.Errno {
+// Reset seeks the internal pos to 0 and refills the buffer.
+func (d *Dir) Reset() syscall.Errno {
 	if d.countRead == 0 {
 		return 0
 	}
@@ -204,7 +228,7 @@ func (d *Readdir) Reset() syscall.Errno {
 }
 
 // Skip is equivalent to calling n times Advance.
-func (d *Readdir) Skip(n uint64) {
+func (d *Dir) Skip(n uint64) {
 	end := d.countRead + n
 	var err syscall.Errno = 0
 	for d.countRead < end && err == 0 {
@@ -212,48 +236,84 @@ func (d *Readdir) Skip(n uint64) {
 	}
 }
 
-// Cookie returns a cookie representing the current state of the ReadDir struct.
+// Tell returns the current position in the directory stream.
 //
-// Note: this returns the countRead field, but it is an implementation detail.
-func (d *Readdir) Cookie() uint64 {
-	return d.countRead
+// This only has meaning if called after a successful call to Read. If
+// Read returned false, this value is undefined, but conventionally zero.
+//
+// # Errors
+//
+// This operation is not implemented with system calls, so does not return
+// an error.
+//
+// # Notes
+//
+//   - This is similar `telldir` in POSIX. See
+//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/seekdir.html
+//   - This value should not be interpreted as a number because the
+//     implementation might not be backed by a numeric index.
+//   - Do not confuse this with `linux_dirent.d_off` from `getdents`: the
+//     location of the next entry. This is the location of the current one.
+//     See https://man7.org/linux/man-pages/man2/getdents.2.html
+func (d *Dir) Tell() uint64 {
+	return d.pos
 }
 
-// Rewind seeks the internal cursor to the state represented by the cookie.
-// It returns a syscall.Errno if the cursor was reset and an I/O error occurred while trying to re-init.
-func (d *Readdir) Rewind(cookie int64) syscall.Errno {
-	unsignedCookie := uint64(cookie)
+// Seek sets the position for the next call to Read.
+//
+// When `loc == 0`, the directory will be reset to its initial state.
+// Otherwise, `loc` should be a former value returned by Tell.
+//
+// # Errors
+//
+// This operation is not implemented with system calls, so does not return
+// an error, even if `loc` is invalid. An invalid `loc` results in the next
+// Read returning syscall.ENOENT.
+//
+// # Notes
+//
+//   - This is similar `seekdir` in POSIX. See
+//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/seekdir.html
+//   - A zero value is similar to calling `rewinddir` in POSIX. See
+//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/rewinddir.html
+//   - `loc == 0` can be implemented by setting a flag that re-opens the
+//     underlying directory and dumps any cache on the next call to Read.
+//   - `loc != 0` can be implemented with cached dirents returned by Read,
+//     kept in a sliding window. The sliding window avoids out of memory
+//     errors reading large directories. If loc is not in the window, the
+//     next call to Read would fail with syscall.ENOENT.
+func (d *Dir) Seek(loc uint64) syscall.Errno {
 	switch {
-	case cookie < 0 || unsignedCookie > d.countRead:
-		// the cookie can neither be negative nor can it be larger than countRead.
-		return syscall.EINVAL
-	case cookie == 0 && d.countRead == 0:
+	case loc > d.countRead:
+		// the pos can neither be negative nor can it be larger than countRead.
+		return syscall.ENOENT
+	case loc == 0 && d.countRead == 0:
 		return 0
-	case cookie == 0 && d.countRead != 0:
-		// This means that there was a previous call to the dir, but cookie is reset.
+	case loc == 0 && d.countRead != 0:
+		// This means that there was a previous call to the dir, but pos is reset.
 		// This happens when the program calls rewinddir, for example:
 		// https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/rewinddir.c#L10-L12
 		return d.Reset()
-	case unsignedCookie < d.countRead:
-		if cookie/direntBufSize != int64(d.countRead)/direntBufSize {
-			// The cookie is not 0, but it points into a window before the current one.
-			return syscall.ENOSYS
+	case loc < d.countRead:
+		if loc/direntBufSize != uint64(d.countRead)/direntBufSize {
+			// The pos is not 0, but it points into a window before the current one.
+			return syscall.ENOENT
 		}
 		// We are allowed to rewind back to a previous offset within the current window.
-		d.countRead = unsignedCookie
-		d.cursor = d.countRead % direntBufSize
+		d.countRead = loc
+		d.pos = d.countRead % direntBufSize
 		return 0
 	default:
-		// The cookie is valid.
+		// The loc is valid.
 		return 0
 	}
 }
 
 // Peek emits the current value.
 // It returns syscall.ENOENT when there are no entries left in the directory.
-func (d *Readdir) Peek() (*fsapi.Dirent, syscall.Errno) {
+func (d *Dir) Peek() (*fsapi.Dirent, syscall.Errno) {
 	switch {
-	case d.cursor == uint64(len(d.dirents)):
+	case d.pos == uint64(len(d.dirents)):
 		// We're past the buf size, fill it up again.
 		dirents, errno := d.dirReader(direntBufSize)
 		if errno != 0 {
@@ -261,23 +321,23 @@ func (d *Readdir) Peek() (*fsapi.Dirent, syscall.Errno) {
 		}
 		d.dirents = append(d.dirents, dirents...)
 		fallthrough
-	default: // d.cursor < direntBufSize FIXME
-		if d.cursor == uint64(len(d.dirents)) {
+	default: // d.pos < direntBufSize FIXME
+		if d.pos == uint64(len(d.dirents)) {
 			return nil, syscall.ENOENT
 		}
-		dirent := &d.dirents[d.cursor]
+		dirent := &d.dirents[d.pos]
 		return dirent, 0
 	}
 }
 
 // Advance advances the internal counters and indices to the next value.
-// It also empties and refill the buffer with the next set of values when the internal cursor
+// It also empties and refill the buffer with the next set of values when the internal pos
 // reaches the end of it.
-func (d *Readdir) Advance() syscall.Errno {
-	if d.cursor == uint64(len(d.dirents)) {
+func (d *Dir) Advance() syscall.Errno {
+	if d.pos == uint64(len(d.dirents)) {
 		return syscall.ENOENT
 	}
-	d.cursor++
+	d.pos++
 	d.countRead++
 	return 0
 }

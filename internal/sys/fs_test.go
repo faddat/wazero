@@ -243,72 +243,64 @@ func TestFSContext_Renumber(t *testing.T) {
 	})
 }
 
-func TestReaddDir_Rewind(t *testing.T) {
+func TestReaddDir_Seek(t *testing.T) {
 	tests := []struct {
-		name           string
-		f              *Readdir
-		cookie         int64
-		expectedCookie int64
-		expectedErrno  syscall.Errno
+		name          string
+		f             *Dir
+		pos           uint64
+		expectedPos   uint64
+		expectedErrno syscall.Errno
 	}{
 		{
 			name: "no prior call",
 		},
 		{
-			name:          "no prior call, but passed a cookie",
-			cookie:        1,
-			expectedErrno: syscall.EINVAL,
+			name:          "no prior call, but passed a pos",
+			pos:           1,
+			expectedErrno: syscall.ENOENT,
 		},
 		{
-			name: "cookie is negative",
-			f: &Readdir{
+			name: "pos is greater than last d_next",
+			f: &Dir{
 				countRead: 3,
 			},
-			cookie:        -1,
-			expectedErrno: syscall.EINVAL,
+			pos:           5,
+			expectedErrno: syscall.ENOENT,
 		},
 		{
-			name: "cookie is greater than last d_next",
-			f: &Readdir{
+			name: "pos is last pos",
+			f: &Dir{
 				countRead: 3,
 			},
-			cookie:        5,
-			expectedErrno: syscall.EINVAL,
+			pos: 3,
 		},
 		{
-			name: "cookie is last pos",
-			f: &Readdir{
+			name: "pos is one before last pos",
+			f: &Dir{
 				countRead: 3,
 			},
-			cookie: 3,
+			pos: 2,
 		},
 		{
-			name: "cookie is one before last pos",
-			f: &Readdir{
-				countRead: 3,
-			},
-			cookie: 2,
-		},
-		{
-			name: "cookie is before current entries",
-			f: &Readdir{
+			name: "pos is before current entries",
+			f: &Dir{
 				countRead: direntBufSize + 2,
 			},
-			cookie:        1,
-			expectedErrno: syscall.ENOSYS, // not implemented
+			pos:           1,
+			expectedErrno: syscall.ENOENT,
 		},
 		{
-			name: "read from the beginning (cookie=0)",
-			f: &Readdir{
+			name: "read from the beginning (pos=0)",
+			f: &Dir{
 				dirInit: func() ([]fsapi.Dirent, syscall.Errno) {
 					return []fsapi.Dirent{{Name: "."}, {Name: ".."}}, 0
 				},
 				dirReader: func(n uint64) ([]fsapi.Dirent, syscall.Errno) {
 					return nil, 0
 				},
-				cursor: 3,
+				pos: 3,
 			},
-			cookie: 0,
+			pos: 0,
 		},
 	}
 
@@ -318,10 +310,10 @@ func TestReaddDir_Rewind(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := tc.f
 			if f == nil {
-				f = &Readdir{}
+				f = &Dir{}
 			}
 
-			errno := f.Rewind(tc.cookie)
+			errno := f.Seek(tc.pos)
 			require.EqualErrno(t, tc.expectedErrno, errno)
 		})
 	}

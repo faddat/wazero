@@ -2067,7 +2067,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				_ = rdd.Advance()
 			},
 
@@ -2082,7 +2082,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				_ = rdd.Advance()
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
@@ -2097,7 +2097,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				_ = rdd.Advance()
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
@@ -2111,7 +2111,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				_ = rdd.Advance()
 			},
 			bufLen:          53, // length is long enough for second and third.
@@ -2125,7 +2125,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				rdd.Skip(2)
 			},
 			bufLen:          27, // length is long enough for exactly third.
@@ -2139,7 +2139,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				rdd.Skip(2)
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2153,7 +2153,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
+				rdd, _ := f.Opendir(true)
 				rdd.Skip(5)
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2200,9 +2200,9 @@ func Test_fdReaddir(t *testing.T) {
 				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
 
-			rdd, errno := file.OpenDir(true)
+			rdd, errno := file.Opendir(true)
 			require.Equal(t, syscall.Errno(0), errno)
-			require.Equal(t, tc.expectedCookie, rdd.Cookie())
+			require.Equal(t, tc.expectedCookie, rdd.Tell())
 		})
 	}
 }
@@ -2352,22 +2352,24 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			buf:  0, bufLen: 1000,
 			cookie:        1,
 			resultBufused: 2000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=1)
-<== (bufused=,errno=EINVAL)
+<== (bufused=,errno=ENOENT)
 `,
 		},
 		{
+			// cookie should be treated opaquely. When negative, it is a
+			// position not yet read,
 			name: "negative cookie invalid",
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
 			cookie:        -1,
 			resultBufused: 2000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=-1)
-<== (bufused=,errno=EINVAL)
+<== (bufused=,errno=ENOENT)
 `,
 		},
 	}

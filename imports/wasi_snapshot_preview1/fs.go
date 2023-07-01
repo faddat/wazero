@@ -846,10 +846,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	fd := int32(params[0])
 	buf := uint32(params[1])
 	bufLen := uint32(params[2])
-	// We control the value of the cookie, and it should never be negative.
-	// However, we coerce it to signed to ensure the caller doesn't manipulate
-	// it in such a way that becomes negative.
-	cookie := int64(params[3])
+	cookie := params[3]
 	resultBufused := uint32(params[4])
 
 	// The bufLen must be enough to write a dirent. Otherwise, the caller can't
@@ -865,7 +862,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	}
 
 	// Validate the cookie and possibly sync the internal state to the one the cookie represents.
-	if errno = dir.Rewind(cookie); errno != 0 {
+	if errno = dir.Seek(cookie); errno != 0 {
 		return errno
 	}
 
@@ -901,7 +898,7 @@ const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
+func maxDirents(dir *sys.Dir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for {
 		d, errno := dir.Peek()
@@ -1007,11 +1004,11 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 }
 
 // openDir lazy opens a sys.Readdir for the directory or returns an error.
-func openDir(fsc *sys.FSContext, fd int32) (*sys.Readdir, syscall.Errno) {
+func openDir(fsc *sys.FSContext, fd int32) (*sys.Dir, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, syscall.EBADF
 	} else {
-		return f.OpenDir(true)
+		return f.Opendir(true)
 	}
 }
 
