@@ -227,12 +227,12 @@ func (d *Dir) Reset() syscall.Errno {
 	return d.init()
 }
 
-// Skip is equivalent to calling n times Advance.
+// Skip is equivalent to calling n times Read.
 func (d *Dir) Skip(n uint64) {
 	end := d.countRead + n
 	var err syscall.Errno = 0
 	for d.countRead < end && err == 0 {
-		err = d.Advance()
+		err = d.Read()
 	}
 }
 
@@ -261,12 +261,11 @@ func (d *Dir) Tell() uint64 {
 
 // Seek sets the position for the next call to Read.
 //
-// When `loc == 0`, the directory will be reset to its initial state.
-// Otherwise, `loc` should be a former value returned by Tell.
+// When `loc == 0`, the directory will be rewound.
 //
 // # Errors
 //
-// This operation is not implemented with system calls, so does not return
+// Unlike operation is not implemented with system calls, so does not return
 // an error, even if `loc` is invalid. An invalid `loc` results in the next
 // Read returning syscall.ENOENT.
 //
@@ -330,10 +329,14 @@ func (d *Dir) Peek() (*fsapi.Dirent, syscall.Errno) {
 	}
 }
 
-// Advance advances the internal counters and indices to the next value.
+// TODO(codefromthecrypt): Peek should be just removed for calling Read after
+// seeking to the correct location. Seek shouldn't return an error as we can
+// handle errors more consistently if in one place on Read.
+
+// Read advances the internal counters and indices to the next value.
 // It also empties and refill the buffer with the next set of values when the internal pos
 // reaches the end of it.
-func (d *Dir) Advance() syscall.Errno {
+func (d *Dir) Read() syscall.Errno {
 	if d.pos == uint64(len(d.dirents)) {
 		return syscall.ENOENT
 	}

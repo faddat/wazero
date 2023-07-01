@@ -168,7 +168,7 @@ entry:
 		ln = lines[index-1]
 	}
 
-	// Advance the line reader for the found position.
+	// Read the line reader for the found position.
 	lineReader.Seek(ln.pos)
 	err = lineReader.Next(&le)
 

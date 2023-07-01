@@ -953,7 +953,7 @@ func maxDirents(dir *sys.Dir, bufLen uint32) (dirents []fsapi.Dirent, bufused, d
 		lenRemaining -= entryLen
 		bufused += entryLen
 		direntCount++
-		_ = dir.Advance()
+		_ = dir.Read()
 	}
 	return
 }
