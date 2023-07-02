@@ -271,6 +271,37 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		c.insertIcmp(ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
+
+	case wasm.OpcodeF32Eq, wasm.OpcodeF64Eq:
+		if state.unreachable {
+			return
+		}
+		c.insertFcmp(ssa.FloatCmpCondEqual)
+	case wasm.OpcodeF32Ne, wasm.OpcodeF64Ne:
+		if state.unreachable {
+			return
+		}
+		c.insertFcmp(ssa.FloatCmpCondNotEqual)
+	case wasm.OpcodeF32Lt, wasm.OpcodeF64Lt:
+		if state.unreachable {
+			return
+		}
+		c.insertFcmp(ssa.FloatCmpCondLessThan)
+	case wasm.OpcodeF32Gt, wasm.OpcodeF64Gt:
+		if state.unreachable {
+			return
+		}
+		c.insertFcmp(ssa.FloatCmpCondGreaterThan)
+	case wasm.OpcodeF32Le, wasm.OpcodeF64Le:
+		if state.unreachable {
+			return
+		}
+		c.insertFcmp(ssa.FloatCmpCondLessThanOrEqual)
+	case wasm.OpcodeF32Ge, wasm.OpcodeF64Ge:
+		if state.unreachable {
+			return
+		}
+		c.insertFcmp(ssa.FloatCmpCondGreaterThanOrEqual)
 	case wasm.OpcodeI32Shl, wasm.OpcodeI64Shl:
 		if state.unreachable {
 			return
@@ -575,6 +606,16 @@ func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
 	y, x := state.pop(), state.pop()
 	cmp := builder.AllocateInstruction()
 	cmp.AsIcmp(x, y, cond)
+	builder.InsertInstruction(cmp)
+	value := cmp.Return()
+	state.push(value)
+}
+
+func (c *Compiler) insertFcmp(cond ssa.FloatCmpCond) {
+	state, builder := &c.loweringState, c.ssaBuilder
+	y, x := state.pop(), state.pop()
+	cmp := builder.AllocateInstruction()
+	cmp.AsFcmp(x, y, cond)
 	builder.InsertInstruction(cmp)
 	value := cmp.Return()
 	state.push(value)

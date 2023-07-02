@@ -361,14 +361,6 @@ const (
 	// OpcodeIcmpImm compares an integer value with the immediate value on the given condition: `v = icmp_imm Cond, x, Y`.
 	OpcodeIcmpImm
 
-	// OpcodeIfcmp ...
-	// `f = ifcmp x, y`.
-	OpcodeIfcmp
-
-	// OpcodeIfcmpImm ...
-	// `f = ifcmp_imm x, Y`. (BinaryImm64)
-	OpcodeIfcmpImm
-
 	// OpcodeIadd performs an integer addition.
 	// `v = Iadd x, y`.
 	OpcodeIadd
@@ -601,13 +593,8 @@ const (
 	// `v = popcnt x`.
 	OpcodePopcnt
 
-	// OpcodeFcmp ...
-	// `v = fcmp Cond, x, y`.
+	// OpcodeFcmp compares two floating point values: `v = fcmp Cond, x, y`.
 	OpcodeFcmp
-
-	// OpcodeFfcmp ...
-	// `f = ffcmp x, y`.
-	OpcodeFfcmp
 
 	// OpcodeFadd performs an floating point addition.
 	// `v = Fadd x, y`.
@@ -852,6 +839,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeIadd:     sideEffectFalse,
 	OpcodeIsub:     sideEffectFalse,
 	OpcodeIcmp:     sideEffectFalse,
+	OpcodeFcmp:     sideEffectFalse,
 	OpcodeFadd:     sideEffectFalse,
 	OpcodeSExtend:  sideEffectFalse,
 	OpcodeUExtend:  sideEffectFalse,
@@ -899,6 +887,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeIadd:     returnTypesFnSingle,
 	OpcodeIsub:     returnTypesFnSingle,
 	OpcodeIcmp:     returnTypesFnI32,
+	OpcodeFcmp:     returnTypesFnI32,
 	OpcodeFadd:     returnTypesFnSingle,
 	OpcodeFsub:     returnTypesFnSingle,
 	OpcodeF32const: returnTypesFnF32,
@@ -951,6 +940,15 @@ func (i *Instruction) AsIsub(x, y Value) {
 // AsIcmp initializes this instruction as an integer comparison instruction with OpcodeIcmp.
 func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) {
 	i.opcode = OpcodeIcmp
+	i.v = x
+	i.v2 = y
+	i.u64 = uint64(c)
+	i.typ = TypeI32
+}
+
+// AsFcmp initializes this instruction as an integer comparison instruction with OpcodeFcmp.
+func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
+	i.opcode = OpcodeFcmp
 	i.v = x
 	i.v2 = y
 	i.u64 = uint64(c)
@@ -1128,6 +1126,8 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.format(b), i.v2.format(b))
 	case OpcodeIcmp:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u64), i.v.format(b), i.v2.format(b))
+	case OpcodeFcmp:
+		instSuffix = fmt.Sprintf(" %s, %s, %s", FloatCmpCond(i.u64), i.v.format(b), i.v2.format(b))
 	case OpcodeSExtend, OpcodeUExtend:
 		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.format(b), i.u64>>8, i.u64&0xff)
 	case OpcodeCall:
@@ -1360,10 +1360,6 @@ func (o Opcode) String() (ret string) {
 		return "Icmp"
 	case OpcodeIcmpImm:
 		return "IcmpImm"
-	case OpcodeIfcmp:
-		return "Ifcmp"
-	case OpcodeIfcmpImm:
-		return "IfcmpImm"
 	case OpcodeIadd:
 		return "Iadd"
 	case OpcodeIsub:
@@ -1482,8 +1478,6 @@ func (o Opcode) String() (ret string) {
 		return "Popcnt"
 	case OpcodeFcmp:
 		return "Fcmp"
-	case OpcodeFfcmp:
-		return "Ffcmp"
 	case OpcodeFadd:
 		return "Fadd"
 	case OpcodeFsub:

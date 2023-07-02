@@ -64,3 +64,40 @@ func (i IntegerCmpCond) Signed() bool {
 		return false
 	}
 }
+
+type FloatCmpCond byte
+
+const (
+	// FloatCmpCondEqual represents "==".
+	FloatCmpCondEqual FloatCmpCond = iota
+	// FloatCmpCondNotEqual represents "!=".
+	FloatCmpCondNotEqual
+	// FloatCmpCondLessThan represents "<".
+	FloatCmpCondLessThan
+	// FloatCmpCondLessThanOrEqual represents "<=".
+	FloatCmpCondLessThanOrEqual
+	// FloatCmpCondGreaterThan represents ">".
+	FloatCmpCondGreaterThan
+	// FloatCmpCondGreaterThanOrEqual represents ">=".
+	FloatCmpCondGreaterThanOrEqual
+)
+
+// String implements fmt.Stringer.
+func (f FloatCmpCond) String() string {
+	switch f {
+	case FloatCmpCondEqual:
+		return "eq"
+	case FloatCmpCondNotEqual:
+		return "neq"
+	case FloatCmpCondLessThan:
+		return "lt"
+	case FloatCmpCondLessThanOrEqual:
+		return "le"
+	case FloatCmpCondGreaterThan:
+		return "gt"
+	case FloatCmpCondGreaterThanOrEqual:
+		return "ge"
+	default:
+		panic("invalid float comparison condition")
+	}
+}

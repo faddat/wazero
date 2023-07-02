@@ -891,6 +891,80 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret
 `,
 		},
+
+		{
+			name: "float comparisons", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Eq,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Ne,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Lt,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Gt,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Le,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Ge,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeF64Eq,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeF64Ne,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeF64Lt,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeF64Gt,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeF64Le,
+				wasm.OpcodeDrop,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeF64Ge,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{f32, f64}),
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:f32 = F32const 0.000000
+	v3:f64 = F64const 0.000000
+	v4:i32 = Fcmp eq, v2, v2
+	v5:i32 = Fcmp neq, v2, v2
+	v6:i32 = Fcmp lt, v2, v2
+	v7:i32 = Fcmp gt, v2, v2
+	v8:i32 = Fcmp le, v2, v2
+	v9:i32 = Fcmp ge, v2, v2
+	v10:i32 = Fcmp eq, v3, v3
+	v11:i32 = Fcmp neq, v3, v3
+	v12:i32 = Fcmp lt, v3, v3
+	v13:i32 = Fcmp gt, v3, v3
+	v14:i32 = Fcmp le, v3, v3
+	v15:i32 = Fcmp ge, v3, v3
+	Jump blk_ret
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
