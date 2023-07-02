@@ -134,7 +134,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	m.setCurrentInstructionGroupID(instr.GroupID())
 
 	switch instr.Opcode() {
-	// TODO: all instructions.
+	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
+		panic("BUG: branching instructions are handled by LowerBranches")
 	}
 
 	m.flushPendingInstructions()

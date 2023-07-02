@@ -53,7 +53,7 @@ func TestMachine_getOperand_NR(t *testing.T) {
 				return def, extModeZeroExtend64
 			},
 			exp:          operandNR(regToVReg(x4)),
-			instructions: []string{"mov w4, w4"},
+			instructions: []string{"mov x4, w4"},
 		},
 		{
 			name: "block param - sign extend",
