@@ -638,7 +638,7 @@ func (c *Compiler) insertJumpToBlock(args []ssa.Value, targetBlk ssa.BasicBlock)
 	builder.InsertInstruction(jmp)
 }
 
-func (c *Compiler) insertIntegerExtend(signed bool, from, to int) {
+func (c *Compiler) insertIntegerExtend(signed bool, from, to byte) {
 	state := &c.loweringState
 	builder := c.ssaBuilder
 	v := state.pop()

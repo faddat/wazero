@@ -597,7 +597,7 @@ const (
 	extModeSignExtend64
 )
 
-func (e extMode) bits() int {
+func (e extMode) bits() byte {
 	switch e {
 	case extModeZeroExtend32, extModeSignExtend32:
 		return 32
@@ -647,7 +647,29 @@ const (
 	extendOpSXTX = 0b111
 )
 
-func extendOpFrom(signed bool, from int) extendOp {
+func (e extendOp) String() string {
+	switch e {
+	case extendOpUXTB:
+		return "UXTB"
+	case extendOpUXTH:
+		return "UXTH"
+	case extendOpUXTW:
+		return "UXTW"
+	case extendOpUXTX:
+		return "UXTX"
+	case extendOpSXTB:
+		return "SXTB"
+	case extendOpSXTH:
+		return "SXTH"
+	case extendOpSXTW:
+		return "SXTW"
+	case extendOpSXTX:
+		return "SXTX"
+	}
+	panic(int(e))
+}
+
+func extendOpFrom(signed bool, from byte) extendOp {
 	switch from {
 	case 8:
 		if signed {
@@ -681,3 +703,17 @@ const (
 	shiftOpASR shiftOp = 0b10
 	shiftOpROR shiftOp = 0b11
 )
+
+func (s shiftOp) String() string {
+	switch s {
+	case shiftOpLSL:
+		return "LSL"
+	case shiftOpLSR:
+		return "LSR"
+	case shiftOpASR:
+		return "ASR"
+	case shiftOpROR:
+		return "ROR"
+	}
+	panic(int(s))
+}

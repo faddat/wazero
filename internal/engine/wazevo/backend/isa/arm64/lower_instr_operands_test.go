@@ -230,6 +230,197 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 	}
 }
 
+func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
+	type testCase struct {
+		name         string
+		setup        func(*mockCompilationContext, ssa.Builder, *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T))
+		exp          operand
+		instructions []string
+	}
+	runner := func(tc testCase) {
+		ctx, b, m := newSetupWithMockContext()
+		def, mode, verify := tc.setup(ctx, b, m)
+		actual := m.getOperand_ER_SR_NR(def, mode)
+		require.Equal(t, tc.exp, actual)
+		verify(t)
+		require.Equal(t, strings.Join(tc.instructions, "\n"), formatEmittedInstructions(m))
+	}
+
+	t.Run("block param", func(t *testing.T) {
+		runner(testCase{
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+				blk := builder.CurrentBlock()
+				v := blk.AddParam(builder, ssa.TypeI64)
+				def = &backend.SSAValueDefinition{BlkParamVReg: regToVReg(x4), BlockParamValue: v}
+				return def, extModeZeroExtend64, func(t *testing.T) {}
+			},
+			exp: operandNR(regToVReg(x4)),
+		})
+	})
+
+	t.Run("mode none", func(t *testing.T) {
+		for _, c := range []struct {
+			from, to byte
+			signed   bool
+			exp      operand
+		}{
+			{from: 8, to: 32, signed: true, exp: operandER(backend.VReg(10), extendOpSXTB, 32)},
+			{from: 16, to: 32, signed: true, exp: operandER(backend.VReg(10), extendOpSXTH, 32)},
+			{from: 8, to: 32, signed: false, exp: operandER(backend.VReg(10), extendOpUXTB, 32)},
+			{from: 16, to: 32, signed: false, exp: operandER(backend.VReg(10), extendOpUXTH, 32)},
+			{from: 8, to: 64, signed: true, exp: operandER(backend.VReg(10), extendOpSXTB, 64)},
+			{from: 16, to: 64, signed: true, exp: operandER(backend.VReg(10), extendOpSXTH, 64)},
+			{from: 32, to: 64, signed: true, exp: operandER(backend.VReg(10), extendOpSXTW, 64)},
+			{from: 8, to: 64, signed: false, exp: operandER(backend.VReg(10), extendOpUXTB, 64)},
+			{from: 16, to: 64, signed: false, exp: operandER(backend.VReg(10), extendOpUXTH, 64)},
+			{from: 32, to: 64, signed: false, exp: operandER(backend.VReg(10), extendOpUXTW, 64)},
+		} {
+			runner(testCase{
+				setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+					blk := builder.CurrentBlock()
+					v := blk.AddParam(builder, ssa.TypeI64)
+					ext := builder.AllocateInstruction()
+					if c.signed {
+						ext.AsSExtend(v, c.from, c.to)
+					} else {
+						ext.AsUExtend(v, c.from, c.to)
+					}
+					builder.InsertInstruction(ext)
+					ctx.vRegMap[ext.Arg()] = backend.VReg(10)
+					def = &backend.SSAValueDefinition{Instr: ext, N: 0}
+					return def, extModeNone, func(t *testing.T) {
+						_, ok := ctx.lowered[ext]
+						require.True(t, ok)
+					}
+				},
+				exp: c.exp,
+			})
+		}
+	})
+
+	t.Run("valid mode", func(t *testing.T) {
+		const argVReg, resultVReg = backend.VReg(10), backend.VReg(11)
+		for _, c := range []struct {
+			name     string
+			from, to byte
+			signed   bool
+			mode     extMode
+			exp      operand
+			lowered  bool
+		}{
+			{
+				name: "8->16->32: signed",
+				from: 8, to: 16, signed: true, mode: extModeSignExtend32,
+				exp:     operandER(argVReg, extendOpSXTB, 32),
+				lowered: true,
+			},
+			{
+				name: "8->16->32: unsigned",
+				from: 8, to: 16, signed: false, mode: extModeZeroExtend32,
+				exp:     operandER(argVReg, extendOpUXTB, 32),
+				lowered: true,
+			},
+			{
+				name: "8->32->64: signed",
+				from: 8, to: 32, signed: true, mode: extModeSignExtend64,
+				exp:     operandER(argVReg, extendOpSXTB, 64),
+				lowered: true,
+			},
+			{
+				name: "16->32->64: signed",
+				from: 16, to: 32, signed: true, mode: extModeSignExtend64,
+				exp:     operandER(argVReg, extendOpSXTH, 64),
+				lowered: true,
+			},
+			{
+				name: "8->32->64: unsigned",
+				from: 8, to: 32, signed: false, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpUXTB, 64),
+				lowered: true,
+			},
+			{
+				name: "16->32->64: unsigned",
+				from: 16, to: 32, signed: false, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpUXTH, 64),
+				lowered: true,
+			},
+			{
+				name: "8->16->64: signed",
+				from: 8, to: 16, signed: true, mode: extModeSignExtend64,
+				exp:     operandER(argVReg, extendOpSXTB, 64),
+				lowered: true,
+			},
+			{
+				name: "8->16->64: unsigned",
+				from: 8, to: 16, signed: false, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpUXTB, 64),
+				lowered: true,
+			},
+			// Not lowered cases.
+			{
+				name: "8-signed->16-zero->64",
+				from: 8, to: 16, signed: true, mode: extModeZeroExtend64,
+				exp:     operandER(resultVReg, extendOpUXTH, 64),
+				lowered: false,
+			},
+			{
+				name: "8-signed->32-zero->64",
+				from: 8, to: 32, signed: true, mode: extModeZeroExtend64,
+				exp:     operandER(resultVReg, extendOpUXTW, 64),
+				lowered: false,
+			},
+			{
+				name: "16-signed->32-zero->64",
+				from: 16, to: 32, signed: true, mode: extModeZeroExtend64,
+				exp:     operandER(resultVReg, extendOpUXTW, 64),
+				lowered: false,
+			},
+			{
+				name: "8-zero->16-signed->64",
+				from: 8, to: 16, signed: false, mode: extModeSignExtend64,
+				exp:     operandER(resultVReg, extendOpSXTH, 64),
+				lowered: false,
+			},
+			{
+				name: "8-zero->32-signed->64",
+				from: 8, to: 32, signed: false, mode: extModeSignExtend64,
+				exp:     operandER(resultVReg, extendOpSXTW, 64),
+				lowered: false,
+			},
+			{
+				name: "16-zero->32-signed->64",
+				from: 16, to: 32, signed: false, mode: extModeSignExtend64,
+				exp:     operandER(resultVReg, extendOpSXTW, 64),
+				lowered: false,
+			},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				runner(testCase{
+					setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+						blk := builder.CurrentBlock()
+						v := blk.AddParam(builder, ssa.TypeI64)
+						ext := builder.AllocateInstruction()
+						if c.signed {
+							ext.AsSExtend(v, c.from, c.to)
+						} else {
+							ext.AsUExtend(v, c.from, c.to)
+						}
+						builder.InsertInstruction(ext)
+						ctx.vRegMap[ext.Arg()] = argVReg
+						ctx.vRegMap[ext.Return()] = resultVReg
+						def = &backend.SSAValueDefinition{Instr: ext, N: 0}
+						return def, c.mode, func(t *testing.T) {
+							_, ok := ctx.lowered[ext]
+							require.Equal(t, c.lowered, ok)
+						}
+					},
+					exp: c.exp,
+				})
+			})
+		}
+	})
+}
+
 func TestMachine_getOperand_Imm12_ER_SR_NR(t *testing.T) {
 	for _, tc := range []struct {
 		name         string

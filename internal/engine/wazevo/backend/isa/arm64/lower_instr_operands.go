@@ -5,6 +5,8 @@ package arm64
 // the source instructions into an operand whenever possible.
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -34,6 +36,25 @@ const (
 	operandKindImm12
 )
 
+// String implements fmt.Stringer for debugging.
+func (o operand) String() string {
+	switch o.kind {
+	case operandKindNR:
+		return fmt.Sprintf("r%d", o.nr())
+	case operandKindSR:
+		r, amt, sop := o.sr()
+		return fmt.Sprintf("r%d, #%d, %s", r, amt, sop)
+	case operandKindER:
+		r, eop, to := o.er()
+		return fmt.Sprintf("r%d, %s, %d", r, eop, to)
+	case operandKindImm12:
+		imm12, shiftBit := o.imm12()
+		return fmt.Sprintf("#%d<<#%d", imm12, 12*shiftBit)
+	default:
+		panic(fmt.Sprintf("unknown operand kind: %d", o.kind))
+	}
+}
+
 // operandNR encodes the given VReg as an operand of operandKindNR.
 func operandNR(r backend.VReg) operand {
 	return operand{kind: operandKindNR, data: uint64(r)}
@@ -45,8 +66,13 @@ func (o operand) nr() backend.VReg {
 }
 
 // operandER encodes the given VReg as an operand of operandKindER.
-func operandER(r backend.VReg, eop extendOp, to int) operand {
+func operandER(r backend.VReg, eop extendOp, to byte) operand {
 	return operand{kind: operandKindER, data: uint64(r) | uint64(eop)<<32 | uint64(to)<<40}
+}
+
+// er decodes the underlying VReg, extend operation, and the target size assuming the operand is of operandKindER.
+func (o operand) er() (r backend.VReg, eop extendOp, to byte) {
+	return backend.VReg(o.data), extendOp(o.data >> 32), byte(o.data >> 40)
 }
 
 // operandSR encodes the given VReg as an operand of operandKindSR.
@@ -104,31 +130,29 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 
 		signed := extInstr.Opcode() == ssa.OpcodeSExtend
 		innerExtFromBits, innerExtToBits := extInstr.ExtendFromToBits()
+		if mode == extModeNone {
+			eop := extendOpFrom(signed, innerExtFromBits)
+			op = operandER(m.ctx.VRegOf(extInstr.Arg()), eop, innerExtToBits)
+			m.ctx.MarkLowered(extInstr) // We merged the instruction in the operand.
+			return
+		}
+
 		modeBits, modeSigned := mode.bits(), mode.signed()
-		if innerExtToBits < modeBits {
-			panic("BUG: need the results of inner extension to be larger than the mode")
+		if innerExtToBits >= modeBits {
+			panic("BUG?TODO?: need the results of inner extension to be larger than the mode")
 		}
 
 		switch {
-		case !signed && !modeSigned:
-			// Two zero extensions are equivalent to one zero extension for the larger size.
-			eop := extendOpFrom(false, innerExtFromBits)
+		case (!signed && !modeSigned) || (signed && modeSigned):
+			// Two sign/zero extensions are equivalent to one sign/zero extension for the larger size.
+			eop := extendOpFrom(modeSigned, innerExtFromBits)
 			op = operandER(m.ctx.VRegOf(extInstr.Arg()), eop, modeBits)
 			m.ctx.MarkLowered(extInstr) // We merged the instruction in the operand.
-		case signed && modeSigned:
-			// Two signed extension is equivalent to one signed extension for the larger size.
-			eop := extendOpFrom(true, innerExtFromBits)
-			op = operandER(m.ctx.VRegOf(extInstr.Arg()), eop, modeBits)
-			m.ctx.MarkLowered(extInstr) // We merged the instruction in the operand.
-		case signed && !modeSigned:
-			// We need to zero-extend the result of the signed extension.
-			eop := extendOpFrom(false, innerExtToBits)
+		case (signed && !modeSigned) || (!signed && modeSigned):
+			// We need to {sign, zero}-extend the result of the {zero,sign} extension.
+			eop := extendOpFrom(modeSigned, innerExtToBits)
 			op = operandER(m.ctx.VRegOf(extInstr.Return()), eop, modeBits)
-			// Note: we failed to merge the inner extension instruction this case.
-		case !signed && modeSigned:
-			eop := extendOpFrom(true, innerExtToBits)
-			op = operandER(m.ctx.VRegOf(extInstr.Return()), eop, modeBits)
-			// Note: we failed to merge the inner extension instruction this case.
+			// Note that we failed to merge the inner extension instruction this case.
 		}
 		return
 	}
@@ -145,7 +169,7 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 
 	if m.matchInstr(def, ssa.OpcodeIshl) {
 		// Check if the shift amount is constant instruction.
-		targetVal, amountVal, _ := def.Instr.Args()
+		targetVal, amountVal := def.Instr.Arg2()
 		amountDef := m.ctx.ValueDefinition(amountVal)
 		if amountDef.IsFromInstr() && amountDef.Instr.Constant() {
 			// If that is the case, we can use the shifted register operand (SR).

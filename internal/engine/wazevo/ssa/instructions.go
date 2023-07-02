@@ -740,7 +740,7 @@ const (
 	// OpcodeUExtend zero-extends the given integer: `v = UExtend x, from->to`.
 	OpcodeUExtend
 
-	// OpcodeSExtend sign-extends the given integer: `v = SExtend x`.
+	// OpcodeSExtend sign-extends the given integer: `v = SExtend x, from->to`.
 	OpcodeSExtend
 
 	// OpcodeFpromote ...
@@ -1088,7 +1088,7 @@ func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
 }
 
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
-func (i *Instruction) AsSExtend(v Value, from, to int) {
+func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
 	i.v = v
 	i.u64 = uint64(from)<<8 | uint64(to)
@@ -1100,7 +1100,7 @@ func (i *Instruction) AsSExtend(v Value, from, to int) {
 }
 
 // AsUExtend initializes this instruction as an unsigned extension instruction with OpcodeUExtend.
-func (i *Instruction) AsUExtend(v Value, from, to int) {
+func (i *Instruction) AsUExtend(v Value, from, to byte) {
 	i.opcode = OpcodeUExtend
 	i.v = v
 	i.u64 = uint64(from)<<8 | uint64(to)
@@ -1112,9 +1112,9 @@ func (i *Instruction) AsUExtend(v Value, from, to int) {
 }
 
 // ExtendFromToBits returns the from and to bit size for the extension instruction.
-func (i *Instruction) ExtendFromToBits() (from, to int) {
-	from = int(i.u64 >> 8)
-	to = int(i.u64)
+func (i *Instruction) ExtendFromToBits() (from, to byte) {
+	from = byte(i.u64 >> 8)
+	to = byte(i.u64)
 	return
 }
 
