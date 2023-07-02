@@ -896,6 +896,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeTrap:     returnTypesFnNoReturns,
 	OpcodeReturn:   returnTypesFnNoReturns,
 	OpcodeBrz:      returnTypesFnNoReturns,
+	OpcodeBrnz:     returnTypesFnNoReturns,
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
@@ -966,6 +967,11 @@ func (i *Instruction) AsIshl(x, amount Value) {
 // IcmpData returns the operands and comparison condition of this integer comparison instruction.
 func (i *Instruction) IcmpData() (x, y Value, c IntegerCmpCond) {
 	return i.v, i.v2, IntegerCmpCond(i.u64)
+}
+
+// FcmpData returns the operands and comparison condition of this floating-point comparison instruction.
+func (i *Instruction) FcmpData() (x, y Value, c FloatCmpCond) {
+	return i.v, i.v2, FloatCmpCond(i.u64)
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.

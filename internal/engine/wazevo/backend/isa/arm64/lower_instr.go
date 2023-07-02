@@ -54,7 +54,7 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 	cvalDef := m.ctx.ValueDefinition(cval)
 
 	switch {
-	case m.matchInstr(cvalDef, ssa.OpcodeIcmp):
+	case m.matchInstr(cvalDef, ssa.OpcodeIcmp): // This case, we can use the ALU flag set by SUBS instruction.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.IcmpData()
 		cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
@@ -78,7 +78,7 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 		rm := m.getOperand_Imm12_ER_SR_NR(m.ctx.ValueDefinition(y), extMod)
 
 		alu := m.allocateInstr()
-		// subs zr, rn, rm!
+		// subs zr, rn, rm
 		alu.asALU(
 			aluOpSubS,
 			// We don't need the result, just need to set flags.
@@ -88,19 +88,54 @@ func (m *machine) lowerConditionalBranch(b *ssa.Instruction) {
 			bits == 64,
 		)
 		m.insert2(alu, cbr)
-	case m.matchInstr(cvalDef, ssa.OpcodeFcmp):
-		// TODO: this should be able to share the code in the above case.
-		panic("TODO")
+		m.ctx.MarkLowered(cvalDef.Instr)
+	case m.matchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
+		cvalInstr := cvalDef.Instr
+		x, y, c := cvalInstr.FcmpData()
+		cc := condFlagFromSSAFloatCmpCond(c)
+		if b.Opcode() == ssa.OpcodeBrz {
+			cc = cc.invert()
+		}
+
+		if x.Type() != y.Type() {
+			panic("TODO(maybe): support icmp with different types")
+		}
+
+		rn := m.getOperand_NR(m.ctx.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.ctx.ValueDefinition(y), extModeNone)
+		cmp := m.allocateInstr()
+		cmp.asFpuCmp(rn, rm, x.Type().Bits() == 64)
+		cbr := m.allocateInstr()
+		cbr.asCondBr(cc.asCond(), target)
+		m.insert2(cmp, cbr)
+		m.ctx.MarkLowered(cvalDef.Instr)
 	default:
-		panic("TODO")
+		rn := m.getOperand_NR(cvalDef, extModeNone)
+		var c cond
+		if b.Opcode() == ssa.OpcodeBrz {
+			c = registerAsRegZeroCond(rn.nr())
+		} else {
+			c = registerAsRegNonZeroCond(rn.nr())
+		}
+		cbr := m.allocateInstr()
+		cbr.asCondBr(c, target)
+		m.insert(cbr)
 	}
 }
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	op := instr.Opcode()
+	switch op {
+	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
+		return
+	}
+
 	m.setCurrentInstructionGroupID(instr.GroupID())
 
-	// TODO: lowering logic.
+	switch instr.Opcode() {
+	// TODO: all instructions.
+	}
 
 	m.flushPendingInstructions()
 }

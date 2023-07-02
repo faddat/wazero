@@ -164,6 +164,7 @@ func (c condFlag) String() string {
 	}
 }
 
+// condFlagFromSSAIntegerCmpCond returns the condition flag for the given ssa.IntegerCmpCond.
 func condFlagFromSSAIntegerCmpCond(c ssa.IntegerCmpCond) condFlag {
 	switch c {
 	case ssa.IntegerCmpCondEqual:
@@ -186,6 +187,26 @@ func condFlagFromSSAIntegerCmpCond(c ssa.IntegerCmpCond) condFlag {
 		return hi
 	case ssa.IntegerCmpCondUnsignedLessThanOrEqual:
 		return ls
+	default:
+		panic(c)
+	}
+}
+
+// condFlagFromSSAFloatCmpCond returns the condition flag for the given ssa.FloatCmpCond.
+func condFlagFromSSAFloatCmpCond(c ssa.FloatCmpCond) condFlag {
+	switch c {
+	case ssa.FloatCmpCondEqual:
+		return eq
+	case ssa.FloatCmpCondNotEqual:
+		return ne
+	case ssa.FloatCmpCondLessThan:
+		return mi
+	case ssa.FloatCmpCondLessThanOrEqual:
+		return ls
+	case ssa.FloatCmpCondGreaterThan:
+		return gt
+	case ssa.FloatCmpCondGreaterThanOrEqual:
+		return ge
 	default:
 		panic(c)
 	}

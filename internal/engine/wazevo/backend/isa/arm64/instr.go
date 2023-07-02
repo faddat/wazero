@@ -88,6 +88,14 @@ func (i *instruction) asLoadFpuConst64(rd backend.VReg, raw uint64) {
 	i.rd = operandNR(rd)
 }
 
+func (i *instruction) asFpuCmp(rn, rm operand, is64bit bool) {
+	i.kind = fpuCmp
+	i.rn, i.rm = rn, rm
+	if is64bit {
+		i.u1 = 1
+	}
+}
+
 // asALU setups a basic ALU instruction.
 func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand, dst64bit bool) {
 	switch rm.kind {
@@ -129,21 +137,38 @@ func (i *instruction) asExtend(rd, rn backend.VReg, fromBits, toBits byte, signe
 
 // String implements fmt.Stringer.
 func (i *instruction) String() (str string) {
+	is64SizeBitToSize := func(u3 uint64) byte {
+		if u3 == 0 {
+			return 32
+		}
+		return 64
+	}
+
 	switch i.kind {
 	case nop0:
 		str = "nop0"
 	case nop4:
 		panic("TODO")
 	case aluRRR:
-		panic("TODO")
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
+			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size))
 	case aluRRRR:
 		panic("TODO")
 	case aluRRImm12:
-		panic("TODO")
+		size := is64SizeBitToSize(i.u3)
+		v, shiftBit := i.rm.imm12()
+		if shiftBit == 1 {
+			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(),
+				formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), v<<12)
+		} else {
+			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(),
+				formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), v)
+		}
 	case aluRRBitmaskImm:
-		is32bit := i.u3 == 0
-		rd, rn := formatVRegSized(i.rd.nr(), is32bit), formatVRegSized(i.rn.nr(), is32bit)
-		if is32bit {
+		size := is64SizeBitToSize(i.u3)
+		rd, rn := formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size)
+		if size == 32 {
 			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, uint32(i.u2))
 		} else {
 			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, i.u2)
@@ -187,21 +212,26 @@ func (i *instruction) String() (str string) {
 	case mov32:
 		panic("TODO")
 	case movZ:
-		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
 	case movN:
-		str = fmt.Sprintf("movn %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("movn %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
 	case movK:
-		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), i.u3 == 0), uint16(i.u1), i.u2*16)
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
 	case extend:
 		fromBits, toBits := i.u1, i.u2
 		if fromBits == 32 && toBits == 64 {
 			if i.u3 == 0 { // unsigned
 				str = fmt.Sprintf("mov %s, %s",
-					formatVRegSized(i.rd.nr(), true), formatVRegSized(i.rn.nr(), true))
+					formatVRegSized(i.rd.nr(), 64), formatVRegSized(i.rn.nr(), 32))
 			} else {
 				str = fmt.Sprintf("sxtw %s, %s",
-					formatVRegSized(i.rd.nr(), false), formatVRegSized(i.rn.nr(), true))
+					formatVRegSized(i.rd.nr(), 64), formatVRegSized(i.rn.nr(), 32))
 			}
+		} else {
+			panic("TODO")
 		}
 	case cSel:
 		panic("TODO")
@@ -223,10 +253,10 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case fpuRRRR:
 		panic("TODO")
-	case fpuCmp32:
-		panic("TODO")
-	case fpuCmp64:
-		panic("TODO")
+	case fpuCmp:
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("fcmp %s, %s",
+			formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size))
 	case fpuLoad32:
 		panic("TODO")
 	case fpuStore32:
@@ -410,10 +440,8 @@ const (
 	fpuRRI
 	// fpuRRRR represents a 3-op FPU instruction.
 	fpuRRRR
-	// fpuCmp32 represents a FPU comparison, single-precision (32 bit).
-	fpuCmp32
-	// fpuCmp64 represents a FPU comparison, double-precision (64 bit).
-	fpuCmp64
+	// fpuCmp represents a FPU comparison, either 32 or 64 bit.
+	fpuCmp
 	// fpuLoad32 represents a floating-point load, single-precision (32 bit).
 	fpuLoad32
 	// fpuStore32 represents a floating-point store, single-precision (32 bit).
@@ -525,7 +553,7 @@ func (a aluOp) String() string {
 	case aluOpAddS:
 		return "adds"
 	case aluOpSubS:
-		return "sub"
+		return "subs"
 	case aluOpSMulH:
 		return "sMulH"
 	case aluOpUMulH:

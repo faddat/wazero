@@ -4,8 +4,10 @@ package ssa
 type IntegerCmpCond byte
 
 const (
+	// IntegerCmpCondInvalid represents an invalid condition.
+	IntegerCmpCondInvalid IntegerCmpCond = iota
 	// IntegerCmpCondEqual represents "==".
-	IntegerCmpCondEqual IntegerCmpCond = iota
+	IntegerCmpCondEqual
 	// IntegerCmpCondNotEqual represents "!=".
 	IntegerCmpCondNotEqual
 	// IntegerCmpCondSignedLessThan represents Signed "<".
@@ -68,8 +70,10 @@ func (i IntegerCmpCond) Signed() bool {
 type FloatCmpCond byte
 
 const (
+	// FloatCmpCondInvalid represents an invalid condition.
+	FloatCmpCondInvalid FloatCmpCond = iota
 	// FloatCmpCondEqual represents "==".
-	FloatCmpCondEqual FloatCmpCond = iota
+	FloatCmpCondEqual
 	// FloatCmpCondNotEqual represents "!=".
 	FloatCmpCondNotEqual
 	// FloatCmpCondLessThan represents "<".

@@ -47,6 +47,42 @@ const (
 	x29
 	x30
 
+	// Vector purpose registers. Note that we do not distinguish vn and dn, ... registers
+	// because they are the same from the perspective of register allocator, and
+	// the size can be determined by the type of the instruction.
+
+	v0
+	v1
+	v2
+	v3
+	v4
+	v5
+	v6
+	v7
+	v8
+	v9
+	v10
+	v11
+	v12
+	v13
+	v14
+	v15
+	v16
+	v17
+	v18
+	v19
+	v20
+	v21
+	v22
+	v23
+	v24
+	v25
+	v26
+	v27
+	v28
+	v29
+	v30
+
 	// Special registers
 
 	wzr
@@ -97,6 +133,37 @@ var regNames = [...]string{
 	wsp: "wsp",
 	sp:  "sp",
 	lr:  "lr",
+	v0:  "v0",
+	v1:  "v1",
+	v2:  "v2",
+	v3:  "v3",
+	v4:  "v4",
+	v5:  "v5",
+	v6:  "v6",
+	v7:  "v7",
+	v8:  "v8",
+	v9:  "v9",
+	v10: "v10",
+	v11: "v11",
+	v12: "v12",
+	v13: "v13",
+	v14: "v14",
+	v15: "v15",
+	v16: "v16",
+	v17: "v17",
+	v18: "v18",
+	v19: "v19",
+	v20: "v20",
+	v21: "v21",
+	v22: "v22",
+	v23: "v23",
+	v24: "v24",
+	v25: "v25",
+	v26: "v26",
+	v27: "v27",
+	v28: "v28",
+	v29: "v29",
+	v30: "v30",
 }
 
 func formatVReg(r backend.VReg) string {
@@ -107,11 +174,24 @@ func formatVReg(r backend.VReg) string {
 	}
 }
 
-func formatVRegSized(r backend.VReg, _32bit bool) (ret string) {
+func formatVRegSized(r backend.VReg, size byte) (ret string) {
 	if r.RealReg() != backend.RealRegInvalid {
 		ret = regNames[r.RealReg()]
-		if _32bit {
-			ret = strings.Replace(ret, "x", "w", 1)
+		switch ret[0] {
+		case 'x':
+			switch size {
+			case 32:
+				ret = strings.Replace(ret, "x", "w", 1)
+			}
+		case 'v':
+			switch size {
+			case 32:
+				ret = strings.Replace(ret, "v", "w", 1)
+			case 64:
+				ret = strings.Replace(ret, "v", "d", 1)
+			default:
+				panic("TODO")
+			}
 		}
 	} else {
 		ret = r.String()
