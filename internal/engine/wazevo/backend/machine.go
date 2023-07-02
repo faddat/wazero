@@ -40,6 +40,7 @@ type (
 		Reset()
 
 		// Format returns the string representation of the currently compiled machine code.
+		// This is only for testing purpose.
 		Format() string
 	}
 

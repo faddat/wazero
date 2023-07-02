@@ -174,7 +174,7 @@ func (m *machine) setCurrentInstructionGroupID(gid ssa.InstructionGroupID) {
 	m.currentGID = gid
 }
 
-// Format returns the string representation of the currently compiled machine code.
+// Format implements backend.Machine.
 func (m *machine) Format() string {
 	begins := map[*instruction]label{}
 	for l, pos := range m.labelPositions {
@@ -202,5 +202,5 @@ func (m *machine) Format() string {
 		}
 		lines = append(lines, "\t"+cur.String())
 	}
-	return strings.Join(lines, "\n")
+	return "\n" + strings.Join(lines, "\n") + "\n"
 }

@@ -33,7 +33,10 @@ func TestE2E(t *testing.T) {
 	}
 
 	for _, tc := range []testCase{
-		{name: "empty", m: testcases.Empty.Module},
+		{name: "empty", m: testcases.Empty.Module, targetIndex: 0, afterLowering: `
+L1 (SSA Block: blk0):
+	ret
+`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			od := wazevoapi.NewOffsetData(tc.m)
