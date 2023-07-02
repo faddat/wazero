@@ -47,7 +47,7 @@ const (
 	x29
 	x30
 
-	// Vector purpose registers. Note that we do not distinguish vn and dn, ... registers
+	// Vector registers. Note that we do not distinguish vn and dn, ... registers
 	// because they are the same from the perspective of register allocator, and
 	// the size can be determined by the type of the instruction.
 

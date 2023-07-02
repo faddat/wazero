@@ -29,14 +29,13 @@ func (m *machine) lowerSingleBranch(br *ssa.Instruction) {
 		panic("TODO: support block args: insert phi moves")
 	}
 
-	targetLabel := m.getOrAllocateSSABlockLabel(targetBlk)
-
 	switch br.Opcode() {
 	case ssa.OpcodeJump:
 		if br.IsFallthroughJump() {
 			return
 		}
 		b := m.allocateInstr()
+		targetLabel := m.getOrAllocateSSABlockLabel(targetBlk)
 		b.asBr(targetLabel.asBranchTarget())
 		m.insert(b)
 	case ssa.OpcodeBrTable:

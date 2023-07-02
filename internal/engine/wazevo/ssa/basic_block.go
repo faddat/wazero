@@ -112,6 +112,15 @@ func (bb *basicBlock) Name() string {
 	}
 }
 
+// String implements fmt.Stringer for debugging.
+func (bid BasicBlockID) String() string {
+	if bid == basicBlockIDReturnBlock {
+		return "blk_ret"
+	} else {
+		return fmt.Sprintf("blk%d", bid)
+	}
+}
+
 // ID implements BasicBlock.ID.
 func (bb *basicBlock) ID() BasicBlockID {
 	return bb.id

@@ -23,6 +23,9 @@ type Compiler interface {
 	// Compile lowers the state stored in ssa.Builder into the ISA-specific machine code.
 	Compile() ([]byte, error)
 
+	// Format returns the string representation of the currently compiled machine code.
+	Format() string
+
 	// Reset should be called to allow this Compiler to use for the next function.
 	Reset()
 }
@@ -48,11 +51,15 @@ type compiler struct {
 
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile() ([]byte, error) {
-	c.assignVirtualRegisters()
-	c.mach.StartFunction(c.ssaBuilder.Blocks())
-	c.lowerBlocks()
-	c.mach.EndFunction()
 	return nil, nil
+}
+
+// lower lowers the SSA-level instructions into the ISA-specific machine code.
+func (c *compiler) lower() {
+	c.assignVirtualRegisters()
+	c.mach.StartLoweringFunction(c.ssaBuilder.Blocks())
+	c.lowerBlocks()
+	c.mach.EndLoweringFunction()
 }
 
 // lowerBlocks lowers each block in the ssa.Builder.
@@ -190,4 +197,9 @@ func (c *compiler) ValueDefinition(value ssa.Value) *SSAValueDefinition {
 // VRegOf implements CompilationContext.VRegOf.
 func (c *compiler) VRegOf(value ssa.Value) VReg {
 	return c.ssaValuesToVRegs[value.ID()]
+}
+
+// Format implements Compiler.Format.
+func (c *compiler) Format() string {
+	return c.mach.Format()
 }

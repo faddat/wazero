@@ -72,7 +72,11 @@ func (i *instruction) asCondBr(c cond, target branchTarget) {
 }
 
 func (i *instruction) asBr(target branchTarget) {
-	i.kind = condBr
+	if target.label() == returnLabel {
+		i.kind = ret
+		return
+	}
+	i.kind = br
 	i.u1 = target.asUint64()
 }
 
@@ -322,7 +326,7 @@ func (i *instruction) String() (str string) {
 	case callInd:
 		panic("TODO")
 	case ret:
-		panic("TODO")
+		str = "ret"
 	case epiloguePlaceholder:
 		panic("TODO")
 	case br:

@@ -2,6 +2,8 @@ package arm64
 
 import (
 	"fmt"
+	"math"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -22,8 +24,7 @@ type (
 		// ssaBlockIDToLabels maps an SSA block ID to the label.
 		ssaBlockIDToLabels []label
 		// labelToInstructions maps a label to the instructions of the region which the label represents.
-		labelPositions    map[label]*labelPosition
-		labelPositionPool wazevoapi.Pool[labelPosition]
+		labelPositions map[label]*labelPosition
 	}
 
 	// label represents a position in the generated code which is either
@@ -36,7 +37,10 @@ type (
 	labelPosition struct{ begin, end *instruction }
 )
 
-const invalidLabel = 0
+const (
+	invalidLabel = 0
+	returnLabel  = math.MaxUint32
+)
 
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
@@ -54,6 +58,9 @@ func (m *machine) Reset() {
 	m.currentSSABlk = nil
 	m.nextLabel = invalidLabel
 	m.pendingInstructions = m.pendingInstructions[:0]
+	for _, v := range m.labelPositions {
+		v.begin, v.end = nil, nil
+	}
 }
 
 // allocateLabel allocates an unused label.
@@ -67,16 +74,16 @@ func (m *machine) SetCompilationContext(ctx backend.CompilationContext) {
 	m.ctx = ctx
 }
 
-// StartFunction implements backend.Machine.
-func (m *machine) StartFunction(n int) {
+// StartLoweringFunction implements backend.Machine.
+func (m *machine) StartLoweringFunction(n int) {
 	if len(m.ssaBlockIDToLabels) <= n {
 		// Eagerly allocate labels for the blocks since the underlying slice will be used for the next iteration.
 		m.ssaBlockIDToLabels = append(m.ssaBlockIDToLabels, make([]label, n)...)
 	}
 }
 
-// EndFunction implements backend.Machine.
-func (m *machine) EndFunction() {}
+// EndLoweringFunction implements backend.Machine.
+func (m *machine) EndLoweringFunction() {}
 
 // StartBlock implements backend.Machine.
 func (m *machine) StartBlock(blk ssa.BasicBlock) {
@@ -90,7 +97,13 @@ func (m *machine) StartBlock(blk ssa.BasicBlock) {
 
 	end := m.allocateNop()
 	m.insertAtHead(end)
-	m.labelPositions[l] = &labelPosition{end, end}
+
+	labelPos, ok := m.labelPositions[l]
+	if !ok {
+		labelPos = &labelPosition{}
+		m.labelPositions[l] = labelPos
+	}
+	labelPos.begin, labelPos.end = end, end
 }
 
 func (m *machine) insert(i *instruction) {
@@ -146,6 +159,9 @@ func (m *machine) allocateNop() *instruction {
 }
 
 func (m *machine) getOrAllocateSSABlockLabel(blk ssa.BasicBlock) label {
+	if blk.ReturnBlock() {
+		return returnLabel
+	}
 	l := m.ssaBlockIDToLabels[blk.ID()]
 	if l == invalidLabel {
 		l = m.allocateLabel()
@@ -156,4 +172,35 @@ func (m *machine) getOrAllocateSSABlockLabel(blk ssa.BasicBlock) label {
 
 func (m *machine) setCurrentInstructionGroupID(gid ssa.InstructionGroupID) {
 	m.currentGID = gid
+}
+
+// Format returns the string representation of the currently compiled machine code.
+func (m *machine) Format() string {
+	begins := map[*instruction]label{}
+	for l, pos := range m.labelPositions {
+		begins[pos.begin] = l
+	}
+
+	irBlocks := map[label]ssa.BasicBlockID{}
+	for i, l := range m.ssaBlockIDToLabels {
+		irBlocks[l] = ssa.BasicBlockID(i)
+	}
+
+	var lines []string
+	for cur := m.head; cur != nil; cur = cur.next {
+		if l, ok := begins[cur]; ok {
+			var labelStr string
+			if blkID, ok := irBlocks[l]; ok {
+				labelStr = fmt.Sprintf("%s (SSA Block: %s):", l, blkID)
+			} else {
+				labelStr = fmt.Sprintf("%s:", l)
+			}
+			lines = append(lines, labelStr)
+		}
+		if cur.kind == nop0 {
+			continue
+		}
+		lines = append(lines, "\t"+cur.String())
+	}
+	return strings.Join(lines, "\n")
 }

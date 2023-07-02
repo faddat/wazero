@@ -232,7 +232,6 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 
 func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 	type testCase struct {
-		name         string
 		setup        func(*mockCompilationContext, ssa.Builder, *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T))
 		exp          operand
 		instructions []string

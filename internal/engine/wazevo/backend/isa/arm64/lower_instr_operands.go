@@ -31,7 +31,7 @@ const (
 	// operandKindER represents "Extended Register (ER). This is a register which is sign/zero-extended to a larger size.
 	// Some of the arm64 instructions can take this kind of operand.
 	operandKindER
-	// operandKindImm12 represents "Immediate 12" (Imm12). This is a 12-bit immediate value which can be either shifted or not.
+	// operandKindImm12 represents "Immediate 12" (Imm12). This is a 12-bit immediate value which can be either shifted by 12 or not.
 	// See asImm12 function for detail.
 	operandKindImm12
 )

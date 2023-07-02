@@ -27,7 +27,7 @@ func (b branchTarget) label() label {
 }
 
 func (l label) asBranchTarget() branchTarget {
-	return branchTarget(l<<1) | branchTarget(branchTargetKindLabel)
+	return branchTarget(l)<<1 | branchTarget(branchTargetKindLabel)
 }
 
 func (b branchTarget) offset() int64 {

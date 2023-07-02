@@ -14,7 +14,7 @@ func TestMachine_lowerConditionalBranch(t *testing.T) {
 		brz bool, intCond ssa.IntegerCmpCond, floatCond ssa.FloatCmpCond,
 		ctx *mockCompilationContext, builder ssa.Builder, m *machine,
 	) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.StartFunction(10)
+		m.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		isInt := intCond != ssa.IntegerCmpCondInvalid
 
@@ -60,7 +60,7 @@ func TestMachine_lowerConditionalBranch(t *testing.T) {
 	}
 
 	icmpInSameGroupFromParamAndImm12 := func(brz bool, ctx *mockCompilationContext, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.StartFunction(10)
+		m.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		v1 := entry.AddParam(builder, ssa.TypeI32)
 
@@ -101,7 +101,7 @@ func TestMachine_lowerConditionalBranch(t *testing.T) {
 		{
 			name: "icmp in different group",
 			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-				m.StartFunction(10)
+				m.StartLoweringFunction(10)
 				entry := builder.CurrentBlock()
 				v1, v2 := entry.AddParam(builder, ssa.TypeI64), entry.AddParam(builder, ssa.TypeI64)
 
@@ -193,6 +193,57 @@ func TestMachine_lowerConditionalBranch(t *testing.T) {
 			verify(t)
 			require.Equal(t, strings.Join(tc.instructions, "\n"),
 				formatEmittedInstructions(m))
+		})
+	}
+}
+
+func TestMachine_lowerSingleBranch(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		setup        func(*mockCompilationContext, ssa.Builder, *machine) (instr *ssa.Instruction)
+		instructions []string
+	}{
+		{
+			name: "jump-fallthrough",
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
+				jump := builder.AllocateInstruction()
+				jump.AsJump(nil, builder.AllocateBasicBlock())
+				builder.InsertInstruction(jump)
+				jump.AsFallthroughJump()
+				return jump
+			},
+			instructions: []string{}, // Fallthrough jump should be optimized out.
+		},
+		{
+			name: "b",
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
+				m.StartLoweringFunction(10)
+				jump := builder.AllocateInstruction()
+				jump.AsJump(nil, builder.AllocateBasicBlock())
+				builder.InsertInstruction(jump)
+				return jump
+			},
+			instructions: []string{"b L1"},
+		},
+		{
+			name: "ret",
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
+				m.StartLoweringFunction(10)
+				jump := builder.AllocateInstruction()
+				jump.AsJump(nil, builder.ReturnBlock())
+				builder.InsertInstruction(jump)
+				return jump
+			},
+			// Jump which targets the return block should be translated as "ret".
+			instructions: []string{"ret"},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, b, m := newSetupWithMockContext()
+			instr := tc.setup(ctx, b, m)
+			m.lowerSingleBranch(instr)
+			require.Equal(t, strings.Join(tc.instructions, "\n"), formatEmittedInstructions(m))
 		})
 	}
 }

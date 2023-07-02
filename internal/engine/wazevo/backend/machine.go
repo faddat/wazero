@@ -9,12 +9,12 @@ type (
 		// This is only called once per Machine, i.e. before the first compilation.
 		SetCompilationContext(CompilationContext)
 
-		// StartFunction is called when the compilation of the given function is started.
-		// n is the number of ssa.BasicBlock(s) existing in the function.
-		StartFunction(n int)
+		// StartLoweringFunction is called when the lowering of the given function is started.
+		// numBlks is the number of ssa.BasicBlock(s) existing in the function.
+		StartLoweringFunction(numBlks int)
 
-		// EndFunction is called when the compilation of the current function is finished.
-		EndFunction()
+		// EndLoweringFunction is called when the lowering of the current function is finished.
+		EndLoweringFunction()
 
 		// StartBlock is called when the compilation of the given block is started.
 		StartBlock(ssa.BasicBlock)
@@ -38,6 +38,9 @@ type (
 
 		// Reset resets the machine state for the next compilation.
 		Reset()
+
+		// Format returns the string representation of the currently compiled machine code.
+		Format() string
 	}
 
 	// CompilationContext is passed to MachineBackend to perform the lowering in the machine specific backend by
