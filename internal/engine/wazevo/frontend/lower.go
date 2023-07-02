@@ -191,6 +191,36 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(isub)
 		value := isub.Return()
 		state.push(value)
+	case wasm.OpcodeI64Extend8S:
+		if state.unreachable {
+			return
+		}
+		c.insertIntegerExtend(true, 8, 64)
+	case wasm.OpcodeI64Extend16S:
+		if state.unreachable {
+			return
+		}
+		c.insertIntegerExtend(true, 16, 64)
+	case wasm.OpcodeI64Extend32S, wasm.OpcodeI64ExtendI32S:
+		if state.unreachable {
+			return
+		}
+		c.insertIntegerExtend(true, 32, 64)
+	case wasm.OpcodeI64ExtendI32U:
+		if state.unreachable {
+			return
+		}
+		c.insertIntegerExtend(false, 32, 64)
+	case wasm.OpcodeI32Extend8S:
+		if state.unreachable {
+			return
+		}
+		c.insertIntegerExtend(true, 8, 32)
+	case wasm.OpcodeI32Extend16S:
+		if state.unreachable {
+			return
+		}
+		c.insertIntegerExtend(true, 16, 32)
 	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
 		if state.unreachable {
 			return
@@ -606,6 +636,21 @@ func (c *Compiler) insertJumpToBlock(args []ssa.Value, targetBlk ssa.BasicBlock)
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
 	builder.InsertInstruction(jmp)
+}
+
+func (c *Compiler) insertIntegerExtend(signed bool, from, to int) {
+	state := &c.loweringState
+	builder := c.ssaBuilder
+	v := state.pop()
+	extend := builder.AllocateInstruction()
+	if signed {
+		extend.AsSExtend(v, from, to)
+	} else {
+		extend.AsUExtend(v, from, to)
+	}
+	builder.InsertInstruction(extend)
+	value := extend.Return()
+	state.push(value)
 }
 
 func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {

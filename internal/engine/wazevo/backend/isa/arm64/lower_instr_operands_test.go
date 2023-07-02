@@ -109,7 +109,9 @@ func TestMachine_getOperand_NR(t *testing.T) {
 }
 
 func TestMachine_getOperand_SR_NR(t *testing.T) {
-	ishlWithConstAmount := func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
+	ishlWithConstAmount := func(
+		ctx *mockCompilationContext, builder ssa.Builder, m *machine,
+	) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
 		blk := builder.CurrentBlock()
 		// (p1+p2) << amount
 		p1 := blk.AddParam(builder, ssa.TypeI64)
@@ -138,28 +140,34 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 		ctx.vRegMap[ishl.Return()] = backend.VReg(10)
 		def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
 		mode = extModeNone
+		verify = func(t *testing.T) {
+			_, ok := ctx.lowered[ishl]
+			require.True(t, ok)
+			_, ok = ctx.lowered[amount]
+			require.True(t, ok)
+		}
 		return
 	}
 
 	for _, tc := range []struct {
 		name         string
-		setup        func(*mockCompilationContext, ssa.Builder, *machine) (def *backend.SSAValueDefinition, mode extMode)
+		setup        func(*mockCompilationContext, ssa.Builder, *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T))
 		exp          operand
 		instructions []string
 	}{
 		{
 			name: "block param",
-			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
 				blk := builder.CurrentBlock()
 				v := blk.AddParam(builder, ssa.TypeI64)
 				def = &backend.SSAValueDefinition{BlkParamVReg: regToVReg(x4), BlockParamValue: v}
-				return def, extModeNone
+				return def, extModeNone, func(t *testing.T) {}
 			},
 			exp: operandNR(regToVReg(x4)),
 		},
 		{
 			name: "ishl but not const amount",
-			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
 				blk := builder.CurrentBlock()
 				// (p1+p2) << p3
 				p1 := blk.AddParam(builder, ssa.TypeI64)
@@ -181,7 +189,7 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 
 				ctx.vRegMap[ishl.Return()] = backend.VReg(10)
 				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
-				return def, extModeNone
+				return def, extModeNone, func(t *testing.T) {}
 			},
 			exp: operandNR(backend.VReg(10)),
 		},
@@ -192,18 +200,20 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 		},
 		{
 			name: "ishl with const amount but group id is different",
-			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
-				def, mode = ishlWithConstAmount(ctx, builder, m)
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+				def, mode, _ = ishlWithConstAmount(ctx, builder, m)
 				m.currentGID = 1230
+				verify = func(t *testing.T) { require.Equal(t, 0, len(ctx.lowered)) }
 				return
 			},
 			exp: operandNR(backend.VReg(10)),
 		},
 		{
 			name: "ishl with const amount but ref count is larger than 1",
-			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode) {
-				def, mode = ishlWithConstAmount(ctx, builder, m)
+			setup: func(ctx *mockCompilationContext, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+				def, mode, _ = ishlWithConstAmount(ctx, builder, m)
 				def.RefCount = 10
+				verify = func(t *testing.T) { require.Equal(t, 0, len(ctx.lowered)) }
 				return
 			},
 			exp: operandNR(backend.VReg(10)),
@@ -211,9 +221,10 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
-			def, mode := tc.setup(ctx, b, m)
+			def, mode, verify := tc.setup(ctx, b, m)
 			actual := m.getOperand_SR_NR(def, mode)
 			require.Equal(t, tc.exp, actual)
+			verify(t)
 			require.Equal(t, strings.Join(tc.instructions, "\n"), formatEmittedInstructions(m))
 		})
 	}

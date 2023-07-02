@@ -845,6 +845,52 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret
 `,
 		},
+		{
+			name: "integer extension", m: singleFunctionModule(vv, []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64ExtendI32S,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64ExtendI32U,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64Extend8S,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64Extend16S,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64Extend32S,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Extend8S,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Extend16S,
+				wasm.OpcodeDrop,
+
+				wasm.OpcodeEnd,
+			}, []wasm.ValueType{i32, i64}),
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x0
+	v3:i64 = Iconst_64 0x0
+	v4:i64 = SExtend v2, 32->64
+	v5:i64 = UExtend v2, 32->64
+	v6:i64 = SExtend v3, 8->64
+	v7:i64 = SExtend v3, 16->64
+	v8:i64 = SExtend v3, 32->64
+	v9:i32 = SExtend v2, 8->32
+	v10:i32 = SExtend v2, 16->32
+	Jump blk_ret
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

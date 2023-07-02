@@ -53,7 +53,6 @@ type mockCompilationContext struct {
 
 func newMockCompilationContext() *mockCompilationContext {
 	return &mockCompilationContext{
-		vRegCounter: 0,
 		vRegMap:     make(map[ssa.Value]backend.VReg),
 		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
 		lowered:     make(map[*ssa.Instruction]bool),

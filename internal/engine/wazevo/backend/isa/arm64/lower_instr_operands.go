@@ -1,8 +1,8 @@
 package arm64
 
 // This file contains the logic to "find and determine operands" for instructions.
-// In order to finalize the form of an operand, we might end up merging
-// the source instructions into one whenever possible.
+// In order to finalize the form of an operand, we might end up merging/eliminating
+// the source instructions into an operand whenever possible.
 
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -44,6 +44,11 @@ func (o operand) nr() backend.VReg {
 	return backend.VReg(o.data)
 }
 
+// operandER encodes the given VReg as an operand of operandKindER.
+func operandER(r backend.VReg, eop extendOp, to int) operand {
+	return operand{kind: operandKindER, data: uint64(r) | uint64(eop)<<32 | uint64(to)<<40}
+}
+
 // operandSR encodes the given VReg as an operand of operandKindSR.
 func operandSR(r backend.VReg, amt byte, sop shiftOp) operand {
 	if sop != shiftOpLSL {
@@ -79,6 +84,7 @@ func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mod
 	instr := def.Instr
 	if instr.Opcode() == ssa.OpcodeIconst {
 		if imm12, shift, ok := asImm12(instr.ConstantVal()); ok {
+			m.ctx.MarkLowered(instr)
 			return operandImm12(imm12, shift)
 		}
 	}
@@ -89,15 +95,42 @@ func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mod
 //
 // `mode` is used to extend the operand if the bit length is smaller than mode.bits().
 func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
-	if def.IsFromInstr() {
+	if def.IsFromBlockParam() {
 		return operandNR(def.BlkParamVReg)
 	}
 
-	switch {
-	case m.matchInstr(def, ssa.OpcodeSextend):
-		panic("TODO: can be zero-extended register operand")
-	case m.matchInstr(def, ssa.OpcodeUextend):
-		panic("TODO: can be sign-extended register operand")
+	if m.matchInstr(def, ssa.OpcodeSExtend) || m.matchInstr(def, ssa.OpcodeUExtend) {
+		extInstr := def.Instr
+
+		signed := extInstr.Opcode() == ssa.OpcodeSExtend
+		innerExtFromBits, innerExtToBits := extInstr.ExtendFromToBits()
+		modeBits, modeSigned := mode.bits(), mode.signed()
+		if innerExtToBits < modeBits {
+			panic("BUG: need the results of inner extension to be larger than the mode")
+		}
+
+		switch {
+		case !signed && !modeSigned:
+			// Two zero extensions are equivalent to one zero extension for the larger size.
+			eop := extendOpFrom(false, innerExtFromBits)
+			op = operandER(m.ctx.VRegOf(extInstr.Arg()), eop, modeBits)
+			m.ctx.MarkLowered(extInstr) // We merged the instruction in the operand.
+		case signed && modeSigned:
+			// Two signed extension is equivalent to one signed extension for the larger size.
+			eop := extendOpFrom(true, innerExtFromBits)
+			op = operandER(m.ctx.VRegOf(extInstr.Arg()), eop, modeBits)
+			m.ctx.MarkLowered(extInstr) // We merged the instruction in the operand.
+		case signed && !modeSigned:
+			// We need to zero-extend the result of the signed extension.
+			eop := extendOpFrom(false, innerExtToBits)
+			op = operandER(m.ctx.VRegOf(extInstr.Return()), eop, modeBits)
+			// Note: we failed to merge the inner extension instruction this case.
+		case !signed && modeSigned:
+			eop := extendOpFrom(true, innerExtToBits)
+			op = operandER(m.ctx.VRegOf(extInstr.Return()), eop, modeBits)
+			// Note: we failed to merge the inner extension instruction this case.
+		}
+		return
 	}
 	return m.getOperand_SR_NR(def, mode)
 }
@@ -118,6 +151,8 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 			// If that is the case, we can use the shifted register operand (SR).
 			c := amountDef.Instr.ConstantVal() & 63 // Clears the unnecessary bits.
 			vreg := m.ctx.VRegOf(targetVal)
+			m.ctx.MarkLowered(def.Instr)
+			m.ctx.MarkLowered(amountDef.Instr)
 			return operandSR(vreg, byte(c), shiftOpLSL)
 		}
 	}
@@ -136,6 +171,7 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 		if instr.Constant() {
 			// We inline all the constant instructions so that we could reduce the register usage.
 			v = m.lowerConstant(instr)
+			m.ctx.MarkLowered(instr)
 		} else {
 			if n := def.N; n == 0 {
 				v = m.ctx.VRegOf(instr.Return())

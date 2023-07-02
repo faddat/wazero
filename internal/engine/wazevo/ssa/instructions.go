@@ -79,6 +79,16 @@ func (i *Instruction) Args() (v1, v2 Value, vs []Value) {
 	return i.v, i.v2, i.vs
 }
 
+// Arg returns the first argument to this instruction.
+func (i *Instruction) Arg() Value {
+	return i.v
+}
+
+// Arg2 returns the first two argument2 to this instruction.
+func (i *Instruction) Arg2() (Value, Value) {
+	return i.v, i.v2
+}
+
 // Next returns the next instruction laid out next to itself.
 func (i *Instruction) Next() *Instruction {
 	return i.next
@@ -727,13 +737,11 @@ const (
 	// `v = widening_pairwise_dot_product_s x, y`.
 	OpcodeWideningPairwiseDotProductS
 
-	// OpcodeUextend ...
-	// `v = uextend x`.
-	OpcodeUextend
+	// OpcodeUExtend zero-extends the given integer: `v = UExtend x, from->to`.
+	OpcodeUExtend
 
-	// OpcodeSextend ...
-	// `v = sextend x`.
-	OpcodeSextend
+	// OpcodeSExtend sign-extends the given integer: `v = SExtend x`.
+	OpcodeSExtend
 
 	// OpcodeFpromote ...
 	// `v = fpromote x`.
@@ -845,6 +853,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeIsub:     sideEffectFalse,
 	OpcodeIcmp:     sideEffectFalse,
 	OpcodeFadd:     sideEffectFalse,
+	OpcodeSExtend:  sideEffectFalse,
+	OpcodeUExtend:  sideEffectFalse,
 	OpcodeFsub:     sideEffectFalse,
 	OpcodeF32const: sideEffectFalse,
 	OpcodeF64const: sideEffectFalse,
@@ -866,9 +876,11 @@ func (i *Instruction) HasSideEffects() bool {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeIshl:   returnTypesFnSingle,
-	OpcodeJump:   returnTypesFnNoReturns,
-	OpcodeIconst: returnTypesFnSingle,
+	OpcodeIshl:    returnTypesFnSingle,
+	OpcodeJump:    returnTypesFnNoReturns,
+	OpcodeIconst:  returnTypesFnSingle,
+	OpcodeSExtend: returnTypesFnSingle,
+	OpcodeUExtend: returnTypesFnSingle,
 	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.v)
 		sig, ok := b.signatures[sigID]
@@ -1075,6 +1087,37 @@ func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
 	sig.used = true
 }
 
+// AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
+func (i *Instruction) AsSExtend(v Value, from, to int) {
+	i.opcode = OpcodeSExtend
+	i.v = v
+	i.u64 = uint64(from)<<8 | uint64(to)
+	if to == 64 {
+		i.typ = TypeI64
+	} else {
+		i.typ = TypeI32
+	}
+}
+
+// AsUExtend initializes this instruction as an unsigned extension instruction with OpcodeUExtend.
+func (i *Instruction) AsUExtend(v Value, from, to int) {
+	i.opcode = OpcodeUExtend
+	i.v = v
+	i.u64 = uint64(from)<<8 | uint64(to)
+	if to == 64 {
+		i.typ = TypeI64
+	} else {
+		i.typ = TypeI32
+	}
+}
+
+// ExtendFromToBits returns the from and to bit size for the extension instruction.
+func (i *Instruction) ExtendFromToBits() (from, to int) {
+	from = int(i.u64 >> 8)
+	to = int(i.u64)
+	return
+}
+
 // Format returns a string representation of this instruction with the given builder.
 // For debugging purposes only.
 func (i *Instruction) Format(b Builder) string {
@@ -1085,6 +1128,8 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.format(b), i.v2.format(b))
 	case OpcodeIcmp:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u64), i.v.format(b), i.v2.format(b))
+	case OpcodeSExtend, OpcodeUExtend:
+		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.format(b), i.u64>>8, i.u64&0xff)
 	case OpcodeCall:
 		vs := make([]string, len(i.vs))
 		for idx := range vs {
@@ -1503,10 +1548,10 @@ func (o Opcode) String() (ret string) {
 		return "IaddPairwise"
 	case OpcodeWideningPairwiseDotProductS:
 		return "WideningPairwiseDotProductS"
-	case OpcodeUextend:
-		return "Uextend"
-	case OpcodeSextend:
-		return "Sextend"
+	case OpcodeUExtend:
+		return "UExtend"
+	case OpcodeSExtend:
+		return "SExtend"
 	case OpcodeFpromote:
 		return "Fpromote"
 	case OpcodeFdemote:

@@ -608,6 +608,15 @@ func (e extMode) bits() int {
 	}
 }
 
+func (e extMode) signed() bool {
+	switch e {
+	case extModeSignExtend32, extModeSignExtend64:
+		return true
+	default:
+		return false
+	}
+}
+
 func extModeOf(t ssa.Type, signed bool) extMode {
 	switch t.Bits() {
 	case 32:
@@ -637,6 +646,32 @@ const (
 	extendOpSXTW = 0b110
 	extendOpSXTX = 0b111
 )
+
+func extendOpFrom(signed bool, from int) extendOp {
+	switch from {
+	case 8:
+		if signed {
+			return extendOpSXTB
+		}
+		return extendOpUXTB
+	case 16:
+		if signed {
+			return extendOpSXTH
+		}
+		return extendOpUXTH
+	case 32:
+		if signed {
+			return extendOpSXTW
+		}
+		return extendOpUXTW
+	case 64:
+		if signed {
+			return extendOpSXTX
+		}
+		return extendOpUXTX
+	}
+	panic("invalid extendOpFrom")
+}
 
 type shiftOp byte
 
